@@ -201,6 +201,20 @@ class TestImport(unittest.TestCase):
         with self.assertRaises(ValueError):
             pal.apply_import(bank(), items)
 
+    def test_reimporting_an_export_is_all_already_there(self):
+        b = bank()
+        d = tempfile.mkdtemp()
+        try:
+            for name, write in (("x.csv", pal.save_palette), ("x.gpl", pal.write_gpl)):
+                path = os.path.join(d, name)
+                write(path, b)
+                items = pal.plan_import(b, pal.read_import_file(path))
+                self.assertTrue(items)
+                # the CSV carries the retired yarn marked retired, so it's "same" too
+                self.assertEqual({i.kind for i in items}, {pal.SAME}, name)
+        finally:
+            shutil.rmtree(d)
+
     def test_suggest_name(self):
         taken = {pal.name_key(n) for n in ("Light Teal", "Light Teal 2")}
         self.assertEqual(pal.suggest_name("Light Teal", taken), "Light Teal 3")

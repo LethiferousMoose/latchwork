@@ -25,6 +25,12 @@ def swatch_image(colors, w=30, h=16, slots=None):
     return img
 
 
+def _round_rect(c, x0, y0, x1, y1, r, **kw):
+    pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1, x1 - r, y1,
+           x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
+    return c.create_polygon(pts, smooth=True, **kw)
+
+
 def center_on(win, parent):
     win.update_idletasks()
     x = parent.winfo_rootx() + (parent.winfo_width() - win.winfo_width()) // 2
@@ -206,6 +212,12 @@ class PaletteWindow(tk.Toplevel):
             messagebox.showinfo("Import", "No colors found in that file.", parent=self)
             return
         items = pal.plan_import(self.app.bank, entries)
+        if all(it.kind == pal.SAME for it in items):
+            messagebox.showinfo(
+                "Import", "Everything in %s is already in your palette (%d color%s).\n\n"
+                "Nothing to import." % (os.path.basename(path), len(items),
+                                        "" if len(items) == 1 else "s"), parent=self)
+            return
         if not ImportDialog(self, self.app.bank, items, os.path.basename(path)).confirmed:
             return
         new = pal.apply_import(self.app.bank, items)
@@ -355,12 +367,18 @@ class ImportDialog(tk.Toplevel):
         self.minsize(700, 420)
         self.transient(parent)
 
-        self.summary = tk.Label(self, font=("Segoe UI", 11), bg=BG, anchor="w", justify="left")
-        self.summary.pack(fill="x")
+        head = tk.Frame(self, bg=BG)
+        head.pack(fill="x")
+        tk.Label(head, text="Import from %s" % filename, font=("Segoe UI", 15, "bold"),
+                 bg=BG).pack(side="left")
+        tk.Label(head, text="   %d color%s in the file" % (len(items), "" if len(items) == 1 else "s"),
+                 font=("Segoe UI", 11), bg=BG, fg="#555").pack(side="left", pady=(5, 0))
+        self.badges = tk.Canvas(self, height=30, bg=BG, highlightthickness=0)
+        self.badges.pack(fill="x", pady=(8, 4))
         tk.Label(self, font=("Segoe UI", 9), bg=BG, fg="#555", anchor="w",
-                 text="Swatches: file's color on the left, your yarn's on the right. Select rows "
+                 text="Swatches: the file's color on the left, your yarn's on the right. Select rows "
                       "and pick an action below. Nothing changes until you press Import.").pack(
-            fill="x", pady=(2, 6))
+            fill="x", pady=(0, 6))
 
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True)
@@ -386,8 +404,9 @@ class ImportDialog(tk.Toplevel):
                                        width=30)
         self.action_box.pack(side="left", padx=6)
         self.action_box.bind("<<ComboboxSelected>>", lambda e: self.set_action())
-        ttk.Button(ctl, text="Select all like this", command=self.select_kind).pack(side="left")
-        tk.Label(ctl, text="New name", font=UI_FONT, bg=BG).pack(side="left", padx=(16, 4))
+        ttk.Button(ctl, text="Select all like this", command=self.select_kind).pack(
+            side="left", padx=(6, 0), ipadx=8)
+        tk.Label(ctl, text="New name", font=UI_FONT, bg=BG).pack(side="left", padx=(24, 4))
         self.name_var = tk.StringVar()
         self.name_entry = ttk.Entry(ctl, textvariable=self.name_var, width=24)
         self.name_entry.pack(side="left")
@@ -428,18 +447,51 @@ class ImportDialog(tk.Toplevel):
         for i, it in enumerate(self.shown):
             label = pal.ACTION_LABELS[it.action]
             if it.needs_name:
-                label += ": " + (pal.clean_name(it.new_name) or "?")
+                n = pal.clean_name(it.new_name)
+                label = 'Add as "%s"' % n if n else "Add as … (type a name)"
             self.tree.set(str(i), "action", label)
-        counts = {}
-        for it in self.items:
-            key = "already there" if it.kind == pal.SAME else pal.ACTION_LABELS[it.action].lower()
-            counts[key] = counts.get(key, 0) + 1
-        self.summary.config(text="%d colors in file:  %s" % (
-            len(self.items), "   ·   ".join("%s %d" % (k, v) for k, v in sorted(counts.items()))))
         problems = pal.import_problems(self.bank, self.items)
+        self.draw_badges(problems)
         self.problems.config(text="\n".join(problems[:4]) + (
             "\n... and %d more" % (len(problems) - 4) if len(problems) > 4 else ""))
         self.ok.state(["disabled"] if problems else ["!disabled"])
+
+    # (outcome key, label, text/outline color, fill)
+    BADGES = (("add", "Add", "#1B5E20", "#DCEFDD"),
+              ("update", "Update", "#0D47A1", "#DCE8F7"),
+              ("skip", "Skip", "#424242", "#E4E4E4"),
+              ("same", "Already there", "#616161", "#F7F7F7"),
+              ("problem", "Needs attention", "#B71C1C", "#F9DEDE"))
+
+    @staticmethod
+    def outcome_of(it):
+        if it.kind == pal.SAME:
+            return "same"
+        if it.action in ("add", "keep_both", "add_named"):
+            return "add"
+        if it.action in ("skip", "keep_mine"):
+            return "skip"
+        return "update"
+
+    def draw_badges(self, problems):
+        counts = {}
+        for it in self.items:
+            o = self.outcome_of(it)
+            counts[o] = counts.get(o, 0) + 1
+        counts["problem"] = len(problems)
+        c = self.badges
+        c.delete("all")
+        font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
+        x = 1
+        for key, label, fg, fill in self.BADGES:
+            n = counts.get(key, 0)
+            if not n and key != "add":
+                continue
+            text = "%s  %d" % (label, n)
+            w = font.measure(text) + 26
+            _round_rect(c, x, 2, x + w, 28, 12, fill=fill, outline=fg)
+            c.create_text(x + w / 2, 15, text=text, font=font, fill=fg)
+            x += w + 8
 
     def on_select(self):
         sel = self.sel_items()

@@ -276,7 +276,10 @@ def plan_import(bank, entries):
             item = ImportItem(e, DUPLICATE, by_name.get(k))
         elif k in by_name:
             ex = by_name[k]
-            kind = RETIRED if ex.retired else (SAME if ex.hex == e.hex else CLASH)
+            if ex.retired and not e.retired:
+                kind = RETIRED          # file has it active: offer to restore
+            else:
+                kind = SAME if ex.hex == e.hex else CLASH
             item = ImportItem(e, kind, ex)
         elif e.hex in by_hex:
             item = ImportItem(e, HEX_MATCH, by_hex[e.hex])
