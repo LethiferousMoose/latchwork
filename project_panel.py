@@ -11,6 +11,7 @@ BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
 IMG_W, IMG_H = 400, 250
 TRANSPARENT_SHOW = "#F7F7F7"
+TABLE_ROWS = 6     # requested table height; tables shrink on short windows
 
 
 def short_path(path, limit=62):
@@ -120,10 +121,23 @@ class ProjectPanel(tk.Frame):
     def _build_colors_tab(self):
         tab = tk.Frame(self.tabs, bg=BG, padx=4, pady=6)
         self.tabs.add(tab, text="  Colors  ")
+        # Bottom parts are packed first so a short window squeezes the table, never the buttons.
+        btns = tk.Frame(tab, bg=BG)
+        btns.pack(side="bottom", fill="x", pady=(6, 0))
+        self.assign_btn = ttk.Button(btns, text="Assign current yarn (A)", command=self.app.assign)
+        self.assign_btn.pack(side="left")
+        self.unassign_btn = ttk.Button(btns, text="Back to suggestion", command=self.app.unassign)
+        self.unassign_btn.pack(side="left", padx=6)
+        self.progress = tk.Label(btns, font=("Segoe UI", 10, "bold"), bg=BG)
+        self.progress.pack(side="right")
+        self.assigned_info = tk.Label(tab, font=UI_FONT, bg=BG, anchor="w", justify="left",
+                                      wraplength=IMG_W)
+        self.assigned_info.pack(side="bottom", fill="x", pady=(6, 0))
+
         body = tk.Frame(tab, bg=BG)
-        body.pack(fill="both", expand=True)
+        body.pack(side="top", fill="both", expand=True)
         self.tree = ttk.Treeview(body, columns=("count", "yarn", "state"), selectmode="browse",
-                                 height=8)
+                                 height=TABLE_ROWS)
         for col, text, width, anchor in (("#0", "Color", 130, "w"), ("count", "Count", 55, "e"),
                                          ("yarn", "Yarn", 145, "w"), ("state", "", 70, "w")):
             self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
@@ -135,23 +149,29 @@ class ProjectPanel(tk.Frame):
         sb.pack(side="left", fill="y")
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
 
-        self.assigned_info = tk.Label(tab, font=UI_FONT, bg=BG, anchor="w", justify="left",
-                                      wraplength=IMG_W)
-        self.assigned_info.pack(fill="x", pady=(6, 0))
-        btns = tk.Frame(tab, bg=BG)
-        btns.pack(fill="x", pady=(6, 0))
-        self.assign_btn = ttk.Button(btns, text="Assign current yarn (A)", command=self.app.assign)
-        self.assign_btn.pack(side="left")
-        self.unassign_btn = ttk.Button(btns, text="Back to suggestion", command=self.app.unassign)
-        self.unassign_btn.pack(side="left", padx=6)
-        self.progress = tk.Label(btns, font=("Segoe UI", 10, "bold"), bg=BG)
-        self.progress.pack(side="right")
-
     def _build_plan_tab(self):
         tab = tk.Frame(self.tabs, bg=BG, padx=4, pady=6)
         self.tabs.add(tab, text="  Plan  ")
-        sizes = tk.Frame(tab, bg=BG)
-        sizes.pack(fill="x")
+        # Same shape as the Colors tab: table on top, details and buttons below.
+        btns = tk.Frame(tab, bg=BG)
+        btns.pack(side="bottom", fill="x", pady=(8, 0))
+        ttk.Button(btns, text="Export pattern...", command=self.app.export_pattern).pack(
+            side="left")
+        ttk.Button(btns, text="Export yarn list...", command=self.app.export_yarn_list).pack(
+            side="left", padx=6)
+        ttk.Button(btns, text="Save preview image...", command=self.app.save_preview).pack(
+            side="left")
+
+        lower = tk.Frame(tab, bg=BG)
+        lower.pack(side="bottom", fill="x")
+        self.totals = tk.Label(lower, font=("Segoe UI", 10, "bold"), bg=BG, anchor="w",
+                               justify="left")
+        self.totals.pack(fill="x", pady=(6, 0))
+        self.notes = tk.Label(lower, font=("Segoe UI", 9), bg=BG, fg="#555", anchor="w",
+                              justify="left", wraplength=IMG_W)
+        self.notes.pack(fill="x")
+        sizes = tk.Frame(lower, bg=BG)
+        sizes.pack(fill="x", pady=(8, 0))
         self.size_vals = {}
         for row, key in enumerate(("Finished size", "Canvas to cut")):
             tk.Label(sizes, text=key, font=UI_FONT, bg=BG, fg="#555").grid(row=row, column=0,
@@ -159,8 +179,8 @@ class ProjectPanel(tk.Frame):
             v = tk.Label(sizes, font=("Segoe UI", 10, "bold"), bg=BG)
             v.grid(row=row, column=1, sticky="w", padx=10)
             self.size_vals[key] = v
-        tk.Label(sizes, text="3.75 holes/inch · canvas adds 3 per side, 8 at the top, "
-                             "3 + 1 empty row at the bottom", font=("Segoe UI", 8), bg=BG,
+        tk.Label(sizes, text="3.75 holes/inch \u00B7 canvas adds 3 per side, 8 top, 3 + 1 bottom",
+                 font=("Segoe UI", 8), bg=BG,
                  fg="#888", wraplength=IMG_W, justify="left").grid(row=2, column=0, columnspan=2,
                                                                    sticky="w")
         spare = tk.Frame(sizes, bg=BG)
@@ -176,9 +196,9 @@ class ProjectPanel(tk.Frame):
                  font=("Segoe UI", 9), bg=BG, fg="#666").pack(side="left")
 
         body = tk.Frame(tab, bg=BG)
-        body.pack(fill="both", expand=True, pady=(8, 0))
+        body.pack(side="top", fill="both", expand=True)
         self.plan_tree = ttk.Treeview(body, columns=("count", "need", "colors"), selectmode="none",
-                                      height=6)
+                                      height=TABLE_ROWS)
         for col, text, width, anchor in (("#0", "Yarn (assigned)", 190, "w"),
                                          ("count", "Count", 55, "e"), ("need", "Need", 95, "e"),
                                          ("colors", "Colors", 55, "e")):
@@ -190,21 +210,6 @@ class ProjectPanel(tk.Frame):
         self.plan_tree.configure(yscrollcommand=sb.set)
         self.plan_tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="left", fill="y")
-
-        self.totals = tk.Label(tab, font=("Segoe UI", 10, "bold"), bg=BG, anchor="w",
-                               justify="left")
-        self.totals.pack(fill="x", pady=(6, 0))
-        self.notes = tk.Label(tab, font=("Segoe UI", 9), bg=BG, fg="#555", anchor="w",
-                              justify="left", wraplength=IMG_W)
-        self.notes.pack(fill="x")
-        btns = tk.Frame(tab, bg=BG)
-        btns.pack(fill="x", pady=(6, 0))
-        ttk.Button(btns, text="Export pattern...", command=self.app.export_pattern).pack(
-            side="left")
-        ttk.Button(btns, text="Export yarn list...", command=self.app.export_yarn_list).pack(
-            side="left", padx=6)
-        ttk.Button(btns, text="Save preview image...", command=self.app.save_preview).pack(
-            side="left")
 
     # ---------- project ----------
     def show_welcome(self):
