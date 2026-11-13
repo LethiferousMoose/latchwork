@@ -274,6 +274,16 @@ class ProjectPanel(tk.Frame):
         # Yarn takes exactly the leftover width (no stretch), so the total never overshoots
         # the visible area by a few pixels and the horizontal scrollbar only moves when a
         # name really doesn't fit.
+        cols = ("#0", "count", "yarn", "state")
+        need = sum(int(t.column(c, "minwidth")) for c in cols) + TREE_BORDER
+        # The sidebar has a fixed width, but text grows with Windows display scaling; widen
+        # the sidebar just enough for the table (up to half the screen) instead of scrolling.
+        chrome = self.winfo_width() - t.winfo_width()
+        if t.winfo_width() > 1 and chrome > 0:
+            want = min(max(IMG_W + 60, need + chrome), self.winfo_screenwidth() // 2)
+            if want != int(self.cget("width")):
+                self.configure(width=want)
+                return   # the resize fires <Configure> again, which sizes the Yarn column
         others = sum(int(t.column(c, "width")) for c in ("#0", "count", "state"))
         avail = t.winfo_width() - TREE_BORDER - others
         t.column("yarn", width=max(int(t.column("yarn", "minwidth")), avail))
