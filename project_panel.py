@@ -119,8 +119,6 @@ class ProjectPanel(tk.Frame):
         # Bottom parts are packed first so a short window squeezes the table, never the buttons.
         btns = tk.Frame(tab, bg=BG)
         btns.pack(side="bottom", fill="x", pady=(6, 0))
-        self.unassign_btn = ttk.Button(btns, text="Back to suggestion", command=self.app.unassign)
-        self.unassign_btn.pack(side="left")
         self.progress = tk.Label(btns, font=("Segoe UI", 10, "bold"), bg=BG)
         self.progress.pack(side="right")
         info = tk.Frame(tab, bg=BG)
@@ -275,9 +273,7 @@ class ProjectPanel(tk.Frame):
             self.info_title.config(text="No color selected")
             self.info_sub.config(text="Pick a color in the list or click the image, then step "
                                       "through yarns and press Assign (A).")
-            self.unassign_btn.state(["disabled"])
             return
-        self.unassign_btn.state(["!disabled"] if c.confirmed else ["disabled"])
         yhex = c.yarn["hex"] if c.yarn else None
         key = (c.hex, yhex)
         if key not in self.row_images:

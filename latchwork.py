@@ -438,9 +438,25 @@ class App:
         else:
             self.jump_nearest()
 
-    def assign(self):
+    def assign_state(self):
+        """'none' (not assigned), 'this' (assigned to the yarn on screen) or 'other'."""
         if not (self.project and self.selected_hex and self.yarns):
+            return None
+        entry = self.project.entry(self.selected_hex)
+        if not (entry.confirmed and entry.yarn):
+            return "none"
+        y = self.yarns[self.index]
+        same = pal.name_key(entry.yarn["name"]) == y.key and entry.yarn["hex"].upper() == y.hex
+        return "this" if same else "other"
+
+    def assign(self):
+        """Toggle: assign the yarn on screen, or un-assign if it's already the assigned one."""
+        state = self.assign_state()
+        if state is None:
             self.root.bell()
+            return
+        if state == "this":
+            self.unassign()
             return
         self.project.assign(self.selected_hex, self.yarns[self.index], self.palette_name)
         self.save_project()
@@ -454,7 +470,7 @@ class App:
         self.project.suggest(self.yarns, self.palette_name)
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
-        self._goto_entry(self.project.entry(self.selected_hex))
+        self.draw_info()  # stay on the same yarn; the button flips back to "Assign"
 
     # ---------- actions ----------
     def on_hex_changed(self):
@@ -611,8 +627,10 @@ class App:
             self.target_title.config(text="Target")
         if self.project:
             self.sidebar.update_footer()
-        can_assign = bool(self.project and self.selected_hex and self.yarns)
-        self.assign_main.state(["!disabled"] if can_assign else ["disabled"])
+        state = self.assign_state()
+        self.assign_main.state(["!disabled"] if state else ["disabled"])
+        self.assign_main.config(text={"this": "\u2713 Assigned (A)",
+                                      "other": "Reassign (A)"}.get(state, "Assign (A)"))
         if not self.yarns:
             self.yarn_title.config(text="No yarns")
             self.yarn_hex_var.set("")

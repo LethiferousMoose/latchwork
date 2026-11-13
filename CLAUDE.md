@@ -128,7 +128,8 @@ saved color maps never refer to yarns that vanished.
 - One yarn can be assigned to several image colors.
 - The hex field still works for trying a color that isn't in the image.
 - Colors not yet assigned show a **suggested** nearest-L yarn (italic) from the open palette;
-  suggestions follow palette switches. **Assign (A)** locks a yarn in; "Back to suggestion" undoes.
+  suggestions follow palette switches. **Assign (A)** is a toggle for the yarn on screen:
+  Assign / ✓ Assigned (press again to undo) / Reassign (assigned to a different yarn).
   Selecting an assigned color jumps to its yarn if the open palette has it.
 - Clicking the image selects that color; the selected color is highlighted in the image (others
   faded), toggleable. Typing a hex that is in the image selects its row.
