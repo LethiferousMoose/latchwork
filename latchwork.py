@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import palette as pal
+import plan as pl
 from colormath import gray_for_lightness, nearest_index, parse_hex, rgb_to_lch, to_hex
 from palette import load_palette  # noqa: F401  (re-exported for tests and scripts)
 from palette_window import PaletteWindow
@@ -85,10 +86,11 @@ class App:
 
         root.title("Latchwork")
         root.configure(bg=BG)
-        root.minsize(780, 720)
+        root.minsize(1240, 780)
         root.columnconfigure(1, weight=1)
         root.rowconfigure(0, weight=1)
         self.sidebar = ProjectPanel(root, self)
+        self.sidebar.grid(row=0, column=0, sticky="ns")
         self.main = tk.Frame(root, bg=BG)
         self.main.grid(row=0, column=1, sticky="nsew")
         self._build_menu()
@@ -105,6 +107,9 @@ class App:
         file_menu.add_command(label="Open project...", accelerator="Ctrl+O",
                               command=self.open_project)
         file_menu.add_command(label="Close project", command=self.close_project)
+        file_menu.add_separator()
+        file_menu.add_command(label="Export yarn list...", command=self.export_yarn_list)
+        file_menu.add_command(label="Save preview image...", command=self.save_preview)
         file_menu.add_separator()
         file_menu.add_command(label="New palette...", command=self.new_palette)
         file_menu.add_command(label="Open palette...", command=self.open_palette)
@@ -168,7 +173,7 @@ class App:
 
         tk.Label(r, font=("Segoe UI", 9), bg=BG, fg="#666",
                  text="← → step lighter / darker    N nearest match    G grayscale    "
-                      "A assign to the selected image color    Enter/Esc leaves the hex field"
+                      "A assign    P original/preview    Enter/Esc leaves the hex field"
                  ).grid(
             row=6, column=0, columnspan=2, pady=(4, 10))
 
@@ -182,6 +187,8 @@ class App:
             self.root.bind_all(k, lambda e: self._key(e, self.toggle_gray))
         for k in ("a", "A"):
             self.root.bind_all(k, lambda e: self._key(e, self.assign))
+        for k in ("p", "P"):
+            self.root.bind_all(k, lambda e: self._key(e, self.sidebar.toggle_view))
         for k in ("<Return>", "<Escape>"):
             self.entry.bind(k, lambda e: self.swatch.focus_set())
 
@@ -341,9 +348,7 @@ class App:
     def show_project(self, project):
         self.project = project
         self.sidebar.set_project(project)
-        self.sidebar.grid(row=0, column=0, sticky="ns")
         self.root.title("Latchwork - %s - %s" % (project.name, self.palette_name))
-        self.root.minsize(1240, 760)
         if self.remember:
             remember_setting("project", os.path.abspath(project.path))
         first = project.colors[0].hex
@@ -353,8 +358,7 @@ class App:
     def close_project(self):
         self.project = None
         self.selected_hex = None
-        self.sidebar.grid_remove()
-        self.root.minsize(780, 720)
+        self.sidebar.show_welcome()
         if self.remember:
             remember_setting("project", None)
         self.draw_info()
@@ -441,6 +445,51 @@ class App:
     def toggle_gray(self):
         self.gray = not self.gray
         self.refresh()
+        self.sidebar.render_image()
+
+    # ---------- exports ----------
+    def _need_project(self, what):
+        if not self.project:
+            messagebox.showinfo("Latchwork", "Open a project first to %s." % what)
+            return False
+        return True
+
+    def export_yarn_list(self):
+        if not self._need_project("export its yarn list"):
+            return
+        plan = pl.Plan(self.project)
+        if not plan.lines and not messagebox.askyesno(
+                "Export yarn list", "No colors are assigned yet, so the list will be empty. "
+                                    "Export anyway?"):
+            return
+        folder, _ = os.path.split(os.path.abspath(self.project.path))
+        path = filedialog.asksaveasfilename(
+            title="Export yarn list", initialdir=folder, defaultextension=".csv",
+            initialfile="%s yarn list.csv" % self.project.name, filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        try:
+            pl.write_yarn_list(plan, path)
+        except OSError as e:
+            messagebox.showerror("Export yarn list", "Could not write %s\n\n%s" % (path, e))
+            return
+        messagebox.showinfo("Export yarn list", "Saved %d yarn%s to\n%s" % (
+            len(plan.lines), "" if len(plan.lines) == 1 else "s", path))
+
+    def save_preview(self):
+        if not self._need_project("save its preview"):
+            return
+        folder, _ = os.path.split(os.path.abspath(self.project.path))
+        path = filedialog.asksaveasfilename(
+            title="Save yarn-color preview (1 pixel per knot)", initialdir=folder,
+            defaultextension=".png", initialfile="%s preview.png" % self.project.name,
+            filetypes=[("PNG", "*.png")])
+        if not path:
+            return
+        try:
+            pl.write_preview_png(self.project, path)
+        except OSError as e:
+            messagebox.showerror("Save preview", "Could not write %s\n\n%s" % (path, e))
 
     def copy_hex(self):
         if self.yarns:

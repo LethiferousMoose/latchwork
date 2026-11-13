@@ -20,7 +20,8 @@ Keep it simple. This is a personal tool, not a product.
 - `widgets.py`: shared widgets (the GIMP-style ColorPanel used in the main view and edit dialog).
 - `pixelart.py`: exact PNG decode/encode (stdlib zlib), GIF via Tk, color counting. No Tk for PNG.
 - `project.py`: the `.latchwork` project file (embedded image, colors, assignments). No Tk.
-- `project_panel.py`: the project sidebar (image, color list, Assign).
+- `project_panel.py`: the project sidebar (image/preview, Colors and Plan tabs, Assign).
+- `plan.py`: quantities, bags, canvas size, merged colors, yarn-list CSV, preview PNG. No Tk.
 - `pattern_template.html`: template for the exported phone/print pattern.
 - `palette.csv`: the yarn palette (see below).
 - `export_palette.py`: GIMP 2.10 Python-Fu script that produced `palette.csv` from `AllColors.xcf`.
@@ -143,8 +144,12 @@ saved color maps never refer to yarns that vanished.
   from**, for information only. Opening a project never forces or prompts a palette switch.
 
 ## Stage 4: Preview and planning
-- **Yarn-color preview:** the image redrawn with the assigned yarn colors, next to the original.
-  The grayscale toggle applies here too.
+- **Yarn-color preview:** an Original / Yarn preview switch above the sidebar image (P). Assigned
+  colors show their yarn; **unassigned colors stay original** (my process). A "Mark unassigned"
+  toggle stripes the unassigned areas. Grayscale and the selected-color highlight apply too.
+- Everything lives on the main screen: a **Plan** tab next to **Colors** in the sidebar; with no
+  project open the sidebar shows New project / Open project buttons. Only exports are also in
+  the File menu.
 - **Merged-color note** when two image colors share a yarn. Informational only, since sometimes
   that's what I want.
 - **Yarn quantities:**
@@ -161,7 +166,8 @@ saved color maps never refer to yarns that vanished.
       hook into.
 - **Export yarn list** (CSV): yarn name, brand, hex, knots, bags or pieces, which image colors
   use it, totals.
-- Optionally save the yarn-color preview as a PNG.
+- Save the yarn-color preview as a PNG (1 pixel per knot, unassigned colors original).
+- Only **assigned** colors count toward quantities; unassigned ones are listed as not counted.
 
 ## Stage 5: Pattern export (phone and print)
 - One **self-contained `.html` file** that works offline on my phone and on a computer.
