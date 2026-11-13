@@ -194,6 +194,8 @@ saved color maps never refer to yarns that vanished.
 ## UI polish pass (later, after Stage 5)
 One pass at the end instead of piecemeal tweaks. Collected so far:
 - The key hints bar at the bottom of the main window: rethink how shortcuts are shown.
+- Pattern page: maybe make the Symbols button cycle Auto / Always / Off. Symbols are hidden
+  below 7 px cells on purpose (tested: under ~6 px they turn into an unreadable texture).
 
 ## Not now
 - Yarn inventory (what I own). Maybe later, once the rest is in use.
