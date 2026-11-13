@@ -105,6 +105,9 @@ saved color maps never refer to yarns that vanished.
     name or skip.
   - Yarns in my bank but not in the file: left alone.
 - **Export** to CSV (everything, including retired) and `.gpl` (active yarns only, since .gpl has no retired flag). `.gpl` lines are `R G B<tab>Name`.
+- **File → New palette** (starts empty) and **File → Open palette** switch to a different
+  palette file. The last one opened is remembered in `latchwork_settings.json` (git-ignored),
+  falling back to `palette.csv`. The manager shows which file is being edited.
 - `palette.csv` gets a `retired` column. `L_gimp` is computed by `colormath` for new or edited
   yarns, and the file stays sorted lightest to darkest.
 
