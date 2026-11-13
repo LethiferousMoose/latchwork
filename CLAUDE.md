@@ -185,6 +185,10 @@ saved color maps never refer to yarns that vanished.
 - **Print:** an overview page plus one page per color. Large patterns are split across pages
   with labels (A1, A2…).
 
+## UI polish pass (later, after Stage 5)
+One pass at the end instead of piecemeal tweaks. Collected so far:
+- The key hints bar at the bottom of the main window: rethink how shortcuts are shown.
+
 ## Not now
 - Yarn inventory (what I own). Maybe later, once the rest is in use.
 - Brand filter. I mix brands because no single brand has enough colors.
