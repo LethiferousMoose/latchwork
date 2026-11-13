@@ -253,10 +253,7 @@ class App:
         if self.project and self.project.suggest(self.yarns, self.palette_name):
             self.save_project()
             self.sidebar.refresh_rows()
-        n_ret = len(self.bank) - len(self.yarns)
-        self.root.title("Latchwork - %s (%d yarns%s)" % (
-            os.path.basename(self.palette_path), len(self.yarns),
-            ", %d retired" % n_ret if n_ret else ""))
+        self.update_title()
         names = [y.sku for y in self.yarns]
         if keep_sku in names:
             self.index = names.index(keep_sku)
@@ -290,6 +287,14 @@ class App:
         names = [y.sku for y in self.yarns]
         if sku in names:
             self.jump_to(names.index(sku))
+
+    def update_title(self):
+        """Window title: project name first (when open), then the palette in use."""
+        n_ret = len(self.bank) - len(self.yarns)
+        pal_text = "%s (%d yarns%s)" % (self.palette_name, len(self.yarns),
+                                        ", %d retired" % n_ret if n_ret else "")
+        parts = ([self.project.name] if self.project else []) + ["Latchwork", pal_text]
+        self.root.title("  \u2013  ".join(parts))
 
     @property
     def palette_name(self):
@@ -352,7 +357,7 @@ class App:
     def show_project(self, project):
         self.project = project
         self.sidebar.set_project(project)
-        self.root.title("Latchwork - %s - %s" % (project.name, self.palette_name))
+        self.update_title()
         if self.remember:
             remember_setting("project", os.path.abspath(project.path))
         first = project.colors[0].hex
@@ -363,6 +368,7 @@ class App:
         self.project = None
         self.selected_hex = None
         self.sidebar.show_welcome()
+        self.update_title()
         if self.remember:
             remember_setting("project", None)
         self.draw_info()

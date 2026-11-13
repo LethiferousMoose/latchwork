@@ -85,8 +85,6 @@ class ProjectPanel(tk.Frame):
         # ----- shown when a project is open -----
         self.content = tk.Frame(self, bg=BG)
         c = self.content
-        self.title = tk.Label(c, font=("Segoe UI", 16, "bold"), bg=BG, anchor="w")
-        self.title.pack(fill="x")
         self.subtitle = tk.Label(c, font=("Segoe UI", 9), bg=BG, fg="#555", anchor="w",
                                  justify="left")
         self.subtitle.pack(fill="x")
@@ -224,7 +222,6 @@ class ProjectPanel(tk.Frame):
             self.scale = (max(1, min(IMG_W // w, IMG_H // h)), 1)
         else:
             self.scale = (1, math.ceil(max(w / IMG_W, h / IMG_H)))
-        self.title.config(text=project.name)
         sub = "%d × %d px  ·  %d colors  ·  %s total" % (
             w, h, len(project.colors), format(project.knots, ","))
         if project.transparent:
