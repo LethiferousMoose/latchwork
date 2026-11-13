@@ -236,10 +236,10 @@ class ProjectPanel(tk.Frame):
         keep = self.selected_hex()
         self._quiet = True
         self.tree.delete(*self.tree.get_children())
-        self.tree.column("yarn", width=145)
         for c in self.project.colors:
             self.tree.insert("", "end", iid=c.hex)
             self.update_row(c.hex, plan=False)
+        self.size_columns()
         if keep and self.tree.exists(keep):
             self.tree.selection_set(keep)
         self._quiet = False
@@ -255,14 +255,20 @@ class ProjectPanel(tk.Frame):
         name = yarn_label(c.yarn["name"], c.yarn.get("brand")) if c.yarn \
             else "(no yarns in palette)"
         state = "assigned" if c.confirmed else "nearest"
-        _fit(self.tree, "yarn", name, self._italic)
         self.tree.item(hex_, text="  " + c.hex, image=self.row_images[key],
                        values=(format(c.count, ","), name, state),
                        tags=() if c.confirmed else ("suggested",))
+        if plan:
+            self.size_columns()
         self.update_footer()
         if plan:
             self.refresh_plan()
             self.render_image()
+
+    def size_columns(self):
+        """Color, Count and status fit their contents; Yarn takes the rest (scrolls if long)."""
+        _fit_columns(self.tree, {"#0": (64, None), "count": (14, None),
+                                 "yarn": (16, self._italic), "state": (14, self._italic)})
 
     def update_footer(self):
         p = self.project
@@ -327,9 +333,7 @@ class ProjectPanel(tk.Frame):
         self.size_vals["Canvas to cut"].config(
             text="%.1f × %.1f in   (%d × %d holes)" % (ciw, cih, cw, ch))
         self.plan_tree.delete(*self.plan_tree.get_children())
-        self.plan_tree.column("#0", width=190)
         for i, l in enumerate(plan.lines):
-            _fit(self.plan_tree, "#0", "  %s" % l.label, None, extra=50)
             img = self.plan_images.get(l.hex)
             if img is None:
                 img = self.plan_images[l.hex] = _swatch(l.hex)
@@ -337,6 +341,8 @@ class ProjectPanel(tk.Frame):
                                   values=(format(l.count, ","), l.need(plan.spare)[2],
                                           len(l.colors)),
                                   tags=("merged",) if l.merged else ())
+        _fit_columns(self.plan_tree, {"#0": (42, None), "count": (14, None),
+                                      "need": (14, None), "colors": (14, None)})
         parts = ["%s assigned" % format(plan.assigned_count, ",")]
         if plan.total_packs:
             parts.append("%d pack%s" % (plan.total_packs, "" if plan.total_packs == 1 else "s"))
@@ -554,9 +560,15 @@ def _scrolled(body, tree):
     body.columnconfigure(0, weight=1)
 
 
-def _fit(tree, col, text, font=None, extra=16):
-    """Widen a column so `text` fits; never narrows it."""
-    f = font or tkfont.nametofont("TkDefaultFont")
-    need = f.measure(text) + extra
-    if need > int(tree.column(col, "width")):
-        tree.column(col, width=need)
+def _fit_columns(tree, spec):
+    """Size columns to their widest cell or heading. spec: {col: (padding px, font or None)};
+    the tree column (#0) padding should include the indent and row image."""
+    base = tkfont.nametofont("TkDefaultFont")
+    head = tkfont.nametofont("TkHeadingFont")
+    items = tree.get_children()
+    for col, (pad, font) in spec.items():
+        f = font or base
+        texts = [tree.item(i, "text") if col == "#0" else str(tree.set(i, col)) for i in items]
+        widest = max([f.measure(t) + pad for t in texts] +
+                     [head.measure(tree.heading(col, "text")) + 14])
+        tree.column(col, width=widest, minwidth=widest)
