@@ -15,6 +15,8 @@ Keep it simple. This is a personal tool, not a product.
 ## Files
 - `latchwork.py`: the app (run this).
 - `colormath.py`: the verified color math (sRGB → CIE Lab/LCh, GIMP-exact). Tests target it.
+- `palette.py`: the yarn bank (load/save, .gpl/CSV import-export, import merge rules). No Tk.
+- `palette_window.py`: the palette manager window and its dialogs.
 - `pattern_template.html`: template for the exported phone/print pattern.
 - `palette.csv`: the yarn palette (see below).
 - `export_palette.py`: GIMP 2.10 Python-Fu script that produced `palette.csv` from `AllColors.xcf`.
@@ -27,7 +29,7 @@ Keep it simple. This is a personal tool, not a product.
 - Yarn swatches are the layers inside the **Colors** group, 10×100 px each. All are solid and
   opaque. The layer name is the yarn name/SKU.
 - Not yarns, so excluded: the **Mask** layer (the target bar, `#88A048`) and **Cafe RH**
-  (dead SKU, replaced by Cafe Latte RH; it is the hidden layer).
+  (an old name for the same yarn as Cafe Latte RH; it is the hidden layer). Keep it out of the palette.
 - My old sort plug-in (`%APPDATA%\GIMP\2.10\plug-ins\soft-by-brightness.py`) used Rec. 601
   luma, which is why it didn't get the order right. Ignore it.
 - **"L" means CIE L\* exactly as shown in GIMP's LCh color selector.** Verified against GIMP:
@@ -45,10 +47,10 @@ Keep it simple. This is a personal tool, not a product.
   else agrees with L\* at one decimal place.
 
 ## Palette
-- `palette.csv` columns: `order, sku, r, g, b, hex, L_gimp, color_stddev`. RGB is 0–255.
-  198 yarns.
-- It is currently in my GIMP layer order. **First task of Stage 1: re-sort it by L\*,
-  lightest to darkest. Ties keep the layer order.**
+- `palette.csv` columns: `order, sku, r, g, b, hex, L_gimp, retired`. RGB is 0–255.
+  `retired` is `yes` or blank. `L_gimp` is written by `colormath` on every save. 198 yarns at the
+  start of Stage 2.
+- Kept sorted by L\*, lightest to darkest. Ties keep their existing order.
 - Brand comes from the name suffix: **`RH` = Red Heart, `L&T` = Loops & Threads, no suffix =
   Hershner's.** Use names exactly as they are in the layers (including any typos).
 
@@ -86,11 +88,22 @@ The yarn bank is editable from the app, not just a static CSV. Built before the 
 saved color maps never refer to yarns that vanished.
 - **Add** a yarn by hand: name + hex, with a live preview of where it lands in the L order.
 - **Edit** a yarn: rename it or fix its hex.
-- **Retire** a yarn (like Cafe RH): it stays in the file but is hidden from matching, and can be
+- **Retire** a yarn (e.g. a discontinued SKU): it stays in the file but is hidden from matching, and can be
   restored. **Delete** is only for typos and mistakes.
 - **Import** from CSV (same format as `palette.csv`) or GIMP `.gpl`. Both carry name + hex.
-  Flag duplicate names instead of silently overwriting.
-- **Export** to CSV and `.gpl`, with name + hex.
+  Import always **merges** into the one shared bank; it never removes anything. A summary is
+  shown first and nothing changes until I confirm. Names match case-insensitively.
+  - New name: added.
+  - Same name, same hex: skipped.
+  - Same name, different hex (a clash): I choose per yarn, or for all at once: keep mine, take
+    the file's, or keep both (the imported one gets a name I type, prefilled e.g. "Light Teal 2").
+  - Name matches a retired yarn: offer to restore it (with the file's hex if different).
+  - Same hex as an existing yarn under another name (maybe a rename): add as new, skip, or rename
+    the existing yarn.
+  - Placeholder names ("Index 3", "Untitled") or a name repeated within the file: flagged to
+    name or skip.
+  - Yarns in my bank but not in the file: left alone.
+- **Export** to CSV (everything, including retired) and `.gpl` (active yarns only, since .gpl has no retired flag). `.gpl` lines are `R G B<tab>Name`.
 - `palette.csv` gets a `retired` column. `L_gimp` is computed by `colormath` for new or edited
   yarns, and the file stays sorted lightest to darkest.
 
@@ -105,8 +118,13 @@ saved color maps never refer to yarns that vanished.
   **Assign** records the current yarn for it.
 - One yarn can be assigned to several image colors.
 - The hex field still works for trying a color that isn't in the image.
-- **Auto-save** the color map next to the image (e.g. `my_art.latchwork.csv`) and reload it when
-  the image is opened again.
+- **Project file** per rug, e.g. `dragon.latchwork` (small readable JSON). File → New project
+  starts from an image; File → Open loads a saved one. Auto-saves on every change. It holds:
+  - the image itself, embedded, so moving or renaming the PNG can't break the project
+  - each assignment as yarn name **plus its hex at the time**, so the project survives later
+    edits, retirements or deletions in the bank
+  - settings (spare margin etc.) and, later, progress
+- The yarn bank (`palette.csv`) stays global, shared by all projects.
 
 ## Stage 4: Preview and planning
 - **Yarn-color preview:** the image redrawn with the assigned yarn colors, next to the original.

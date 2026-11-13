@@ -1,14 +1,16 @@
 """Latchwork: match pixel-art colors to latch-hook yarns by lightness (CIE L*, as GIMP shows it).
 
-Stage 1: comparison view. Run:  python latchwork.py
+Stages 1-2: comparison view and palette manager. Run:  python latchwork.py
 """
-import csv
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import palette as pal
 from colormath import (gray_for_lightness, lch_to_rgb, nearest_index, parse_hex, rgb_to_lch,
                        to_hex)
+from palette import load_palette  # noqa: F401  (re-exported for tests and scripts)
+from palette_window import PaletteWindow
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_PALETTE = os.path.join(HERE, "palette.csv")
@@ -23,28 +25,6 @@ PANEL_BG = "#F7F7F7"
 UI_FONT = ("Segoe UI", 10)
 VALUE_FONT = ("Consolas", 11)
 TITLE_FONT = ("Segoe UI", 18, "bold")
-
-
-class Yarn:
-    def __init__(self, sku, r, g, b, L):
-        self.sku, self.rgb, self.L = sku, (r, g, b), L
-        self.hex = to_hex(r, g, b)
-        self.lch = rgb_to_lch(r, g, b)
-
-
-def load_palette(path):
-    """Read palette.csv and return yarns lightest -> darkest (stable: ties keep file order)."""
-    with open(path, newline="", encoding="utf-8-sig") as fh:
-        reader = csv.DictReader(fh)
-        missing = {"sku", "r", "g", "b", "L_gimp"} - set(reader.fieldnames or [])
-        if missing:
-            raise ValueError("palette is missing column(s): " + ", ".join(sorted(missing)))
-        yarns = [Yarn(row["sku"], int(row["r"]), int(row["g"]), int(row["b"]), float(row["L_gimp"]))
-                 for row in reader]
-    if not yarns:
-        raise ValueError("palette has no rows")
-    yarns.sort(key=lambda y: -y.L)
-    return yarns
 
 
 def display_color(rgb, gray):
@@ -131,7 +111,10 @@ class ColorPanel(tk.Frame):
 class App:
     def __init__(self, root, palette_path):
         self.root = root
-        self.yarns = []
+        self.bank = []       # every yarn in the palette file, retired ones included
+        self.yarns = []      # active yarns, lightest -> darkest: what matching and stepping use
+        self.palette_path = None
+        self.palette_window = None
         self.index = 0
         self.target = None  # (r, g, b) or None
         self.gray = False
@@ -152,7 +135,12 @@ class App:
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.destroy)
         bar.add_cascade(label="File", menu=file_menu)
+        pal_menu = tk.Menu(bar, tearoff=False)
+        pal_menu.add_command(label="Manage yarns...", accelerator="Ctrl+P",
+                             command=self.open_palette_window)
+        bar.add_cascade(label="Palette", menu=pal_menu)
         self.root.config(menu=bar)
+        self.root.bind("<Control-p>", lambda e: self.open_palette_window())
 
     def _build_ui(self):
         r = self.root
@@ -202,17 +190,20 @@ class App:
 
     def _bind_keys(self):
         # Arrows step even while typing in the hex field (it's a paste-and-go field).
-        self.root.bind_all("<Left>", lambda e: self._key(lambda: self.step(-1), always=True))
-        self.root.bind_all("<Right>", lambda e: self._key(lambda: self.step(1), always=True))
+        self.root.bind_all("<Left>", lambda e: self._key(e, lambda: self.step(-1), always=True))
+        self.root.bind_all("<Right>", lambda e: self._key(e, lambda: self.step(1), always=True))
         for k in ("n", "N", "<Home>"):
-            self.root.bind_all(k, lambda e: self._key(self.jump_nearest))
+            self.root.bind_all(k, lambda e: self._key(e, self.jump_nearest))
         for k in ("g", "G"):
-            self.root.bind_all(k, lambda e: self._key(self.toggle_gray))
+            self.root.bind_all(k, lambda e: self._key(e, self.toggle_gray))
         for k in ("<Return>", "<Escape>"):
             self.entry.bind(k, lambda e: self.swatch.focus_set())
 
-    def _key(self, action, always=False):
-        if not always and isinstance(self.root.focus_get(), (tk.Entry, ttk.Entry)):
+    def _key(self, event, action, always=False):
+        widget = event.widget
+        if not isinstance(widget, tk.Misc) or widget.winfo_toplevel() is not self.root:
+            return None  # keys in other windows (palette manager, dialogs) behave normally
+        if not always and isinstance(widget, (tk.Entry, ttk.Entry)):
             return None  # let the letter be typed
         action()
         return "break"
@@ -226,16 +217,60 @@ class App:
 
     def load(self, path):
         try:
-            yarns = load_palette(path)
-        except (OSError, ValueError, KeyError) as e:
+            bank = pal.load_palette(path)
+        except (OSError, ValueError, UnicodeDecodeError) as e:
             messagebox.showerror("Latchwork", "Could not load palette:\n%s\n\n%s" % (path, e))
             return
-        self.yarns, self.index = yarns, 0
-        self.root.title("Latchwork - %s (%d yarns)" % (os.path.basename(path), len(yarns)))
-        if self.target:
+        self.palette_path = path
+        self.index = 0
+        self._use_bank(bank, keep_sku=None)
+        if self.palette_window:
+            self.palette_window.refresh()
+
+    def _use_bank(self, bank, keep_sku):
+        self.bank = pal.sort_yarns(bank)
+        self.yarns = pal.active(self.bank)
+        n_ret = len(self.bank) - len(self.yarns)
+        self.root.title("Latchwork - %s (%d yarns%s)" % (
+            os.path.basename(self.palette_path), len(self.yarns),
+            ", %d retired" % n_ret if n_ret else ""))
+        names = [y.sku for y in self.yarns]
+        if keep_sku in names:
+            self.index = names.index(keep_sku)
+            self.refresh()
+        elif self.target:
             self.jump_nearest()
         else:
+            self.index = max(0, min(self.index, len(self.yarns) - 1))
             self.refresh()
+
+    def set_bank(self, bank):
+        """Save an edited yarn bank to the palette file and show it. Returns True on success."""
+        if not pal.active(bank):
+            messagebox.showerror("Latchwork", "At least one yarn has to stay active.",
+                                 parent=self.palette_window or self.root)
+            return False
+        try:
+            pal.save_palette(self.palette_path, bank)
+        except OSError as e:
+            messagebox.showerror("Latchwork", "Could not save %s\n\n%s" % (self.palette_path, e),
+                                 parent=self.palette_window or self.root)
+            return False
+        current = self.yarns[self.index].sku if self.yarns else None
+        self._use_bank(bank, keep_sku=current)
+        return True
+
+    def open_palette_window(self):
+        if self.palette_window:
+            self.palette_window.lift()
+            self.palette_window.focus_set()
+        else:
+            self.palette_window = PaletteWindow(self)
+
+    def jump_to_sku(self, sku):
+        names = [y.sku for y in self.yarns]
+        if sku in names:
+            self.jump_to(names.index(sku))
 
     # ---------- actions ----------
     def on_hex_changed(self):
@@ -284,6 +319,7 @@ class App:
         w, h = c.winfo_width(), c.winfo_height()
         if w < 4 or not self.yarns:
             return
+        self.index = max(0, min(self.index, len(self.yarns) - 1))
         mid = w // 2
         if self.target:
             c.create_rectangle(0, 0, mid, h, fill=display_color(self.target, self.gray), width=0)
