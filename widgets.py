@@ -13,6 +13,39 @@ UI_FONT = ("Segoe UI", 10)
 VALUE_FONT = ("Consolas", 11)
 
 
+class StatCard(tk.Frame):
+    """A small boxed readout: caption, big value, short explanatory note."""
+
+    def __init__(self, parent, caption, width=210):
+        super().__init__(parent, bg=PANEL_BG, bd=1, relief="solid", padx=14, pady=5,
+                         width=width, height=92)
+        self.pack_propagate(False)
+        tk.Label(self, text=caption, font=("Segoe UI", 9), bg=PANEL_BG, fg="#666",
+                 anchor="w").pack(fill="x")
+        self.value = tk.Label(self, font=("Segoe UI", 18, "bold"), bg=PANEL_BG, anchor="w")
+        self.value.pack(fill="x")
+        self.note = tk.Label(self, font=("Segoe UI", 9), bg=PANEL_BG, fg="#555", anchor="w")
+        self.note.pack(fill="x")
+
+    def set(self, value, note="", color="#222222"):
+        self.value.config(text=value, fg=color)
+        self.note.config(text=note)
+
+
+def describe_delta_L(dL):
+    """(value text, note, color) for yarn L minus target L."""
+    a = abs(dL)
+    value = ("%+.1f" % dL).replace("-", "−")
+    if a < 0.05:
+        return "0.0", "same lightness", "#1B5E20"
+    side = "darker" if dL < 0 else "lighter"
+    if a <= 1:
+        return value, "very close · yarn is a touch %s" % side, "#1B5E20"
+    if a <= 3:
+        return value, "close · yarn is a bit %s" % side, "#8A5A00"
+    return value, "yarn is noticeably %s" % side, "#B71C1C"
+
+
 # Each channel: label, displayed value, position 0..1, gradient sampler t(0..1) -> rgb.
 def _channels(rgb, lch):
     r, g, b = rgb

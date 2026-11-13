@@ -63,9 +63,9 @@ class ProjectPanel(tk.Frame):
 
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True, pady=(8, 0))
-        self.tree = ttk.Treeview(body, columns=("knots", "yarn", "state"), selectmode="browse",
+        self.tree = ttk.Treeview(body, columns=("count", "yarn", "state"), selectmode="browse",
                                  height=10)
-        for col, text, width, anchor in (("#0", "Color", 130, "w"), ("knots", "Knots", 55, "e"),
+        for col, text, width, anchor in (("#0", "Color", 130, "w"), ("count", "Count", 55, "e"),
                                          ("yarn", "Yarn", 150, "w"), ("state", "", 70, "w")):
             self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
             self.tree.column(col, width=width, minwidth=40, anchor=anchor, stretch=(col == "yarn"))
@@ -104,7 +104,7 @@ class ProjectPanel(tk.Frame):
         else:
             self.scale = (1, math.ceil(max(w / IMG_W, h / IMG_H)))
         self.title.config(text=project.name)
-        sub = "%d × %d px  ·  %d colors  ·  %s knots" % (
+        sub = "%d × %d px  ·  %d colors  ·  %s total" % (
             w, h, len(project.colors), format(project.knots, ","))
         if project.transparent:
             sub += "  ·  %s transparent (skipped)" % format(project.transparent, ",")

@@ -13,7 +13,7 @@ from palette import load_palette  # noqa: F401  (re-exported for tests and scrip
 from palette_window import PaletteWindow
 from project import EXTENSION, MANY_COLORS, Project
 from project_panel import ProjectPanel
-from widgets import ColorPanel
+from widgets import ColorPanel, StatCard, describe_delta_L
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_PALETTE = os.path.join(HERE, "palette.csv")
@@ -145,8 +145,12 @@ class App:
         self.entry = self.target_panel.entry
         self.hex_var.trace_add("write", lambda *_: self.on_hex_changed())
 
-        self.summary = tk.Label(r, text="", font=("Segoe UI", 12), bg=BG)
-        self.summary.grid(row=3, column=0, columnspan=2, pady=(8, 2))
+        stats = tk.Frame(r, bg=BG)
+        stats.grid(row=3, column=0, columnspan=2, pady=(10, 2))
+        self.delta_card = StatCard(stats, "Lightness difference (yarn \u2212 target)", width=260)
+        self.delta_card.pack(side="left", padx=6)
+        self.pos_card = StatCard(stats, "Position in palette", width=190)
+        self.pos_card.pack(side="left", padx=6)
 
         nav = tk.Frame(r, bg=BG)
         nav.grid(row=4, column=0, columnspan=2, pady=6)
@@ -479,7 +483,7 @@ class App:
         entry = self.project.entry(self.selected_hex) if (self.project and self.selected_hex) \
             else None
         if entry:
-            self.target_title.config(text="Target  \u00B7  %s knots" % format(entry.count, ","))
+            self.target_title.config(text="Target  \u00B7  Count %s" % format(entry.count, ","))
         else:
             self.target_title.config(text="Target")
         if self.project:
@@ -489,7 +493,8 @@ class App:
             self.yarn_hex_var.set("")
             self.target_panel.show(self.target)
             self.yarn_panel.show(None)
-            self.summary.config(text="")
+            self.delta_card.set("\u2013", "no yarns in this palette", "#888")
+            self.pos_card.set("\u2013", "", "#888")
             return
         yarn = self.yarns[self.index]
         self.yarn_title.config(text=yarn.sku)
@@ -497,11 +502,12 @@ class App:
         t_L = rgb_to_lch(*self.target)[0] if self.target else None
         self.target_panel.show(self.target, other_L=yarn.L)
         self.yarn_panel.show(yarn.rgb, other_L=t_L)
-        pos = "%d / %d" % (self.index + 1, len(self.yarns))
+        self.pos_card.set("%d of %d" % (self.index + 1, len(self.yarns)),
+                          "lightest \u2192 darkest")
         if t_L is None:
-            self.summary.config(text=pos)
+            self.delta_card.set("\u2013", "enter a target color", "#888")
         else:
-            self.summary.config(text="ΔL  %+.1f        ·        %s" % (yarn.L - t_L, pos))
+            self.delta_card.set(*describe_delta_L(yarn.L - t_L))
 
     def draw_strip(self):
         c = self.strip
