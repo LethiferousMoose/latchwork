@@ -64,6 +64,37 @@ UI_FONT = ("Segoe UI", 10)
 TITLE_FONT = ("Segoe UI", 18, "bold")
 
 
+def app_icon(size=32):
+    """A small yarn ball, drawn in code (no image file)."""
+    import math
+    img = tk.PhotoImage(width=size, height=size)
+    c = (size - 1) / 2.0
+    r = size * 0.40
+    rows = []
+    for y in range(size):
+        row = []
+        for x in range(size):
+            dx, dy = x - c, y - c
+            d = math.hypot(dx, dy)
+            if d > r + 0.5:
+                # loose strand trailing off to the bottom right
+                on = abs((x - y * 0.35) - size * 0.83) < 1.2 and y > size * 0.62
+                row.append("#B0305C" if on else "{}")
+                continue
+            band = math.sin((dx * 0.8 + dy * 0.6 + 0.05 * d * d) * 0.9)
+            shade = 1 - 0.35 * max(0.0, (dx + dy) / (2 * r))
+            base = (214, 76, 120) if band > 0.15 else (176, 48, 92)
+            if d > r - 0.8:
+                base = (120, 30, 60)
+            row.append("#%02X%02X%02X" % tuple(int(v * shade) for v in base))
+        rows.append("{" + " ".join(row) + "}")
+    for y, row in enumerate(rows):
+        for x, col in enumerate(row[1:-1].split(" ")):
+            if col != "{}":
+                img.put(col, to=(x, y, x + 1, y + 1))
+    return img
+
+
 def display_color(rgb, gray):
     if not gray:
         return to_hex(*rgb)
@@ -88,12 +119,18 @@ class App:
         root.title("Latchwork")
         root.configure(bg=BG)
         root.minsize(1240, 780)
-        root.columnconfigure(1, weight=1)
+        root.columnconfigure(2, weight=1)
         root.rowconfigure(0, weight=1)
         self.sidebar = ProjectPanel(root, self)
         self.sidebar.grid(row=0, column=0, sticky="ns")
+        tk.Frame(root, bg="#C4C4C4", width=1).grid(row=0, column=1, sticky="ns")
         self.main = tk.Frame(root, bg=BG)
-        self.main.grid(row=0, column=1, sticky="nsew")
+        self.main.grid(row=0, column=2, sticky="nsew")
+        try:
+            self.icon = app_icon()
+            root.iconphoto(True, self.icon)
+        except tk.TclError:
+            pass
         self._build_menu()
         self._build_ui()
         self._bind_keys()
@@ -163,13 +200,14 @@ class App:
 
         nav = tk.Frame(r, bg=BG)
         nav.grid(row=4, column=0, columnspan=2, pady=6)
-        buttons = [("◀  Lighter", lambda: self.step(-1)),
-                   ("Nearest match (N)", self.jump_nearest),
-                   ("Darker  ▶", lambda: self.step(1)),
-                   ("Grayscale (G)", self.toggle_gray),
-                   ("Assign (A)", self.assign)]
-        for text, cmd in buttons:
+        for text, cmd in (("◀  Lighter", lambda: self.step(-1)),
+                          ("Nearest match (N)", self.jump_nearest),
+                          ("Darker  ▶", lambda: self.step(1))):
             ttk.Button(nav, text=text, width=18, command=cmd).pack(side="left", padx=4)
+        self.gray_btn = ttk.Button(nav, text="Grayscale (G)", width=18, command=self.toggle_gray)
+        self.gray_btn.pack(side="left", padx=4)
+        self.assign_main = ttk.Button(nav, text="Assign (A)", width=18, command=self.assign)
+        self.assign_main.pack(side="left", padx=4)
 
         self.strip = tk.Canvas(r, height=96, bg=BG, highlightthickness=0)
         self.strip.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(6, 0))
@@ -454,6 +492,7 @@ class App:
 
     def toggle_gray(self):
         self.gray = not self.gray
+        self.gray_btn.config(text="\u2713 Grayscale on (G)" if self.gray else "Grayscale (G)")
         self.refresh()
         self.sidebar.render_image()
 
@@ -560,8 +599,8 @@ class App:
                           text="This palette has no active yarns yet.\n"
                                "Add some in Palette \u2192 Manage yarns... (Ctrl+P)")
         if self.gray:
-            c.create_text(8, 8, text="GRAYSCALE", anchor="nw", font=("Segoe UI", 9, "bold"),
-                          fill="#FF3366")
+            c.create_rectangle(8, 8, 104, 30, fill="#2B2B2B", outline="")
+            c.create_text(56, 19, text="Grayscale", font=("Segoe UI", 9, "bold"), fill="white")
 
     def draw_info(self):
         entry = self.project.entry(self.selected_hex) if (self.project and self.selected_hex) \
@@ -572,6 +611,8 @@ class App:
             self.target_title.config(text="Target")
         if self.project:
             self.sidebar.update_footer()
+        can_assign = bool(self.project and self.selected_hex and self.yarns)
+        self.assign_main.state(["!disabled"] if can_assign else ["disabled"])
         if not self.yarns:
             self.yarn_title.config(text="No yarns")
             self.yarn_hex_var.set("")

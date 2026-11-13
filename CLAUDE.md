@@ -192,8 +192,14 @@ saved color maps never refer to yarns that vanished.
   the browser's local storage on that device.
 
 ## UI polish pass (later, after Stage 5)
-One pass at the end instead of piecemeal tweaks. Collected so far:
+One pass at the end instead of piecemeal tweaks.
+Done (first pass): grayscale toggle state + badge, single Assign button (main row, disabled when
+nothing to assign), image options in one row, selected-color info line, sidebar divider,
+palette manager shows file name only and disables Edit/Retire/Delete without a selection,
+yarn-ball window icon.
+Still open:
 - The key hints bar at the bottom of the main window: rethink how shortcuts are shown.
+- Neighbor strip: long yarn names wrap to two lines while short ones use one.
 - Pattern page: maybe make the Symbols button cycle Auto / Always / Off. Symbols are hidden
   below 7 px cells on purpose (tested: under ~6 px they turn into an unreadable texture).
 

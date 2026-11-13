@@ -53,8 +53,6 @@ class PaletteWindow(tk.Toplevel):
         tk.Label(head, text="Editing:", font=("Segoe UI", 11), bg=BG, fg="#555").pack(side="left")
         self.file_label = tk.Label(head, font=("Segoe UI", 11, "bold"), bg=BG)
         self.file_label.pack(side="left", padx=(4, 8))
-        self.path_label = tk.Label(head, font=("Segoe UI", 8), bg=BG, fg="#888", anchor="w")
-        self.path_label.pack(side="left", fill="x", expand=True, pady=(3, 0))
 
         top = tk.Frame(self, bg=BG)
         top.pack(fill="x", padx=12, pady=(8, 6))
@@ -91,6 +89,7 @@ class PaletteWindow(tk.Toplevel):
         buttons = tk.Frame(body, bg=BG)
         buttons.pack(side="left", fill="y", padx=(10, 0))
         self.retire_btn = None
+        self.needs_selection = []
         for text, cmd in (("Add...", self.add), ("Edit...", self.edit), ("Retire", self.retire),
                           ("Delete...", self.delete), (None, None), ("Import...", self.import_),
                           ("Export CSV...", self.export_csv), ("Export GPL...", self.export_gpl)):
@@ -101,6 +100,8 @@ class PaletteWindow(tk.Toplevel):
             b.pack(pady=2)
             if text == "Retire":
                 self.retire_btn = b
+            if text in ("Edit...", "Retire", "Delete..."):
+                self.needs_selection.append(b)
 
         tk.Label(self, font=("Segoe UI", 9), bg=BG, fg="#666", anchor="w", justify="left",
                  text="Changes save to the palette file immediately. Retired yarns are kept but "
@@ -140,7 +141,6 @@ class PaletteWindow(tk.Toplevel):
         self.tree.column("#0", width=longest + 70)  # + tree indent and swatch image
         path = self.app.palette_path or ""
         self.file_label.config(text=os.path.basename(path))
-        self.path_label.config(text=os.path.dirname(path))
         self.title("Latchwork - Yarn palette - %s" % os.path.basename(path))
         n_act = len(pal.active(self.app.bank))
         self.count.config(text="%d active, %d retired   (showing %d)" % (
@@ -149,6 +149,8 @@ class PaletteWindow(tk.Toplevel):
 
     def on_select(self):
         sel = self.selected()
+        for b in self.needs_selection:
+            b.state(["!disabled"] if sel else ["disabled"])
         if sel and all(y.retired for y in sel):
             self.retire_btn.config(text="Restore")
         else:

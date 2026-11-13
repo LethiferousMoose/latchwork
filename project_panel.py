@@ -90,19 +90,21 @@ class ProjectPanel(tk.Frame):
         for value, text in (("original", "Original"), ("preview", "Yarn preview")):
             ttk.Radiobutton(views, text=text, value=value, variable=self.view, style="Toolbutton",
                             command=self.on_view).pack(side="left", ipadx=8)
-        self.mark_unassigned = tk.BooleanVar(value=False)
-        self.mark_cb = ttk.Checkbutton(views, text="Mark unassigned", variable=self.mark_unassigned,
-                                       command=self.render_image)
-        self.mark_cb.pack(side="right")
 
         self.canvas = tk.Canvas(c, width=IMG_W, height=IMG_H, bg="#D8D8D8",
                                 highlightthickness=1, highlightbackground="#AAA",
                                 cursor="crosshair")
         self.canvas.pack(pady=(2, 2))
         self.canvas.bind("<Button-1>", self.on_image_click)
+        opts = tk.Frame(c, bg=BG)
+        opts.pack(fill="x")
         self.highlight = tk.BooleanVar(value=True)
-        ttk.Checkbutton(c, text="Highlight the selected color", variable=self.highlight,
-                        command=self.render_image).pack(anchor="w")
+        ttk.Checkbutton(opts, text="Highlight selected color", variable=self.highlight,
+                        command=self.render_image).pack(side="left")
+        self.mark_unassigned = tk.BooleanVar(value=False)
+        self.mark_cb = ttk.Checkbutton(opts, text="Mark unassigned (preview)",
+                                       variable=self.mark_unassigned, command=self.render_image)
+        self.mark_cb.pack(side="left", padx=(16, 0))
 
         self.tabs = ttk.Notebook(c)
         self.tabs.pack(fill="both", expand=True, pady=(8, 0))
@@ -117,15 +119,21 @@ class ProjectPanel(tk.Frame):
         # Bottom parts are packed first so a short window squeezes the table, never the buttons.
         btns = tk.Frame(tab, bg=BG)
         btns.pack(side="bottom", fill="x", pady=(6, 0))
-        self.assign_btn = ttk.Button(btns, text="Assign current yarn (A)", command=self.app.assign)
-        self.assign_btn.pack(side="left")
         self.unassign_btn = ttk.Button(btns, text="Back to suggestion", command=self.app.unassign)
-        self.unassign_btn.pack(side="left", padx=6)
+        self.unassign_btn.pack(side="left")
         self.progress = tk.Label(btns, font=("Segoe UI", 10, "bold"), bg=BG)
         self.progress.pack(side="right")
-        self.assigned_info = tk.Label(tab, font=UI_FONT, bg=BG, anchor="w", justify="left",
-                                      wraplength=IMG_W)
-        self.assigned_info.pack(side="bottom", fill="x", pady=(6, 0))
+        info = tk.Frame(tab, bg=BG)
+        info.pack(side="bottom", fill="x", pady=(8, 0))
+        self.info_swatch = tk.Label(info, bg=BG)
+        self.info_swatch.pack(side="left", padx=(2, 10))
+        text = tk.Frame(info, bg=BG)
+        text.pack(side="left", fill="x", expand=True)
+        self.info_title = tk.Label(text, font=("Segoe UI", 10, "bold"), bg=BG, anchor="w")
+        self.info_title.pack(fill="x")
+        self.info_sub = tk.Label(text, font=("Segoe UI", 9), bg=BG, fg="#666", anchor="w",
+                                 justify="left", wraplength=IMG_W - 70)
+        self.info_sub.pack(fill="x")
 
         body = tk.Frame(tab, bg=BG)
         body.pack(side="top", fill="both", expand=True)
@@ -263,22 +271,32 @@ class ProjectPanel(tk.Frame):
         self.progress.config(text="%d / %d assigned" % (p.assigned_count, len(p.colors)))
         c = p.entry(self.selected_hex()) if self.selected_hex() else None
         if c is None:
-            self.assigned_info.config(text="Select a color (or click the image) to match it.")
-            self.assign_btn.state(["disabled"])
+            self.info_swatch.config(image="")
+            self.info_title.config(text="No color selected")
+            self.info_sub.config(text="Pick a color in the list or click the image, then step "
+                                      "through yarns and press Assign (A).")
             self.unassign_btn.state(["disabled"])
             return
-        self.assign_btn.state(["!disabled"] if self.app.yarns else ["disabled"])
         self.unassign_btn.state(["!disabled"] if c.confirmed else ["disabled"])
+        yhex = c.yarn["hex"] if c.yarn else None
+        key = (c.hex, yhex)
+        if key not in self.row_images:
+            self.row_images[key] = _pair_image(c.hex, yhex)
+        self.info_swatch.config(image=self.row_images[key])
         if c.yarn is None:
-            text = "%s: no yarn suggested (the open palette has no active yarns)." % c.hex
+            self.info_title.config(text="%s  \u2192  no yarn" % c.hex)
+            self.info_sub.config(text="The open palette has no active yarns.")
+            return
+        y = c.yarn
+        self.info_title.config(text="%s  \u2192  %s" % (c.hex, y["name"]))
+        if c.confirmed:
+            sub = "Assigned \u00B7 %s \u00B7 from %s" % (y["hex"], y.get("palette") or "?")
+            if not self.app.yarn_in_palette(y):
+                sub += "\nNot in the open palette."
         else:
-            y = c.yarn
-            how = "Assigned" if c.confirmed else "Suggested"
-            text = "%s: %s %s  %s  (from %s)" % (c.hex, how, y["name"], y["hex"],
-                                                 y.get("palette") or "?")
-            if c.confirmed and not self.app.yarn_in_palette(y):
-                text += "\nThat yarn isn't in the open palette."
-        self.assigned_info.config(text=text)
+            sub = "Suggested (nearest lightness) \u00B7 %s \u00B7 %s" % (
+                y["hex"], y.get("palette") or "?")
+        self.info_sub.config(text=sub)
 
     # ---------- plan ----------
     def on_spare(self):
