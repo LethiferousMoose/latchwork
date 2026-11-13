@@ -22,7 +22,8 @@ Keep it simple. This is a personal tool, not a product.
 - `project.py`: the `.latchwork` project file (embedded image, colors, assignments). No Tk.
 - `project_panel.py`: the project sidebar (image/preview, Colors and Plan tabs, Assign).
 - `plan.py`: quantities, bags, canvas size, merged colors, yarn-list CSV, preview PNG. No Tk.
-- `pattern_template.html`: template for the exported phone/print pattern.
+- `pattern_template.html`: the phone/print pattern page (HTML/CSS/JS, no external files).
+- `pattern.py`: embeds a project into the template as JSON (one cell per knot). No Tk.
 - `palette.csv`: the yarn palette (see below).
 - `export_palette.py`: GIMP 2.10 Python-Fu script that produced `palette.csv` from `AllColors.xcf`.
 - `tests/`: unit tests.
@@ -184,6 +185,11 @@ saved color maps never refer to yarns that vanished.
   It moves up and down one row at a time and is remembered on that device.
 - **Print:** an overview page plus one page per color. Large patterns are split across pages
   with labels (A1, A2…).
+- Built: File → Export pattern (Ctrl+E) or the Plan tab button. Unassigned colors appear in
+  their original color with a ? symbol (export warns first). Symbols are drawn shapes (20),
+  then letters and numbers, so phones never swap them for emoji. Pages are 50 × 70 holes on
+  letter paper, A1 = bottom-left. Done marks, row and symbol toggle are saved per pattern in
+  the browser's local storage on that device.
 
 ## UI polish pass (later, after Stage 5)
 One pass at the end instead of piecemeal tweaks. Collected so far:
@@ -205,3 +211,4 @@ One pass at the end instead of piecemeal tweaks. Collected so far:
 - Stage 2+: palette add/edit/retire/import/export round trips.
 - Stage 3+: color counting on a small test image, color map save/load round trip.
 - Stage 4+: bag math and canvas size math.
+- Stage 5+: pattern data (yarn order, cell indexes, unassigned, transparent) and safe HTML embedding.

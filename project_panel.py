@@ -199,10 +199,12 @@ class ProjectPanel(tk.Frame):
         self.notes.pack(fill="x")
         btns = tk.Frame(tab, bg=BG)
         btns.pack(fill="x", pady=(6, 0))
-        ttk.Button(btns, text="Export yarn list...", command=self.app.export_yarn_list).pack(
+        ttk.Button(btns, text="Export pattern...", command=self.app.export_pattern).pack(
             side="left")
-        ttk.Button(btns, text="Save preview image...", command=self.app.save_preview).pack(
+        ttk.Button(btns, text="Export yarn list...", command=self.app.export_yarn_list).pack(
             side="left", padx=6)
+        ttk.Button(btns, text="Save preview image...", command=self.app.save_preview).pack(
+            side="left")
 
     # ---------- project ----------
     def show_welcome(self):

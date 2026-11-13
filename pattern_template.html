@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>__LATCHWORK_TITLE__ · Latchwork pattern</title>
+<style>
+  :root {
+    --bg: #ECECEC; --panel: #FAFAFA; --ink: #1E1E1E; --muted: #666; --line: #C9C9C9;
+    --accent: #1565C0; --warn: #9A6700; --row: #E53935;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 15px/1.35 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+  body { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr auto;
+    grid-template-areas: "bar bar" "main legend" "rowbar legend"; overflow: hidden; }
+  button { font: inherit; color: inherit; background: #fff; border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #DCE8F7; border-color: #90B4E0; }
+  button:active { background: #eee; }
+
+  #bar { grid-area: bar; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  #bar .title { font-weight: 700; font-size: 17px; }
+  #bar .sub { color: var(--muted); font-size: 12.5px; }
+  #bar .grow { flex: 1; }
+  #bar .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  main { grid-area: main; position: relative; min-height: 0; min-width: 0; }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none;
+    display: block; cursor: grab; }
+  #toast { position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+    background: rgba(30,30,30,.88); color: #fff; padding: 6px 12px; border-radius: 8px;
+    font-size: 14px; pointer-events: none; opacity: 0; transition: opacity .2s; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+
+  #legend { grid-area: legend; width: 320px; background: var(--panel); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; min-height: 0; }
+  #legend header { display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+    border-bottom: 1px solid var(--line); }
+  #legend header .count { color: var(--muted); font-size: 13px; flex: 1; }
+  #legend ul { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; flex: 1; }
+  #legend li { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer;
+    border-left: 4px solid transparent; }
+  #legend li.sel { background: #DCE8F7; border-left-color: var(--accent); }
+  #legend li.done .name { text-decoration: line-through; color: var(--muted); }
+  #legend li.unassigned .name { color: var(--warn); }
+  #legend canvas { width: 34px; height: 34px; border-radius: 4px; flex: none; }
+  #legend .txt { flex: 1; min-width: 0; }
+  #legend .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #legend .meta { color: var(--muted); font-size: 12.5px; }
+  #legend label.done { display: flex; flex-direction: column; align-items: center; font-size: 11px;
+    color: var(--muted); gap: 2px; padding: 4px; }
+  #legend input[type=checkbox] { width: 22px; height: 22px; margin: 0; }
+
+  #rowbar { grid-area: rowbar; display: flex; align-items: center; justify-content: center; gap: 10px;
+    padding: 8px; background: var(--panel); border-top: 1px solid var(--line); }
+  #rowbar .label { min-width: 150px; text-align: center; }
+  #rowbar .label b { font-size: 18px; }
+  #rowbar button.big { min-width: 56px; font-size: 18px; padding: 6px 14px; }
+
+  #printDlg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none;
+    align-items: center; justify-content: center; z-index: 10; }
+  #printDlg.open { display: flex; }
+  #printDlg .box { background: #fff; border-radius: 12px; padding: 18px 20px; width: min(420px, 92vw); }
+  #printDlg h2 { margin: 0 0 10px; font-size: 18px; }
+  #printDlg label { display: block; margin: 8px 0; }
+  #printDlg .est { color: var(--muted); font-size: 13px; margin: 10px 0 14px; }
+  #printDlg .btns { display: flex; justify-content: flex-end; gap: 8px; }
+
+  #printArea { display: none; }
+
+  /* Phones: legend becomes a bottom sheet */
+  @media (max-width: 820px) {
+    body { grid-template-columns: 1fr; grid-template-areas: "bar" "main" "rowbar"; }
+    #legend { position: fixed; left: 0; right: 0; bottom: 0; width: auto; height: 55vh;
+      border-left: 0; border-top: 1px solid var(--line); border-radius: 14px 14px 0 0;
+      box-shadow: 0 -6px 24px rgba(0,0,0,.18); transform: translateY(105%);
+      transition: transform .22s ease; z-index: 5; }
+    #legend.open { transform: none; }
+    #bar { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; }
+    #bar > div:first-child { flex: 1; min-width: 0; }
+    #bar .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #bar .sub, #bar .grow { display: none; }
+    #bar .actions { flex: none; flex-wrap: nowrap; gap: 4px; }
+    #bar button { padding: 6px 8px; font-size: 14px; }
+    #legendInfo { display: block; }
+    #rowbar { gap: 6px; }
+    #rowbar .label { min-width: 0; flex: 1; }
+    #rowbar button { padding: 6px 9px; }
+    #rowbar button.big { min-width: 48px; padding: 6px 10px; }
+  }
+  @media (min-width: 821px) { #legendBtn { display: none; } #closeLegend { display: none; } }
+  #legendInfo { display: none; padding: 8px 12px; color: var(--muted); font-size: 12.5px;
+    border-bottom: 1px solid var(--line); }
+
+  @page { size: letter portrait; margin: 0.35in; }
+  @media print {
+    html, body { height: auto; overflow: visible; background: #fff; display: block; }
+    #bar, main, #legend, #rowbar, #printDlg { display: none !important; }
+    #printArea { display: block; }
+    .page { page-break-after: always; break-after: page; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
+    .page h3 { margin: 0 0 4px; font-size: 13pt; }
+    .page .pmeta { margin: 0 0 6px; font-size: 9pt; color: #444; }
+    .page img { display: block; max-width: 100%; }
+    .page table { border-collapse: collapse; font-size: 9.5pt; margin-top: 8px; }
+    .page td, .page th { border: 1px solid #bbb; padding: 3px 6px; text-align: left; }
+    .page td.n { text-align: right; }
+  }
+</style>
+</head>
+<body>
+<div id="bar">
+  <div>
+    <div class="title" id="title"></div>
+  </div>
+  <div class="sub" id="sub"></div>
+  <div class="grow"></div>
+  <div class="actions">
+    <button id="fitBtn" title="Show the whole pattern">Fit</button>
+    <button id="symBtn" aria-pressed="true" title="Show symbols in the cells">Symbols</button>
+    <button id="legendBtn">Yarns</button>
+    <button id="printBtn">Print…</button>
+  </div>
+</div>
+
+<main>
+  <canvas id="view"></canvas>
+  <div id="toast"></div>
+</main>
+
+<aside id="legend">
+  <header>
+    <span class="count" id="legendCount"></span>
+    <button id="showAll">Show all</button>
+    <button id="closeLegend" aria-label="Close">✕</button>
+  </header>
+  <div id="legendInfo"></div>
+  <ul id="legendList"></ul>
+</aside>
+
+<div id="rowbar">
+  <button id="rowTrack" aria-pressed="false" title="Highlight one row at a time">Row tracker</button>
+  <button id="rowDown" class="big" aria-label="Row down">▼</button>
+  <span class="label" id="rowLabel"></span>
+  <button id="rowUp" class="big" aria-label="Row up">▲</button>
+</div>
+
+<div id="printDlg" role="dialog" aria-modal="true">
+  <div class="box">
+    <h2>Print pattern</h2>
+    <label><input type="checkbox" id="pOverview" checked> Overview page and yarn legend</label>
+    <label><input type="checkbox" id="pFull"> Full-color pattern pages (all yarns)</label>
+    <label><input type="checkbox" id="pPerColor" checked> One set of pages per yarn
+      <br><small>Only the pages where that yarn appears</small></label>
+    <div class="est" id="pEst"></div>
+    <div class="btns"><button id="pCancel">Cancel</button><button id="pGo">Print</button></div>
+  </div>
+</div>
+
+<div id="printArea"></div>
+
+<script id="latchwork-data" type="application/json">/*__LATCHWORK_DATA__*/null</script>
+<script>
+"use strict";
+window.onerror = function (msg) { document.documentElement.setAttribute("data-error", msg); };
+
+const D = JSON.parse(document.getElementById("latchwork-data").textContent);
+const W = D.width, H = D.height, Y = D.yarns, NONE = 0xFFFF;
+const cells = (() => {
+  const bin = atob(D.cells), out = new Uint16Array(W * H);
+  for (let i = 0; i < out.length; i++) out[i] = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8);
+  return out;
+})();
+const PALE = "#E6E6E6", EMPTY = "#FFFFFF";
+const fmt = n => n.toLocaleString("en-US");
+
+// ---------- saved state (per pattern, on this device) ----------
+const STORE = "latchwork:" + D.key;
+const state = { done: [], rowOn: false, row: 1, sym: true };
+try { Object.assign(state, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) {}
+function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+let sel = -1;   // highlighted yarn index, -1 = all
+
+// ---------- symbols: drawn shapes (consistent everywhere), then letters/numbers ----------
+const SHAPES = 20;
+function poly(ctx, cx, cy, r, n, rot) {
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = rot + i * 2 * Math.PI / n;
+    ctx[i ? "lineTo" : "moveTo"](cx + r * Math.cos(a), cy + r * Math.sin(a));
+  }
+  ctx.closePath();
+}
+function star(ctx, cx, cy, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rr = i % 2 ? r * 0.45 : r, a = -Math.PI / 2 + i * Math.PI / 5;
+    ctx[i ? "lineTo" : "moveTo"](cx + rr * Math.cos(a), cy + rr * Math.sin(a));
+  }
+  ctx.closePath();
+}
+function drawSymbol(ctx, idx, cx, cy, size, ink) {
+  const r = size * 0.36, lw = Math.max(1, size * 0.11);
+  ctx.save();
+  ctx.fillStyle = ctx.strokeStyle = ink; ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.lineCap = "round";
+  if (Y[idx] && Y[idx].unassigned) { text("?"); ctx.restore(); return; }
+  const k = idx % SHAPES, fill = () => ctx.fill(), line = () => ctx.stroke();
+  function text(t) {
+    ctx.font = "700 " + Math.round(size * (t.length > 1 ? 0.5 : 0.68)) + "px Segoe UI, Arial, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(t, cx, cy + size * 0.04);
+  }
+  if (idx >= SHAPES) {
+    const j = idx - SHAPES;
+    text(j < 26 ? String.fromCharCode(65 + j) : String(j - 25));
+    ctx.restore(); return;
+  }
+  switch (k) {
+    case 0: ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); fill(); break;
+    case 1: ctx.fillRect(cx - r * .85, cy - r * .85, r * 1.7, r * 1.7); break;
+    case 2: poly(ctx, cx, cy + r * .15, r * 1.1, 3, -Math.PI / 2); fill(); break;
+    case 3: poly(ctx, cx, cy, r * 1.1, 4, 0); fill(); break;
+    case 4: ctx.lineWidth = lw * 1.6; ctx.beginPath(); ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+            ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r); line(); break;
+    case 5: ctx.lineWidth = lw * 1.6; ctx.beginPath(); ctx.moveTo(cx - r * .8, cy - r * .8); ctx.lineTo(cx + r * .8, cy + r * .8);
+            ctx.moveTo(cx + r * .8, cy - r * .8); ctx.lineTo(cx - r * .8, cy + r * .8); line(); break;
+    case 6: ctx.beginPath(); ctx.arc(cx, cy, r * .9, 0, 7); line(); break;
+    case 7: ctx.strokeRect(cx - r * .8, cy - r * .8, r * 1.6, r * 1.6); break;
+    case 8: poly(ctx, cx, cy + r * .15, r * 1.05, 3, -Math.PI / 2); line(); break;
+    case 9: poly(ctx, cx, cy, r * 1.05, 4, 0); line(); break;
+    case 10: poly(ctx, cx, cy - r * .15, r * 1.1, 3, Math.PI / 2); fill(); break;
+    case 11: star(ctx, cx, cy, r * 1.15); fill(); break;
+    case 12: star(ctx, cx, cy, r * 1.1); line(); break;
+    case 13: poly(ctx, cx, cy, r, 6, 0); fill(); break;
+    case 14: poly(ctx, cx, cy, r, 6, 0); line(); break;
+    case 15: ctx.beginPath(); ctx.arc(cx, cy, r * .9, 0, 7); line();
+             ctx.beginPath(); ctx.arc(cx, cy, r * .35, 0, 7); fill(); break;
+    case 16: ctx.fillRect(cx - r, cy - r * .3, r * 2, r * .6); break;
+    case 17: ctx.fillRect(cx - r * .3, cy - r, r * .6, r * 2); break;
+    case 18: poly(ctx, cx, cy, r * 1.05, 4, 0); line();
+             ctx.beginPath(); ctx.arc(cx, cy, r * .3, 0, 7); fill(); break;
+    case 19: ctx.fillRect(cx - r * .85, cy - r * .85, r * 1.7, r * 1.7);
+             ctx.clearRect(cx - r * .35, cy - r * .35, r * .7, r * .7);
+             ctx.fillStyle = Y[idx].hex; ctx.fillRect(cx - r * .35, cy - r * .35, r * .7, r * .7); break;
+  }
+  ctx.restore();
+}
+
+// ---------- the pattern bitmap (1 pixel per knot), rebuilt when the highlight changes ----------
+function hexRGB(h) { return [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); }
+const RGB = Y.map(y => hexRGB(y.hex)), PALE_RGB = hexRGB(PALE), EMPTY_RGB = hexRGB(EMPTY);
+function buildBitmap(highlight, x0 = 0, y0 = 0, w = W, h = H) {
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const g = c.getContext("2d"), img = g.createImageData(w, h), px = img.data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = cells[(y0 + y) * W + x0 + x];
+    const rgb = v === NONE ? EMPTY_RGB : (highlight >= 0 && v !== highlight ? PALE_RGB : RGB[v]);
+    const o = (y * w + x) * 4;
+    px[o] = rgb[0]; px[o + 1] = rgb[1]; px[o + 2] = rgb[2]; px[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  return c;
+}
+let bitmap = buildBitmap(-1);
+
+// ---------- grid drawing shared by screen and print ----------
+// opts: {x0, y0, w, h (cell window), s (px per cell), ox, oy (where cell x0,y0 lands), highlight,
+//        sym, bmp (bitmap of that window), clip: [vw, vh] or null}
+function drawGrid(ctx, o) {
+  const { s, ox, oy } = o;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(o.bmp, ox, oy, o.w * s, o.h * s);
+  const vw = o.clip ? o.clip[0] : ox + o.w * s, vh = o.clip ? o.clip[1] : oy + o.h * s;
+  const c0 = Math.max(0, Math.floor(-ox / s)), c1 = Math.min(o.w, Math.ceil((vw - ox) / s));
+  const r0 = Math.max(0, Math.floor(-oy / s)), r1 = Math.min(o.h, Math.ceil((vh - oy) / s));
+  if (c1 <= c0 || r1 <= r0) return;
+  // symbols
+  if (o.sym && s >= 11) {
+    for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) {
+      const v = cells[(o.y0 + r) * W + o.x0 + c];
+      if (v === NONE || (o.highlight >= 0 && v !== o.highlight)) continue;
+      drawSymbol(ctx, v, ox + (c + .5) * s, oy + (r + .5) * s, s, Y[v].ink);
+    }
+  }
+  // grid lines: thin per cell when large enough, bold every 10 (rows counted from the bottom)
+  const line = (x1, y1, x2, y2) => { ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); };
+  const top = oy + r0 * s, bot = oy + r1 * s, left = ox + c0 * s, right = ox + c1 * s;
+  if (s >= 5) {
+    ctx.beginPath(); ctx.strokeStyle = "rgba(0,0,0,.16)"; ctx.lineWidth = 1;
+    for (let c = c0; c <= c1; c++) line(Math.round(ox + c * s) + .5, top, Math.round(ox + c * s) + .5, bot);
+    for (let r = r0; r <= r1; r++) line(left, Math.round(oy + r * s) + .5, right, Math.round(oy + r * s) + .5);
+    ctx.stroke();
+  }
+  if (s >= 1.2) {
+    ctx.beginPath(); ctx.strokeStyle = "rgba(0,0,0,.62)"; ctx.lineWidth = s >= 5 ? 2 : 1;
+    for (let c = c0; c <= c1; c++) if ((o.x0 + c) % 10 === 0) line(Math.round(ox + c * s), top, Math.round(ox + c * s), bot);
+    for (let r = r0; r <= r1; r++) if ((H - (o.y0 + r)) % 10 === 0) line(left, Math.round(oy + r * s), right, Math.round(oy + r * s));
+    ctx.stroke();
+  }
+  ctx.strokeStyle = "#333"; ctx.lineWidth = 1.5;
+  ctx.strokeRect(ox, oy, o.w * s, o.h * s);
+}
+
+function labelStep(s, minPx) {
+  for (const st of [1, 2, 5, 10, 20, 50, 100, 200, 500]) if (st * s >= minPx) return st;
+  return 1000;
+}
+
+// ---------- screen view: pan / zoom ----------
+const view = document.getElementById("view"), vctx = view.getContext("2d");
+const GL = 38, GT = 22;  // gutters for row / column numbers
+let scale = 10, ox = GL, oy = GT, vw = 0, vh = 0, dpr = 1, fitScale = 1;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  vw = view.clientWidth; vh = view.clientHeight;
+  view.width = Math.round(vw * dpr); view.height = Math.round(vh * dpr);
+  draw();
+}
+function fit() {
+  fitScale = Math.max(0.2, Math.min((vw - GL - 12) / W, (vh - GT - 12) / H));
+  scale = fitScale;
+  ox = GL + (vw - GL - W * scale) / 2; oy = GT + (vh - GT - H * scale) / 2;
+  draw();
+}
+function zoomAt(px, py, f) {
+  const ns = Math.max(fitScale * 0.5, Math.min(90, scale * f));
+  ox = px - (px - ox) * ns / scale; oy = py - (py - oy) * ns / scale; scale = ns;
+  draw();
+}
+let pending = false;
+function draw() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; paint(); });
+}
+function paint() {
+  const g = vctx;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = "#DADADA"; g.fillRect(0, 0, vw, vh);
+  drawGrid(g, { x0: 0, y0: 0, w: W, h: H, s: scale, ox, oy, highlight: sel, sym: state.sym,
+                bmp: bitmap, clip: [vw, vh] });
+  // row tracker: dim everything but the current row
+  if (state.rowOn) {
+    const ry = oy + (H - state.row) * scale;
+    g.fillStyle = "rgba(255,255,255,.55)";
+    g.fillRect(ox, oy, W * scale, Math.max(0, ry - oy));
+    g.fillRect(ox, ry + scale, W * scale, Math.max(0, oy + H * scale - ry - scale));
+    g.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--row") || "#E53935";
+    g.lineWidth = 2.5; g.strokeRect(ox - 1, ry - 1, W * scale + 2, scale + 2);
+  }
+  // gutters with numbers
+  g.fillStyle = "rgba(250,250,250,.96)";
+  g.fillRect(0, 0, vw, GT); g.fillRect(0, 0, GL, vh);
+  g.fillStyle = "#555"; g.font = "11px Segoe UI, Arial, sans-serif"; g.textBaseline = "middle";
+  g.textAlign = "center";
+  const cs = labelStep(scale, 26);
+  for (let c = cs; c <= W; c += cs) {
+    const x = ox + (c - .5) * scale;
+    if (x > GL - 4 && x < vw) g.fillText(String(c), x, GT / 2);
+  }
+  g.textAlign = "right";
+  const rs = labelStep(scale, 15);
+  for (let rn = rs; rn <= H; rn += rs) {
+    const y = oy + (H - rn + .5) * scale;
+    if (y > GT - 4 && y < vh) {
+      g.fillStyle = state.rowOn && rn === state.row ? "#E53935" : "#555";
+      g.fillText(String(rn), GL - 6, y);
+    }
+  }
+  if (state.rowOn && rs > 1) {   // always label the tracked row
+    const y = oy + (H - state.row + .5) * scale;
+    if (y > GT && y < vh) { g.fillStyle = "#E53935"; g.fillText(String(state.row), GL - 6, y); }
+  }
+  g.fillStyle = "rgba(250,250,250,1)"; g.fillRect(0, 0, GL, GT);
+  g.strokeStyle = "#BBB"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(0, GT + .5); g.lineTo(vw, GT + .5); g.moveTo(GL + .5, 0); g.lineTo(GL + .5, vh); g.stroke();
+}
+
+// pointer handling: drag to pan, pinch / wheel to zoom, tap for cell info
+const pts = new Map();
+let gesture = null;
+view.addEventListener("pointerdown", e => {
+  view.setPointerCapture(e.pointerId);
+  pts.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  gesture = { moved: false, t: Date.now(), x: e.offsetX, y: e.offsetY, multi: pts.size > 1 };
+  if (pts.size === 2) gesture.pinch = pinchInfo();
+});
+function pinchInfo() {
+  const [a, b] = [...pts.values()];
+  return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+}
+view.addEventListener("pointermove", e => {
+  if (!pts.has(e.pointerId)) return;
+  const prev = pts.get(e.pointerId);
+  pts.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+  if (!gesture) return;
+  if (Math.hypot(e.offsetX - gesture.x, e.offsetY - gesture.y) > 6) gesture.moved = true;
+  if (pts.size >= 2) {
+    const p = pinchInfo(), q = gesture.pinch || p;
+    ox += p.mx - q.mx; oy += p.my - q.my;
+    gesture.pinch = p; gesture.multi = true;
+    zoomAt(p.mx, p.my, p.d / q.d);
+  } else {
+    ox += e.offsetX - prev.x; oy += e.offsetY - prev.y;
+    draw();
+  }
+});
+function endPointer(e) {
+  pts.delete(e.pointerId);
+  if (pts.size === 1 && gesture) gesture.pinch = null;
+  if (pts.size === 0 && gesture) {
+    if (!gesture.moved && !gesture.multi && Date.now() - gesture.t < 500) tap(e.offsetX, e.offsetY);
+    gesture = null;
+  }
+}
+view.addEventListener("pointerup", endPointer);
+view.addEventListener("pointercancel", endPointer);
+view.addEventListener("wheel", e => {
+  e.preventDefault();
+  zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015));
+}, { passive: false });
+view.addEventListener("dblclick", e => zoomAt(e.offsetX, e.offsetY, 2));
+
+let toastTimer = 0;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+function tap(px, py) {
+  const c = Math.floor((px - ox) / scale), r = Math.floor((py - oy) / scale);
+  if (c < 0 || r < 0 || c >= W || r >= H || px < GL || py < GT) return;
+  const v = cells[r * W + c];
+  toast("Row " + (H - r) + " · Col " + (c + 1) + " · " + (v === NONE ? "empty" : Y[v].name));
+}
+
+// ---------- legend ----------
+const list = document.getElementById("legendList");
+function legendIcon(i) {
+  const c = document.createElement("canvas"), px = 34 * (window.devicePixelRatio || 1);
+  c.width = c.height = px;
+  const g = c.getContext("2d");
+  g.fillStyle = Y[i].hex; g.fillRect(0, 0, px, px);
+  g.strokeStyle = "rgba(0,0,0,.35)"; g.lineWidth = 2; g.strokeRect(1, 1, px - 2, px - 2);
+  drawSymbol(g, i, px / 2, px / 2, px * 0.8, Y[i].ink);
+  return c;
+}
+function buildLegend() {
+  list.innerHTML = "";
+  Y.forEach((y, i) => {
+    const li = document.createElement("li");
+    li.dataset.i = i;
+    if (y.unassigned) li.classList.add("unassigned");
+    li.appendChild(legendIcon(i));
+    const txt = document.createElement("div"); txt.className = "txt";
+    const name = document.createElement("div"); name.className = "name"; name.textContent = y.name;
+    const meta = document.createElement("div"); meta.className = "meta";
+    meta.textContent = y.unassigned ? fmt(y.count) + " · not assigned to a yarn yet"
+      : [y.brand, fmt(y.count) + " knots", y.need].filter(Boolean).join(" · ");
+    txt.append(name, meta); li.appendChild(txt);
+    const lab = document.createElement("label"); lab.className = "done";
+    const cb = document.createElement("input"); cb.type = "checkbox";
+    cb.checked = state.done.includes(y.name);
+    cb.addEventListener("click", ev => ev.stopPropagation());
+    cb.addEventListener("change", () => {
+      state.done = state.done.filter(n => n !== y.name);
+      if (cb.checked) state.done.push(y.name);
+      save(); refreshLegend();
+    });
+    lab.addEventListener("click", ev => ev.stopPropagation());
+    lab.append(cb, document.createTextNode("done"));
+    li.appendChild(lab);
+    li.addEventListener("click", () => highlight(sel === i ? -1 : i));
+    list.appendChild(li);
+  });
+  refreshLegend();
+}
+function refreshLegend() {
+  [...list.children].forEach(li => {
+    const i = +li.dataset.i;
+    li.classList.toggle("sel", i === sel);
+    li.classList.toggle("done", state.done.includes(Y[i].name));
+  });
+  const real = Y.filter(y => !y.unassigned);
+  const done = real.filter(y => state.done.includes(y.name)).length;
+  document.getElementById("legendCount").textContent =
+    real.length + " yarn" + (real.length === 1 ? "" : "s") + " · " + done + " done";
+}
+function highlight(i) {
+  sel = i;
+  bitmap = buildBitmap(sel);
+  refreshLegend(); draw();
+  if (i >= 0) toast(Y[i].name + " · " + fmt(Y[i].count) + " knots");
+}
+document.getElementById("showAll").onclick = () => highlight(-1);
+
+// ---------- header, toolbar, row tracker ----------
+document.getElementById("title").textContent = D.name;
+document.getElementById("sub").textContent = document.getElementById("legendInfo").textContent =
+  W + " × " + H + " holes · " + fmt(D.knots) + " knots · finished " + D.finished +
+  " · canvas " + D.canvas;
+const symBtn = document.getElementById("symBtn");
+function syncSym() { symBtn.setAttribute("aria-pressed", state.sym ? "true" : "false"); }
+symBtn.onclick = () => { state.sym = !state.sym; syncSym(); save(); draw(); };
+document.getElementById("fitBtn").onclick = fit;
+const legendEl = document.getElementById("legend");
+document.getElementById("legendBtn").onclick = () => legendEl.classList.toggle("open");
+document.getElementById("closeLegend").onclick = () => legendEl.classList.remove("open");
+
+const rowBtn = document.getElementById("rowTrack");
+function syncRow() {
+  state.row = Math.max(1, Math.min(H, state.row));
+  rowBtn.setAttribute("aria-pressed", state.rowOn ? "true" : "false");
+  document.getElementById("rowLabel").innerHTML = state.rowOn
+    ? "Row <b>" + state.row + "</b> of " + H : "<span style='color:#888'>Row tracker off</span>";
+  document.getElementById("rowUp").disabled = document.getElementById("rowDown").disabled = !state.rowOn;
+}
+function showRow() {   // pan so the tracked row is on screen
+  const ry = oy + (H - state.row) * scale;
+  if (ry < GT + 10 || ry + scale > vh - 10) oy += (vh + GT) / 2 - (ry + scale / 2);
+}
+rowBtn.onclick = () => { state.rowOn = !state.rowOn; syncRow(); save(); if (state.rowOn) showRow(); draw(); };
+function moveRow(d) { if (!state.rowOn) return; state.row += d; syncRow(); save(); showRow(); draw(); }
+document.getElementById("rowUp").onclick = () => moveRow(1);
+document.getElementById("rowDown").onclick = () => moveRow(-1);
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowUp") { moveRow(1); e.preventDefault(); }
+  else if (e.key === "ArrowDown") { moveRow(-1); e.preventDefault(); }
+  else if (e.key === "Escape") { highlight(-1); closePrint(); }
+});
+
+// ---------- print ----------
+const TILE_C = 50, TILE_R = 70, P_CELL = 12, P_GL = 34, P_GT = 18;
+function tiles() {
+  const out = [], nc = Math.ceil(W / TILE_C), nr = Math.ceil(H / TILE_R);
+  for (let br = 0; br < nr; br++) for (let bc = 0; bc < nc; bc++) {
+    // row bands counted from the bottom: band 1 = bottom rows
+    const yEnd = H - br * TILE_R, y0 = Math.max(0, yEnd - TILE_R);
+    const x0 = bc * TILE_C, w = Math.min(TILE_C, W - x0);
+    out.push({ x0, y0, w, h: yEnd - y0, label: String.fromCharCode(65 + bc % 26) + (bc >= 26 ? Math.floor(bc / 26) : "") + (br + 1) });
+  }
+  return out;
+}
+function tileHas(t, v) {
+  for (let y = t.y0; y < t.y0 + t.h; y++) for (let x = t.x0; x < t.x0 + t.w; x++) if (cells[y * W + x] === v) return true;
+  return false;
+}
+function pagesFor(opts) {
+  const T = tiles(), pages = [];
+  if (opts.overview) pages.push({ kind: "overview" });
+  if (opts.full) T.forEach(t => pages.push({ kind: "tile", t, hl: -1 }));
+  if (opts.per) Y.forEach((y, i) => T.forEach(t => { if (tileHas(t, i)) pages.push({ kind: "tile", t, hl: i }); }));
+  return pages;
+}
+function printOpts() {
+  return { overview: document.getElementById("pOverview").checked,
+           full: document.getElementById("pFull").checked,
+           per: document.getElementById("pPerColor").checked };
+}
+function updateEstimate() {
+  const n = pagesFor(printOpts()).length;
+  document.getElementById("pEst").textContent = "About " + n + " page" + (n === 1 ? "" : "s") +
+    " (letter paper, " + TILE_C + " × " + TILE_R + " holes per page; page A1 is the bottom-left corner).";
+}
+["pOverview", "pFull", "pPerColor"].forEach(id => document.getElementById(id).onchange = updateEstimate);
+const dlg = document.getElementById("printDlg");
+document.getElementById("printBtn").onclick = () => { updateEstimate(); dlg.classList.add("open"); };
+function closePrint() { dlg.classList.remove("open"); }
+document.getElementById("pCancel").onclick = closePrint;
+
+function renderTile(t, hl) {
+  const k = 2, s = P_CELL;
+  const c = document.createElement("canvas");
+  c.width = (P_GL + t.w * s + 2) * k; c.height = (P_GT + t.h * s + 2) * k;
+  const g = c.getContext("2d"); g.scale(k, k);
+  g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+  drawGrid(g, { x0: t.x0, y0: t.y0, w: t.w, h: t.h, s, ox: P_GL, oy: P_GT, highlight: hl, sym: true,
+                bmp: buildBitmap(hl, t.x0, t.y0, t.w, t.h), clip: null });
+  g.fillStyle = "#333"; g.font = "9px Arial, sans-serif"; g.textBaseline = "middle";
+  g.textAlign = "center";
+  for (let c2 = 0; c2 < t.w; c2++) { const n = t.x0 + c2 + 1; if (n % 5 === 0 || c2 === 0) g.fillText(String(n), P_GL + (c2 + .5) * s, P_GT / 2); }
+  g.textAlign = "right";
+  for (let r = 0; r < t.h; r++) { const n = H - (t.y0 + r); if (n % 5 === 0 || r === t.h - 1) g.fillText(String(n), P_GL - 4, P_GT + (r + .5) * s); }
+  return c.toDataURL("image/png");
+}
+function renderOverview() {
+  const maxW = 700, maxH = 560, s = Math.max(0.5, Math.min(maxW / W, maxH / H)), k = 2;
+  const c = document.createElement("canvas");
+  c.width = Math.ceil((W * s + 2) * k); c.height = Math.ceil((H * s + 2) * k);
+  const g = c.getContext("2d"); g.scale(k, k);
+  drawGrid(g, { x0: 0, y0: 0, w: W, h: H, s, ox: 1, oy: 1, highlight: -1, sym: s >= 11,
+                bmp: buildBitmap(-1), clip: null });
+  // tile borders and labels so pages can be found on the overview
+  g.strokeStyle = "rgba(21,101,192,.9)"; g.lineWidth = 1.5; g.font = "bold 11px Arial"; g.fillStyle = "rgba(21,101,192,.95)";
+  g.textAlign = "left"; g.textBaseline = "top";
+  tiles().forEach(t => { g.strokeRect(1 + t.x0 * s, 1 + t.y0 * s, t.w * s, t.h * s); g.fillText(t.label, 4 + t.x0 * s, 4 + t.y0 * s); });
+  return c.toDataURL("image/png");
+}
+function el(tag, props, ...kids) { const e = document.createElement(tag); Object.assign(e, props || {}); e.append(...kids); return e; }
+async function doPrint() {
+  const pages = pagesFor(printOpts()), area = document.getElementById("printArea");
+  area.innerHTML = "";
+  const btn = document.getElementById("pGo"); btn.disabled = true; btn.textContent = "Preparing…";
+  await new Promise(r => setTimeout(r, 30));
+  const imgs = [];
+  for (const p of pages) {
+    const page = el("div", { className: "page" });
+    if (p.kind === "overview") {
+      page.append(el("h3", { textContent: D.name + " · overview" }),
+                  el("p", { className: "pmeta", textContent: W + " × " + H + " holes · " + fmt(D.knots) +
+                    " knots · finished " + D.finished + " · canvas to cut " + D.canvas }));
+      const im = el("img", { src: renderOverview() }); im.style.width = "100%"; imgs.push(im); page.append(im);
+      const tb = el("table");
+      tb.append(el("tr", {}, el("th", { textContent: "" }), el("th", { textContent: "Yarn" }),
+                    el("th", { textContent: "Knots" }), el("th", { textContent: "Need" })));
+      Y.forEach((y, i) => {
+        const ic = legendIcon(i); ic.style.width = ic.style.height = "18px";
+        const im2 = el("img", { src: ic.toDataURL() }); im2.style.width = im2.style.height = "18px"; imgs.push(im2);
+        tb.append(el("tr", {}, el("td", {}, im2), el("td", { textContent: y.name }),
+                      el("td", { className: "n", textContent: fmt(y.count) }), el("td", { textContent: y.need })));
+      });
+      page.append(tb);
+    } else {
+      const t = p.t, who = p.hl >= 0 ? Y[p.hl].name : "All yarns";
+      page.append(el("h3", { textContent: D.name + " · " + who + " · page " + t.label }),
+                  el("p", { className: "pmeta", textContent: "Columns " + (t.x0 + 1) + "–" + (t.x0 + t.w) +
+                    " · rows " + (H - t.y0 - t.h + 1) + "–" + (H - t.y0) + " (row 1 = bottom)" +
+                    (p.hl >= 0 ? " · " + fmt(Y[p.hl].count) + " knots of this yarn in total" : "") }));
+      const im = el("img", { src: renderTile(t, p.hl) });
+      im.style.width = ((P_GL + t.w * P_CELL + 2) / 96) + "in"; imgs.push(im); page.append(im);
+    }
+    area.append(page);
+  }
+  await Promise.all(imgs.map(i => i.decode ? i.decode().catch(() => {}) : 0));
+  btn.disabled = false; btn.textContent = "Print"; closePrint();
+  window.print();
+}
+document.getElementById("pGo").onclick = doPrint;
+window.addEventListener("afterprint", () => { document.getElementById("printArea").innerHTML = ""; });
+
+// ---------- start ----------
+syncSym(); syncRow(); buildLegend();
+window.addEventListener("resize", () => { resize(); });
+resize(); fit();
+document.documentElement.setAttribute("data-ready", "1");
+</script>
+</body>
+</html>

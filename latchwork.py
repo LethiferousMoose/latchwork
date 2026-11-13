@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import palette as pal
+import pattern
 import plan as pl
 from colormath import gray_for_lightness, nearest_index, parse_hex, rgb_to_lch, to_hex
 from palette import load_palette  # noqa: F401  (re-exported for tests and scripts)
@@ -108,6 +109,8 @@ class App:
                               command=self.open_project)
         file_menu.add_command(label="Close project", command=self.close_project)
         file_menu.add_separator()
+        file_menu.add_command(label="Export pattern (phone / print)...", accelerator="Ctrl+E",
+                              command=self.export_pattern)
         file_menu.add_command(label="Export yarn list...", command=self.export_yarn_list)
         file_menu.add_command(label="Save preview image...", command=self.save_preview)
         file_menu.add_separator()
@@ -124,6 +127,7 @@ class App:
         self.root.bind("<Control-p>", lambda e: self.open_palette_window())
         self.root.bind("<Control-n>", lambda e: self.new_project())
         self.root.bind("<Control-o>", lambda e: self.open_project())
+        self.root.bind("<Control-e>", lambda e: self.export_pattern())
 
     def _build_ui(self):
         r = self.main
@@ -475,6 +479,31 @@ class App:
             return
         messagebox.showinfo("Export yarn list", "Saved %d yarn%s to\n%s" % (
             len(plan.lines), "" if len(plan.lines) == 1 else "s", path))
+
+    def export_pattern(self):
+        if not self._need_project("export its pattern"):
+            return
+        n_un = len(pl.Plan(self.project).unassigned)
+        if n_un and not messagebox.askyesno(
+                "Export pattern", "%d color%s not assigned to a yarn yet. They'll appear in the "
+                "pattern in their original color, marked with ? and listed as unassigned.\n\n"
+                "Export anyway?" % (n_un, " is" if n_un == 1 else "s are"), icon="warning"):
+            return
+        folder, _ = os.path.split(os.path.abspath(self.project.path))
+        path = filedialog.asksaveasfilename(
+            title="Export pattern for phone / print", initialdir=folder, defaultextension=".html",
+            initialfile="%s pattern.html" % self.project.name, filetypes=[("Web page", "*.html")])
+        if not path:
+            return
+        try:
+            pattern.export_pattern(self.project, path)
+        except (OSError, ValueError) as e:
+            messagebox.showerror("Export pattern", "Could not write %s\n\n%s" % (path, e))
+            return
+        if messagebox.askyesno("Export pattern", "Saved the pattern to\n%s\n\nCopy it to your "
+                               "phone and open it in the browser. Open it here now?" % path):
+            import webbrowser
+            webbrowser.open("file:///" + os.path.abspath(path).replace("\\", "/"))
 
     def save_preview(self):
         if not self._need_project("save its preview"):
