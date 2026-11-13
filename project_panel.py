@@ -141,9 +141,10 @@ class ProjectPanel(tk.Frame):
         for col, text, width, anchor in (("#0", "Color", 130, "w"), ("count", "Count", 55, "e"),
                                          ("yarn", "Yarn", 145, "w"), ("state", "", 70, "w")):
             self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
-            self.tree.column(col, width=width, minwidth=40, anchor=anchor, stretch=(col == "yarn"))
+            self.tree.column(col, width=width, minwidth=40, anchor=anchor, stretch=False)
         self.tree.tag_configure("suggested", foreground="#7A7A7A", font=self._italic)
         _scrolled(body, self.tree)
+        self.tree.bind("<Configure>", lambda e: self.size_columns())
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
 
     def _build_plan_tab(self):
@@ -267,8 +268,15 @@ class ProjectPanel(tk.Frame):
 
     def size_columns(self):
         """Color, Count and status fit their contents; Yarn takes the rest (scrolls if long)."""
-        _fit_columns(self.tree, {"#0": (64, None), "count": (14, None),
-                                 "yarn": (16, self._italic), "state": (14, self._italic)})
+        t = self.tree
+        _fit_columns(t, {"#0": (64, None), "count": (14, None),
+                         "yarn": (16, self._italic), "state": (14, self._italic)})
+        # Yarn takes exactly the leftover width (no stretch), so the total never overshoots
+        # the visible area by a few pixels and the horizontal scrollbar only moves when a
+        # name really doesn't fit.
+        others = sum(int(t.column(c, "width")) for c in ("#0", "count", "state"))
+        avail = t.winfo_width() - TREE_BORDER - others
+        t.column("yarn", width=max(int(t.column("yarn", "minwidth")), avail))
 
     def update_footer(self):
         p = self.project
@@ -558,6 +566,9 @@ def _scrolled(body, tree):
     xs.grid(row=1, column=0, sticky="ew")
     body.rowconfigure(0, weight=1)
     body.columnconfigure(0, weight=1)
+
+
+TREE_BORDER = 4   # px the Treeview's frame takes from its width
 
 
 def _fit_columns(tree, spec):
