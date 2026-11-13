@@ -143,10 +143,7 @@ class ProjectPanel(tk.Frame):
             self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
             self.tree.column(col, width=width, minwidth=40, anchor=anchor, stretch=(col == "yarn"))
         self.tree.tag_configure("suggested", foreground="#7A7A7A", font=self._italic)
-        sb = ttk.Scrollbar(body, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=sb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        sb.pack(side="left", fill="y")
+        _scrolled(body, self.tree)
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
 
     def _build_plan_tab(self):
@@ -205,10 +202,7 @@ class ProjectPanel(tk.Frame):
             self.plan_tree.column(col, width=width, minwidth=40, anchor=anchor,
                                   stretch=(col == "#0"))
         self.plan_tree.tag_configure("merged", background="#FFF4CC")
-        sb = ttk.Scrollbar(body, orient="vertical", command=self.plan_tree.yview)
-        self.plan_tree.configure(yscrollcommand=sb.set)
-        self.plan_tree.pack(side="left", fill="both", expand=True)
-        sb.pack(side="left", fill="y")
+        _scrolled(body, self.plan_tree)
 
     # ---------- project ----------
     def show_welcome(self):
@@ -242,6 +236,7 @@ class ProjectPanel(tk.Frame):
         keep = self.selected_hex()
         self._quiet = True
         self.tree.delete(*self.tree.get_children())
+        self.tree.column("yarn", width=145)
         for c in self.project.colors:
             self.tree.insert("", "end", iid=c.hex)
             self.update_row(c.hex, plan=False)
@@ -260,6 +255,7 @@ class ProjectPanel(tk.Frame):
         name = yarn_label(c.yarn["name"], c.yarn.get("brand")) if c.yarn \
             else "(no yarns in palette)"
         state = "assigned" if c.confirmed else "nearest"
+        _fit(self.tree, "yarn", name, self._italic)
         self.tree.item(hex_, text="  " + c.hex, image=self.row_images[key],
                        values=(format(c.count, ","), name, state),
                        tags=() if c.confirmed else ("suggested",))
@@ -331,7 +327,9 @@ class ProjectPanel(tk.Frame):
         self.size_vals["Canvas to cut"].config(
             text="%.1f × %.1f in   (%d × %d holes)" % (ciw, cih, cw, ch))
         self.plan_tree.delete(*self.plan_tree.get_children())
+        self.plan_tree.column("#0", width=190)
         for i, l in enumerate(plan.lines):
+            _fit(self.plan_tree, "#0", "  %s" % l.label, None, extra=50)
             img = self.plan_images.get(l.hex)
             if img is None:
                 img = self.plan_images[l.hex] = _swatch(l.hex)
@@ -542,3 +540,23 @@ class CanvasDialog(tk.Toplevel):
         if not err:
             self.result = (values, self.default.get())
             self.destroy()
+
+
+def _scrolled(body, tree):
+    """Grid a tree with vertical and horizontal scrollbars (long yarn names can scroll)."""
+    ys = ttk.Scrollbar(body, orient="vertical", command=tree.yview)
+    xs = ttk.Scrollbar(body, orient="horizontal", command=tree.xview)
+    tree.configure(yscrollcommand=ys.set, xscrollcommand=xs.set)
+    tree.grid(row=0, column=0, sticky="nsew")
+    ys.grid(row=0, column=1, sticky="ns")
+    xs.grid(row=1, column=0, sticky="ew")
+    body.rowconfigure(0, weight=1)
+    body.columnconfigure(0, weight=1)
+
+
+def _fit(tree, col, text, font=None, extra=16):
+    """Widen a column so `text` fits; never narrows it."""
+    f = font or tkfont.nametofont("TkDefaultFont")
+    need = f.measure(text) + extra
+    if need > int(tree.column(col, "width")):
+        tree.column(col, width=need)
