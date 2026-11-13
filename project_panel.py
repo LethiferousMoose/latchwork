@@ -14,11 +14,6 @@ TRANSPARENT_SHOW = "#F7F7F7"
 TABLE_ROWS = 6     # requested table height; tables shrink on short windows
 
 
-def short_path(path, limit=62):
-    """Keep the end of a long path (the file name matters most)."""
-    return path if len(path) <= limit else "…" + path[-(limit - 1):]
-
-
 def _fade(hex_, amount=0.78):
     r, g, b = (int(hex_[i:i + 2], 16) for i in (1, 3, 5))
     return to_hex(*(c + (255 - c) * amount for c in (r, g, b)))
@@ -226,7 +221,7 @@ class ProjectPanel(tk.Frame):
             w, h, len(project.colors), format(project.knots, ","))
         if project.transparent:
             sub += "  ·  %s transparent (skipped)" % format(project.transparent, ",")
-        self.subtitle.config(text=sub + "\n" + short_path(project.path))
+        self.subtitle.config(text=sub)
         self.spare_var.set("%g" % float(project.settings.get("spare_percent", 0) or 0))
         self.refresh_rows()
         self.refresh_plan()
