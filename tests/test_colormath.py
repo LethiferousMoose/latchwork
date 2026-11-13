@@ -71,14 +71,14 @@ class TestPaletteOrder(unittest.TestCase):
         self.assertEqual(Ls, sorted(Ls, reverse=True))
 
     def test_excluded_layers_absent(self):
-        names = {r["sku"] for r in palette_rows()}
+        names = {"%s (%s)" % (r["sku"], r["brand"]) for r in palette_rows()}
         self.assertNotIn("Mask", names)
-        self.assertNotIn("Cafe RH", names)
-        self.assertIn("Cafe Latte RH", names)
+        self.assertNotIn("Cafe (Red Heart)", names)       # old name of Cafe Latte
+        self.assertIn("Cafe Latte (Red Heart)", names)
 
     def test_light_teal_before_dusty_grey(self):
-        names = [y.sku for y in load_palette(PALETTE)]
-        self.assertLess(names.index("Light Teal"), names.index("Dusty Grey RH"))
+        names = [y.label for y in load_palette(PALETTE)]
+        self.assertLess(names.index("Light Teal (Hershner's)"), names.index("Dusty Grey (Red Heart)"))
 
 
 class TestMatching(unittest.TestCase):

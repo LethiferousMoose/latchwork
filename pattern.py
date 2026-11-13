@@ -16,18 +16,18 @@ PLACEHOLDER = "/*__LATCHWORK_DATA__*/null"
 TRANSPARENT = 0xFFFF
 
 
-def build_data(project):
+def build_data(project, resolve=None):
     """Everything the page needs: yarn legend entries (most-used first) and one cell per knot."""
-    plan = pl.Plan(project)
+    plan = pl.Plan(project, resolve)
     entries, index_of = [], {}   # index_of: image hex -> legend index
     for line in plan.lines:
-        n, bags, need = line.need(plan.spare)
+        n, packs, need = line.need(plan.spare)
         L = lightness(*parse_hex(line.hex))
-        entries.append({"name": line.name, "hex": line.hex, "brand": line.brand,
+        entries.append({"name": line.name, "id": line.label, "hex": line.hex, "brand": line.brand,
                         "count": line.count, "need": need, "ink": "#000000" if L > 55 else "#FFFFFF",
                         "colors": line.colors, "unassigned": False})
     for c in plan.unassigned:
-        entries.append({"name": "Unassigned %s" % c.hex, "hex": c.hex, "brand": "",
+        entries.append({"name": "Unassigned %s" % c.hex, "id": c.hex, "hex": c.hex, "brand": "",
                         "count": c.count, "need": "", "colors": [c.hex], "unassigned": True,
                         "ink": "#000000" if c.L > 55 else "#FFFFFF"})
     entries.sort(key=lambda e: (e["unassigned"], -e["count"], e["name"].lower()))
@@ -55,19 +55,19 @@ def build_data(project):
     }
 
 
-def render_html(project, template_path=TEMPLATE):
+def render_html(project, template_path=TEMPLATE, resolve=None):
     with open(template_path, encoding="utf-8") as fh:
         html = fh.read()
     if html.count(PLACEHOLDER) != 1:
         raise ValueError("pattern template is missing its data placeholder")
-    data = json.dumps(build_data(project), separators=(",", ":"), ensure_ascii=False)
+    data = json.dumps(build_data(project, resolve), separators=(",", ":"), ensure_ascii=False)
     data = data.replace("</", "<\\/")  # never close the <script> early
     title = project.name.replace("&", "&amp;").replace("<", "&lt;")
     return html.replace(PLACEHOLDER, data).replace("__LATCHWORK_TITLE__", title)
 
 
-def export_pattern(project, path):
-    html = render_html(project)
+def export_pattern(project, path, resolve=None):
+    html = render_html(project, resolve=resolve)
     folder = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(prefix=".latchwork-", suffix=".tmp", dir=folder)
     try:

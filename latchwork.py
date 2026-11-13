@@ -107,6 +107,7 @@ class App:
         self.root = root
         self.remember = remember  # save the open palette in settings (off for tests/scripts)
         self.bank = []       # every yarn in the palette file, retired ones included
+        self.brands = []     # the palette's brand list (name, pack size)
         self.yarns = []      # active yarns, lightest -> darkest: what matching and stepping use
         self.palette_path = None
         self.palette_window = None
@@ -257,7 +258,7 @@ class App:
         if not path:
             return
         try:
-            pal.save_palette(path, [])
+            pal.save_bank(path, [], [])
         except OSError as e:
             messagebox.showerror("Latchwork", "Could not create %s\n\n%s" % (path, e))
             return
@@ -267,7 +268,7 @@ class App:
     def load(self, path):
         """Load a palette file. Returns True on success."""
         try:
-            bank = pal.load_palette(path)
+            bank, brands = pal.load_bank(path)
         except (OSError, ValueError, UnicodeDecodeError) as e:
             messagebox.showerror("Latchwork", "Could not load palette:\n%s\n\n%s" % (path, e))
             return False
@@ -280,21 +281,24 @@ class App:
                 settings["palette"] = self.palette_path
             write_settings(settings)
         self.index = 0
-        self._use_bank(bank, keep_sku=None)
+        self._use_bank(bank, keep_key=None, brands=brands)
         if self.palette_window:
             self.palette_window.refresh()
         return True
 
-    def _use_bank(self, bank, keep_sku):
+    def _use_bank(self, bank, keep_key, brands=None):
+        if brands is not None:
+            self.brands = brands
         self.bank = pal.sort_yarns(bank)
         self.yarns = pal.active(self.bank)
-        if self.project and self.project.suggest(self.yarns, self.palette_name):
-            self.save_project()
-            self.sidebar.refresh_rows()
+        if self.project:
+            if self.project.suggest(self.yarns, self.palette_name, self.brands):
+                self.save_project()
+            self.sidebar.refresh_rows()   # also refreshes the plan (pack sizes may have changed)
         self.update_title()
-        names = [y.sku for y in self.yarns]
-        if keep_sku in names:
-            self.index = names.index(keep_sku)
+        keys = [y.key for y in self.yarns]
+        if keep_key in keys:
+            self.index = keys.index(keep_key)
             self.refresh()
         elif self.target:
             self.jump_nearest()
@@ -302,16 +306,17 @@ class App:
             self.index = max(0, min(self.index, len(self.yarns) - 1))
             self.refresh()
 
-    def set_bank(self, bank):
-        """Save an edited yarn bank to the palette file and show it. Returns True on success."""
+    def set_bank(self, bank, brands=None):
+        """Save an edited yarn bank (and brand list) and show it. Returns True on success."""
+        brands = pal.ensure_brands(self.brands if brands is None else brands, bank)
         try:
-            pal.save_palette(self.palette_path, bank)
+            pal.save_bank(self.palette_path, bank, brands)
         except OSError as e:
             messagebox.showerror("Latchwork", "Could not save %s\n\n%s" % (self.palette_path, e),
                                  parent=self.palette_window or self.root)
             return False
-        current = self.yarns[self.index].sku if self.yarns else None
-        self._use_bank(bank, keep_sku=current)
+        current = self.yarns[self.index].key if self.yarns else None
+        self._use_bank(bank, keep_key=current, brands=brands)
         return True
 
     def open_palette_window(self):
@@ -321,10 +326,21 @@ class App:
         else:
             self.palette_window = PaletteWindow(self)
 
-    def jump_to_sku(self, sku):
-        names = [y.sku for y in self.yarns]
-        if sku in names:
-            self.jump_to(names.index(sku))
+    def jump_to_yarn(self, key):
+        keys = [y.key for y in self.yarns]
+        if key in keys:
+            self.jump_to(keys.index(key))
+
+    def resolve(self, name, brand):
+        """(found, pack size) for a project's yarn in the open palette (retired ones count),
+        so pack-size changes in the palette apply to projects."""
+        key = pal.yarn_key(name, brand)
+        y = next((v for v in self.bank if v.key == key), None)
+        return (True, pal.effective_pack(y, self.brands)) if y else (False, None)
+
+    @staticmethod
+    def assignment_key(y):
+        return pal.yarn_key(y["name"], y.get("brand") or "")
 
     def update_title(self):
         """Window title: project name first (when open), then the palette in use."""
@@ -339,8 +355,8 @@ class App:
         return os.path.basename(self.palette_path) if self.palette_path else ""
 
     def yarn_in_palette(self, y):
-        """Is this assignment's yarn (name + hex) among the active yarns of the open palette?"""
-        key = pal.name_key(y["name"])
+        """Is this assignment's yarn (name + brand + hex) among the active yarns of the palette?"""
+        key = self.assignment_key(y)
         return any(v.key == key and v.hex == y["hex"].upper() for v in self.yarns)
 
     # ---------- projects ----------
@@ -371,7 +387,8 @@ class App:
         if not path:
             return
         project.path = path
-        project.suggest(self.yarns, self.palette_name)
+        project.settings.update(read_settings().get("canvas_defaults") or {})
+        project.suggest(self.yarns, self.palette_name, self.brands)
         if self.save_project(project):
             self.show_project(project)
 
@@ -387,7 +404,7 @@ class App:
         except (OSError, ValueError, KeyError, TypeError) as e:
             messagebox.showerror("Open project", "Could not open %s\n\n%s" % (path, e))
             return False
-        if project.suggest(self.yarns, self.palette_name):
+        if project.suggest(self.yarns, self.palette_name, self.brands):
             self.save_project(project)
         self.show_project(project)
         return True
@@ -432,11 +449,21 @@ class App:
     def _goto_entry(self, entry):
         self.selected_hex = entry.hex
         if entry.confirmed and entry.yarn and self.yarn_in_palette(entry.yarn):
-            key = pal.name_key(entry.yarn["name"])
+            key = self.assignment_key(entry.yarn)
             self.index = next(i for i, y in enumerate(self.yarns) if y.key == key)
             self.refresh()
         else:
             self.jump_nearest()
+
+    def set_canvas(self, values, as_default=False):
+        """Canvas mesh/borders for the open project (and optionally for new projects)."""
+        if not self.project:
+            return
+        self.project.settings.update(values)
+        self.save_project()
+        self.sidebar.refresh_plan()
+        if as_default and self.remember:
+            remember_setting("canvas_defaults", dict(values))
 
     def assign_state(self):
         """'none' (not assigned), 'this' (assigned to the yarn on screen) or 'other'."""
@@ -446,7 +473,7 @@ class App:
         if not (entry.confirmed and entry.yarn):
             return "none"
         y = self.yarns[self.index]
-        same = pal.name_key(entry.yarn["name"]) == y.key and entry.yarn["hex"].upper() == y.hex
+        same = self.assignment_key(entry.yarn) == y.key and entry.yarn["hex"].upper() == y.hex
         return "this" if same else "other"
 
     def assign(self):
@@ -458,7 +485,8 @@ class App:
         if state == "this":
             self.unassign()
             return
-        self.project.assign(self.selected_hex, self.yarns[self.index], self.palette_name)
+        self.project.assign(self.selected_hex, self.yarns[self.index], self.palette_name,
+                            self.brands)
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
         self.draw_info()
@@ -467,7 +495,7 @@ class App:
         if not (self.project and self.selected_hex):
             return
         self.project.unassign(self.selected_hex)
-        self.project.suggest(self.yarns, self.palette_name)
+        self.project.suggest(self.yarns, self.palette_name, self.brands)
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
         self.draw_info()  # stay on the same yarn; the button flips back to "Assign"
@@ -522,7 +550,7 @@ class App:
     def export_yarn_list(self):
         if not self._need_project("export its yarn list"):
             return
-        plan = pl.Plan(self.project)
+        plan = pl.Plan(self.project, self.resolve)
         if not plan.lines and not messagebox.askyesno(
                 "Export yarn list", "No colors are assigned yet, so the list will be empty. "
                                     "Export anyway?"):
@@ -544,7 +572,7 @@ class App:
     def export_pattern(self):
         if not self._need_project("export its pattern"):
             return
-        n_un = len(pl.Plan(self.project).unassigned)
+        n_un = len(pl.Plan(self.project, self.resolve).unassigned)
         if n_un and not messagebox.askyesno(
                 "Export pattern", "%d color%s not assigned to a yarn yet. They'll appear in the "
                 "pattern in their original color, marked with ? and listed as unassigned.\n\n"
@@ -557,7 +585,7 @@ class App:
         if not path:
             return
         try:
-            pattern.export_pattern(self.project, path)
+            pattern.export_pattern(self.project, path, self.resolve)
         except (OSError, ValueError) as e:
             messagebox.showerror("Export pattern", "Could not write %s\n\n%s" % (path, e))
             return
@@ -640,7 +668,7 @@ class App:
             self.pos_card.set("\u2013", "", "#888")
             return
         yarn = self.yarns[self.index]
-        self.yarn_title.config(text=yarn.sku)
+        self.yarn_title.config(text=yarn.label)
         self.yarn_hex_var.set(yarn.hex)
         t_L = rgb_to_lch(*self.target)[0] if self.target else None
         self.target_panel.show(self.target, other_L=yarn.L)

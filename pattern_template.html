@@ -470,11 +470,11 @@ function buildLegend() {
     txt.append(name, meta); li.appendChild(txt);
     const lab = document.createElement("label"); lab.className = "done";
     const cb = document.createElement("input"); cb.type = "checkbox";
-    cb.checked = state.done.includes(y.name);
+    cb.checked = state.done.includes(y.id || y.name);
     cb.addEventListener("click", ev => ev.stopPropagation());
     cb.addEventListener("change", () => {
-      state.done = state.done.filter(n => n !== y.name);
-      if (cb.checked) state.done.push(y.name);
+      state.done = state.done.filter(n => n !== (y.id || y.name));
+      if (cb.checked) state.done.push(y.id || y.name);
       save(); refreshLegend();
     });
     lab.addEventListener("click", ev => ev.stopPropagation());
@@ -489,10 +489,10 @@ function refreshLegend() {
   [...list.children].forEach(li => {
     const i = +li.dataset.i;
     li.classList.toggle("sel", i === sel);
-    li.classList.toggle("done", state.done.includes(Y[i].name));
+    li.classList.toggle("done", state.done.includes(Y[i].id || Y[i].name));
   });
   const real = Y.filter(y => !y.unassigned);
-  const done = real.filter(y => state.done.includes(y.name)).length;
+  const done = real.filter(y => state.done.includes(y.id || y.name)).length;
   document.getElementById("legendCount").textContent =
     real.length + " yarn" + (real.length === 1 ? "" : "s") + " · " + done + " done";
 }

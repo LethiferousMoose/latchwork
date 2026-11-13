@@ -21,7 +21,7 @@ Keep it simple. This is a personal tool, not a product.
 - `pixelart.py`: exact PNG decode/encode (stdlib zlib), GIF via Tk, color counting. No Tk for PNG.
 - `project.py`: the `.latchwork` project file (embedded image, colors, assignments). No Tk.
 - `project_panel.py`: the project sidebar (image/preview, Colors and Plan tabs, Assign).
-- `plan.py`: quantities, bags, canvas size, merged colors, yarn-list CSV, preview PNG. No Tk.
+- `plan.py`: quantities, packs, canvas size, merged colors, yarn-list CSV, preview PNG. No Tk.
 - `pattern_template.html`: the phone/print pattern page (HTML/CSS/JS, no external files).
 - `pattern.py`: embeds a project into the template as JSON (one cell per knot). No Tk.
 - `palette.csv`: the yarn palette (see below).
@@ -53,12 +53,19 @@ Keep it simple. This is a personal tool, not a product.
   else agrees with L\* at one decimal place.
 
 ## Palette
-- `palette.csv` columns: `order, sku, r, g, b, hex, L_gimp, retired`. RGB is 0–255.
-  `retired` is `yes` or blank. `L_gimp` is written by `colormath` on every save. 198 yarns at the
-  start of Stage 2.
+- `palette.csv` columns: `order, sku, brand, r, g, b, hex, L_gimp, pack_size, retired`. RGB is
+  0–255. `retired` is `yes` or blank. `L_gimp` is written by `colormath` on every save.
+  `pack_size` is a per-yarn override (blank = use the brand's).
+- **Brands** live in a companion file named after the palette (`palette.csv` →
+  `palette.brands.csv`): `brand, pack_size` (pieces per pre-cut pack; blank = cut from skeins).
+  Mine: Hershner's 320, Red Heart and Loops & Threads cut. Edited in Palette → Brands…; a pack
+  size change applies to open projects too (projects look the yarn up in the open palette and
+  only fall back to their saved snapshot when it's gone).
+- **A yarn is identified by name + brand** (case-insensitive), shown as "Name (Brand)". The old
+  name suffixes (RH, L&T) were moved into the brand column and dropped from names (2026-11-13);
+  projects saved before that are converted on load ("Gold RH" → Gold, Red Heart).
 - Kept sorted by L\*, lightest to darkest. Ties keep their existing order.
-- Brand comes from the name suffix: **`RH` = Red Heart, `L&T` = Loops & Threads, no suffix =
-  Hershner's.** Use names exactly as they are in the layers (including any typos).
+- Names otherwise as in my GIMP layers (including any typos).
 
 ## Display conventions
 - **RGB shown on a 0–100 scale**, like GIMP's picker (254,250,190 → 99.6, 98.0, 74.5).
@@ -155,18 +162,19 @@ saved color maps never refer to yarns that vanished.
 - **Merged-color note** when two image colors share a yarn. Informational only, since sometimes
   that's what I want.
 - **Yarn quantities:**
-  - Hershner's (no suffix): bags of 320 pre-cut pieces, `ceil(knots / 320)`.
-  - Red Heart / Loops & Threads: show the pieces-to-cut count (= knots). No skein estimates;
-    I cut from skeins myself.
+  - Each yarn's pack size (brand default or its own): `ceil(knots_with_spare / pack_size)`
+    packs. Merged colors are added up before rounding.
+  - No pack size (cut from skeins): show the pieces-to-cut count. No skein estimates.
   - Spare margin setting, default 0%.
-- **Size**, for 3.75 holes per inch mesh (I always use this):
+- **Size**: canvas settings are per project (Plan tab → Change…), defaulting to my setup below;
+  "Also use these for new projects" saves new defaults. My setup, 3.75 holes per inch:
   - Finished size = width ÷ 3.75 by height ÷ 3.75 inches.
   - Canvas to cut = (width + 6) × (height + 12) cells, also in inches.
     - Width +6: a 3-cell fold on each side.
     - Height +12: 8 cells at the top that fold over (for the hanging loop), 3 cells at the bottom
       that fold over, plus 1 empty bottom row, because the canvas edge isn't stable enough to
       hook into.
-- **Export yarn list** (CSV): yarn name, brand, hex, knots, bags or pieces, which image colors
+- **Export yarn list** (CSV): yarn name, brand, hex, knots, pack size, packs or pieces, which image colors
   use it, totals.
 - Save the yarn-color preview as a PNG (1 pixel per knot, unassigned colors original).
 - Only **assigned** colors count toward quantities; unassigned ones are listed as not counted.

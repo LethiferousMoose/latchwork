@@ -1,4 +1,8 @@
-"""The yarn bank: load/save palette.csv, GIMP .gpl and CSV import/export, import merge rules.
+"""The yarn bank: yarns + brands, load/save, GIMP .gpl and CSV import/export, import merge rules.
+
+Files: a palette CSV (one row per yarn) and its companion brand list next to it, named after it
+(palette.csv -> palette.brands.csv). A yarn is identified by name + brand (case-insensitive).
+Pack size: a brand's default (blank = cut from skeins), optionally overridden per yarn.
 
 No Tk in here, so everything is unit-testable.
 """
@@ -9,35 +13,93 @@ import tempfile
 
 from colormath import lightness, parse_hex, rgb_to_lch, to_hex
 
-FIELDS = ["order", "sku", "r", "g", "b", "hex", "L_gimp", "retired"]
-_BRANDS = (("L&T", "Loops & Threads"), ("RH", "Red Heart"))
+FIELDS = ["order", "sku", "brand", "r", "g", "b", "hex", "L_gimp", "pack_size", "retired"]
+BRAND_FIELDS = ["brand", "pack_size"]
 _PLACEHOLDER = re.compile(r"^(|index\s*\d*|untitled.*|unnamed.*|color\s*\d*|colour\s*\d*)$", re.I)
 
+# How palettes made before brands existed were read (from the name suffix). Used only when a
+# palette CSV has no brand column, and for projects saved before brands existed.
+_LEGACY_SUFFIX = (("L&T", "Loops & Threads"), ("RH", "Red Heart"))
+LEGACY_DEFAULT_BRAND = "Hershner's"
+LEGACY_PACKS = {"Hershner's": 320, "Red Heart": None, "Loops & Threads": None}
 
-def brand_of(sku):
+
+def legacy_brand(sku):
     s = sku.strip()
-    for suffix, name in _BRANDS:
+    for suffix, name in _LEGACY_SUFFIX:
         if s.endswith(" " + suffix):
             return name
-    return "Hershner's"
+    return LEGACY_DEFAULT_BRAND
+
+
+def strip_legacy_suffix(sku):
+    """'Gold RH' -> 'Gold' (the brand now lives in its own column)."""
+    s = clean_name(sku)
+    for suffix, _ in _LEGACY_SUFFIX:
+        if s.endswith(" " + suffix):
+            return s[:-len(suffix) - 1].rstrip()
+    return s
+
+
+def legacy_assignment(name):
+    """(name, brand, pack) for a yarn saved before brands existed."""
+    brand = legacy_brand(name)
+    return strip_legacy_suffix(name), brand, LEGACY_PACKS.get(brand)
 
 
 def name_key(name):
     """Names compare case-insensitively and ignore extra spaces."""
-    return " ".join(name.split()).casefold()
+    return " ".join((name or "").split()).casefold()
 
 
 def clean_name(name):
-    return " ".join(name.split())
+    return " ".join((name or "").split())
 
 
 def is_placeholder(name):
     return bool(_PLACEHOLDER.match(clean_name(name)))
 
 
+def yarn_key(name, brand):
+    return (name_key(name), name_key(brand))
+
+
+def label(name, brand):
+    """How a yarn is shown: 'Name (Brand)', or just 'Name' when it has no brand."""
+    return "%s (%s)" % (name, brand) if brand else name
+
+
+def parse_pack(value):
+    """'320' -> 320; blank/0/'cut' -> None. Raises ValueError for anything else."""
+    s = str(value if value is not None else "").strip().lower()
+    if s in ("", "0", "cut", "none", "-"):
+        return None
+    n = int(float(s))
+    if n < 1:
+        raise ValueError("pack size must be a positive number")
+    return n
+
+
+class Brand:
+    def __init__(self, name, pack=None):
+        self.name, self.pack = clean_name(name), pack
+
+    @property
+    def key(self):
+        return name_key(self.name)
+
+    def copy(self):
+        return Brand(self.name, self.pack)
+
+    def __repr__(self):
+        return "Brand(%r, %r)" % (self.name, self.pack)
+
+
 class Yarn:
-    def __init__(self, sku, rgb, retired=False):
+    def __init__(self, sku, rgb, retired=False, brand="", pack=None):
         self.sku = clean_name(sku)
+        self.brand = clean_name(brand)
+        self.pack = pack          # per-yarn override; None = use the brand's pack size
         self.retired = bool(retired)
         self.set_rgb(rgb)
 
@@ -48,26 +110,36 @@ class Yarn:
         self.lch = rgb_to_lch(*self.rgb)
 
     @property
-    def brand(self):
-        return brand_of(self.sku)
+    def key(self):
+        return yarn_key(self.sku, self.brand)
 
     @property
-    def key(self):
-        return name_key(self.sku)
+    def label(self):
+        return label(self.sku, self.brand)
 
     def copy(self):
-        return Yarn(self.sku, self.rgb, self.retired)
+        return Yarn(self.sku, self.rgb, self.retired, self.brand, self.pack)
 
     def __repr__(self):
-        return "Yarn(%r, %s%s)" % (self.sku, self.hex, ", retired" if self.retired else "")
+        return "Yarn(%r, %s%s)" % (self.label, self.hex, ", retired" if self.retired else "")
 
 
 class Entry:
-    """A color read from an import file (name may be empty or a placeholder)."""
+    """A color read from an import file. brand None = the file had no brand information."""
 
-    def __init__(self, name, rgb, retired=False):
+    def __init__(self, name, rgb, retired=False, brand=None, pack=None):
         self.name, self.rgb, self.retired = clean_name(name), tuple(rgb), bool(retired)
+        self.brand = None if brand is None else clean_name(brand)
+        self.pack = pack
         self.hex = to_hex(*self.rgb)
+
+    @property
+    def key(self):
+        return yarn_key(self.name, self.brand or "")
+
+    @property
+    def label(self):
+        return label(self.name, self.brand)
 
 
 def sort_yarns(yarns):
@@ -79,13 +151,58 @@ def active(yarns):
     return [y for y in yarns if not y.retired]
 
 
-def _truthy(value):
-    return str(value or "").strip().lower() in ("1", "yes", "y", "true", "x", "retired")
+# ---------- brands ----------
+def brand_by_key(brands, name):
+    k = name_key(name)
+    return next((b for b in brands if b.key == k), None)
+
+
+def effective_pack(yarn, brands):
+    """Pieces per pre-cut pack for this yarn, or None when it's cut from skeins."""
+    if yarn.pack:
+        return yarn.pack
+    b = brand_by_key(brands, yarn.brand)
+    return b.pack if b else None
+
+
+def ensure_brands(brands, yarns):
+    """Brand list including every brand a yarn uses (new ones get no pack size)."""
+    out = [b.copy() for b in brands]
+    for y in yarns:
+        if y.brand and not brand_by_key(out, y.brand):
+            out.append(Brand(y.brand))
+    return sorted(out, key=lambda b: b.name.lower())
+
+
+def brands_path(palette_path):
+    root, _ = os.path.splitext(palette_path)
+    return root + ".brands.csv"
+
+
+def read_brands(path):
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh)
+        cols = {c.strip().lower(): c for c in (reader.fieldnames or [])}
+        if "brand" not in cols:
+            raise ValueError("%s needs a 'brand' column" % os.path.basename(path))
+        out = []
+        for n, row in enumerate(reader, 2):
+            name = clean_name(row.get(cols["brand"]))
+            if not name:
+                continue
+            try:
+                pack = parse_pack(row.get(cols.get("pack_size", ""), ""))
+            except ValueError:
+                raise ValueError("%s line %d: bad pack size" % (os.path.basename(path), n))
+            if not brand_by_key(out, name):
+                out.append(Brand(name, pack))
+    return out
 
 
 # ---------- CSV ----------
 def read_csv_entries(path):
-    """Rows of a palette-style CSV. Needs a name column (sku or name) and hex or r,g,b."""
+    """Rows of a palette-style CSV. Needs a name column (sku or name) and hex or r,g,b.
+    Optional: brand, pack_size, retired."""
     with open(path, newline="", encoding="utf-8-sig") as fh:
         reader = csv.DictReader(fh)
         cols = {c.strip().lower(): c for c in (reader.fieldnames or [])}
@@ -95,6 +212,7 @@ def read_csv_entries(path):
         has_rgb = all(k in cols for k in ("r", "g", "b"))
         if not has_rgb and "hex" not in cols:
             raise ValueError("needs a 'hex' column or 'r', 'g', 'b' columns")
+        brand_col = cols.get("brand")
         out = []
         for n, row in enumerate(reader, 2):
             if not any((v or "").strip() for v in row.values()):
@@ -110,16 +228,42 @@ def read_csv_entries(path):
                         raise ValueError
             except (ValueError, KeyError):
                 raise ValueError("line %d: can't read a color for %r" % (n, row.get(name_col)))
-            out.append(Entry(row[name_col] or "", rgb, _truthy(row.get(cols.get("retired", ""), ""))))
+            try:
+                pack = parse_pack(row.get(cols.get("pack_size", ""), ""))
+            except ValueError:
+                raise ValueError("line %d: bad pack size for %r" % (n, row.get(name_col)))
+            out.append(Entry(row[name_col] or "", rgb,
+                             str(row.get(cols.get("retired", ""), "") or "").strip().lower()
+                             in ("1", "yes", "y", "true", "x", "retired"),
+                             brand=(row.get(brand_col) or "") if brand_col else None, pack=pack))
     return out
 
 
-def load_palette(path):
+def load_bank(path):
+    """(yarns lightest -> darkest, brands) from a palette CSV and its brand file.
+
+    A palette without a brand column (made before brands existed) gets brands from the old
+    name-suffix rules and the old pack sizes, so its numbers stay the same."""
     entries = read_csv_entries(path)
+    legacy = any(e.brand is None for e in entries)
+    yarns = []
     for e in entries:
         if not e.name:
             raise ValueError("a row has no name (hex %s)" % e.hex)
-    return sort_yarns(Yarn(e.name, e.rgb, e.retired) for e in entries)
+        brand = legacy_brand(e.name) if e.brand is None else e.brand
+        yarns.append(Yarn(e.name, e.rgb, e.retired, brand, e.pack))
+    bpath = brands_path(path)
+    if os.path.exists(bpath):
+        brands = read_brands(bpath)
+    elif legacy:
+        brands = [Brand(n, p) for n, p in LEGACY_PACKS.items()]
+    else:
+        brands = []
+    return sort_yarns(yarns), ensure_brands(brands, yarns)
+
+
+def load_palette(path):
+    return load_bank(path)[0]
 
 
 def _atomic_write(path, write):
@@ -136,12 +280,29 @@ def _atomic_write(path, write):
 
 
 def save_palette(path, yarns):
+    """The yarn file only."""
     def write(fh):
         w = csv.writer(fh)
         w.writerow(FIELDS)
         for i, y in enumerate(sort_yarns(yarns), 1):
-            w.writerow([i, y.sku, *y.rgb, y.hex, "%.4f" % y.L, "yes" if y.retired else ""])
+            w.writerow([i, y.sku, y.brand, *y.rgb, y.hex, "%.4f" % y.L, y.pack or "",
+                        "yes" if y.retired else ""])
     _atomic_write(path, write)
+
+
+def write_brands(path, brands):
+    def write(fh):
+        w = csv.writer(fh)
+        w.writerow(BRAND_FIELDS)
+        for b in sorted(brands, key=lambda b: b.name.lower()):
+            w.writerow([b.name, b.pack or ""])
+    _atomic_write(path, write)
+
+
+def save_bank(path, yarns, brands):
+    """Palette CSV plus its brand file."""
+    save_palette(path, yarns)
+    write_brands(brands_path(path), ensure_brands(brands, yarns))
 
 
 # ---------- GIMP .gpl ----------
@@ -166,30 +327,52 @@ def read_gpl(path):
 
 
 def write_gpl(path, yarns, title="Latchwork yarns"):
-    """Active yarns only (.gpl has no retired flag)."""
+    """Active yarns only (.gpl has no retired flag). Names include the brand."""
     def write(fh):
         fh.write("GIMP Palette\nName: %s\nColumns: 16\n#\n" % title)
         for y in sort_yarns(active(yarns)):
-            fh.write("%3d %3d %3d\t%s\n" % (y.rgb + (y.sku,)))
+            fh.write("%3d %3d %3d\t%s\n" % (y.rgb + (y.label,)))
     _atomic_write(path, write)
 
 
 def read_import_file(path):
+    """(entries, brands from a companion brand file or []) for a .gpl or .csv file."""
     if path.lower().endswith(".gpl"):
-        return read_gpl(path)
-    return read_csv_entries(path)
+        return read_gpl(path), []
+    bpath = brands_path(path)
+    return read_csv_entries(path), (read_brands(bpath) if os.path.exists(bpath) else [])
+
+
+def needs_brand(entries):
+    """True when some imported colors came without brand information (e.g. every .gpl)."""
+    return any(e.brand is None for e in entries)
+
+
+def set_brand(entries, brand):
+    for e in entries:
+        if e.brand is None:
+            e.brand = clean_name(brand)
+
+
+def merge_brands(brands, incoming):
+    """Add brands from an import that aren't known yet; existing brands keep their settings."""
+    out = [b.copy() for b in brands]
+    for b in incoming:
+        if not brand_by_key(out, b.name):
+            out.append(b.copy())
+    return sorted(out, key=lambda b: b.name.lower())
 
 
 # ---------- add / edit helpers ----------
-def name_problem(name, yarns, exclude=None):
-    """Why this name can't be used for a yarn, or None."""
+def name_problem(name, brand, yarns, exclude=None):
+    """Why this name + brand can't be used for a yarn, or None."""
     n = clean_name(name)
     if not n:
         return "Name is empty"
-    k = name_key(n)
+    k = yarn_key(n, brand)
     for y in yarns:
         if y is not exclude and y.key == k:
-            return "Name already used by %s%s" % (y.sku, " (retired)" if y.retired else "")
+            return "%s already exists%s" % (y.label, " (retired)" if y.retired else "")
     return None
 
 
@@ -251,29 +434,29 @@ class ImportItem:
         return {
             NEW: "New yarn",
             SAME: "Already in the bank",
-            CLASH: "Name exists with a different color",
+            CLASH: "Same name and brand, different color",
             RETIRED: "Matches a retired yarn",
-            HEX_MATCH: "Same color as %s" % (self.existing.sku if self.existing else "?"),
+            HEX_MATCH: "Same color as %s" % (self.existing.label if self.existing else "?"),
             PLACEHOLDER: "Placeholder name, needs a real one",
             DUPLICATE: "Name repeated in the file",
         }[self.kind]
 
 
 def plan_import(bank, entries):
-    by_name = {}
-    by_hex = {}
+    """Entries must have a brand by now (see needs_brand / set_brand)."""
+    by_key, by_hex = {}, {}
     for y in bank:
-        by_name.setdefault(y.key, y)
+        by_key.setdefault(y.key, y)
         by_hex.setdefault(y.hex, y)
     seen, items = set(), []
     for e in entries:
-        k = name_key(e.name)
+        k = e.key
         if is_placeholder(e.name):
             item = ImportItem(e, PLACEHOLDER)
         elif k in seen:
-            item = ImportItem(e, DUPLICATE, by_name.get(k))
-        elif k in by_name:
-            ex = by_name[k]
+            item = ImportItem(e, DUPLICATE, by_key.get(k))
+        elif k in by_key:
+            ex = by_key[k]
             if ex.retired and not e.retired:
                 kind = RETIRED          # file has it active: offer to restore
             else:
@@ -289,12 +472,16 @@ def plan_import(bank, entries):
     return items
 
 
-def suggest_name(name, taken_keys):
+def suggest_name(name, brand, taken_keys):
     base = clean_name(name) or "New yarn"
     n = 2
-    while name_key("%s %d" % (base, n)) in taken_keys:
+    while yarn_key("%s %d" % (base, n), brand) in taken_keys:
         n += 1
     return "%s %d" % (base, n)
+
+
+def _new_yarn(name, e):
+    return Yarn(name, e.rgb, e.retired, e.brand or "", e.pack)
 
 
 def _apply(bank, items):
@@ -307,7 +494,7 @@ def _apply(bank, items):
         if it.existing is not None:
             ex = copy_of.get(id(it.existing)) or by_key.get(it.existing.key)
             if ex is None and a not in ("skip", "keep_mine", "add", "keep_both", "add_named"):
-                raise ValueError("%s is no longer in the bank" % it.existing.sku)
+                raise ValueError("%s is no longer in the bank" % it.existing.label)
         if a in ("skip", "keep_mine"):
             continue
         if a == "take_file":
@@ -320,9 +507,9 @@ def _apply(bank, items):
         elif a == "rename_existing":
             ex.sku = e.name
         elif a == "add":
-            result.append(Yarn(e.name, e.rgb, e.retired))
+            result.append(_new_yarn(e.name, e))
         elif a in ("keep_both", "add_named"):
-            result.append(Yarn(it.new_name, e.rgb, e.retired))
+            result.append(_new_yarn(it.new_name, e))
     return result
 
 
@@ -338,10 +525,10 @@ def import_problems(bank, items):
                 problems.append("%s: %r is still a placeholder name" % (it.entry.hex, n))
     counts = {}
     for y in _apply(bank, items):
-        counts.setdefault(y.key, []).append(y.sku)
+        counts.setdefault(y.key, []).append(y.label)
     for names in counts.values():
         if len(names) > 1:
-            problems.append("Name used more than once: %s" % names[0])
+            problems.append("Used more than once: %s" % names[0])
     return problems
 
 

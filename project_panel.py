@@ -5,6 +5,7 @@ import tkinter.font as tkfont
 from tkinter import ttk
 
 import plan as pl
+from palette import label as yarn_label
 from colormath import gray_for_lightness, lightness, parse_hex, to_hex
 
 BG = "#ECECEC"
@@ -173,10 +174,14 @@ class ProjectPanel(tk.Frame):
             v = tk.Label(sizes, font=("Segoe UI", 10, "bold"), bg=BG)
             v.grid(row=row, column=1, sticky="w", padx=10)
             self.size_vals[key] = v
-        tk.Label(sizes, text="3.75 holes/inch \u00B7 canvas adds 3 per side, 8 top, 3 + 1 bottom",
-                 font=("Segoe UI", 8), bg=BG,
-                 fg="#888", wraplength=IMG_W, justify="left").grid(row=2, column=0, columnspan=2,
-                                                                   sticky="w")
+        note = tk.Frame(sizes, bg=BG)
+        note.grid(row=2, column=0, columnspan=2, sticky="w")
+        self.canvas_note = tk.Label(note, font=("Segoe UI", 8), bg=BG, fg="#888", justify="left")
+        self.canvas_note.pack(side="left")
+        link = tk.Label(note, text="Change…", font=("Segoe UI", 8, "underline"), bg=BG,
+                        fg="#1565C0", cursor="hand2")
+        link.pack(side="left", padx=(6, 0))
+        link.bind("<Button-1>", lambda e: self.edit_canvas())
         spare = tk.Frame(sizes, bg=BG)
         spare.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
         tk.Label(spare, text="Spare", font=UI_FONT, bg=BG).pack(side="left")
@@ -186,7 +191,7 @@ class ProjectPanel(tk.Frame):
         sp.pack(side="left", padx=4)
         sp.bind("<Return>", lambda e: self.on_spare())
         sp.bind("<FocusOut>", lambda e: self.on_spare())
-        tk.Label(spare, text="%   added to every count before bags and pieces",
+        tk.Label(spare, text="%   added to every count before packs and pieces",
                  font=("Segoe UI", 9), bg=BG, fg="#666").pack(side="left")
 
         body = tk.Frame(tab, bg=BG)
@@ -252,7 +257,8 @@ class ProjectPanel(tk.Frame):
         key = (c.hex, yhex)
         if key not in self.row_images:
             self.row_images[key] = _pair_image(c.hex, yhex)
-        name = c.yarn["name"] if c.yarn else "(no yarns in palette)"
+        name = yarn_label(c.yarn["name"], c.yarn.get("brand")) if c.yarn \
+            else "(no yarns in palette)"
         state = "assigned" if c.confirmed else "nearest"
         self.tree.item(hex_, text="  " + c.hex, image=self.row_images[key],
                        values=(format(c.count, ","), name, state),
@@ -284,7 +290,8 @@ class ProjectPanel(tk.Frame):
             self.info_sub.config(text="The open palette has no active yarns.")
             return
         y = c.yarn
-        self.info_title.config(text="%s  \u2192  %s" % (c.hex, y["name"]))
+        self.info_title.config(text="%s  \u2192  %s" % (c.hex, yarn_label(y["name"],
+                                                                          y.get("brand"))))
         if c.confirmed:
             sub = "Assigned \u00B7 %s \u00B7 from %s" % (y["hex"], y.get("palette") or "?")
             if not self.app.yarn_in_palette(y):
@@ -311,7 +318,11 @@ class ProjectPanel(tk.Frame):
     def refresh_plan(self):
         if not self.project:
             return
-        plan = pl.Plan(self.project)
+        plan = pl.Plan(self.project, self.app.resolve)
+        cv = plan.canvas
+        self.canvas_note.config(text="%g holes/inch · borders: %d each side, %d top, %d bottom"
+                                % (cv["holes_per_inch"], cv["border_side"], cv["border_top"],
+                                   cv["border_bottom"]))
         fw, fh = plan.finished_in
         cw, ch = plan.canvas_cells
         ciw, cih = plan.canvas_in
@@ -324,14 +335,13 @@ class ProjectPanel(tk.Frame):
             img = self.plan_images.get(l.hex)
             if img is None:
                 img = self.plan_images[l.hex] = _swatch(l.hex)
-            self.plan_tree.insert("", "end", iid=str(i), text="  %s" % l.name, image=img,
+            self.plan_tree.insert("", "end", iid=str(i), text="  %s" % l.label, image=img,
                                   values=(format(l.count, ","), l.need(plan.spare)[2],
                                           len(l.colors)),
                                   tags=("merged",) if l.merged else ())
         parts = ["%s assigned" % format(plan.assigned_count, ",")]
-        if plan.total_bags:
-            parts.append("%d Hershner's bag%s" % (plan.total_bags,
-                                                  "" if plan.total_bags == 1 else "s"))
+        if plan.total_packs:
+            parts.append("%d pack%s" % (plan.total_packs, "" if plan.total_packs == 1 else "s"))
         if plan.total_pieces_to_cut:
             parts.append("%s pieces to cut" % format(plan.total_pieces_to_cut, ","))
         if plan.spare:
@@ -346,6 +356,14 @@ class ProjectPanel(tk.Frame):
             notes.append("Merged: %s is used for %d image colors (%s)." % (
                 l.name, len(l.colors), ", ".join(l.colors)))
         self.notes.config(text="\n".join(notes))
+
+    def edit_canvas(self):
+        if not self.project:
+            return
+        r = CanvasDialog(self, pl.canvas_settings(self.project.settings)).result
+        if r:
+            values, as_default = r
+            self.app.set_canvas(values, as_default)
 
     # ---------- selection ----------
     def selected_hex(self):
@@ -450,3 +468,77 @@ class ProjectPanel(tk.Frame):
         self.display.put(" ".join(rows), to=(0, 0))
         self.offset = ((IMG_W - dw) // 2, (IMG_H - dh) // 2)
         c.create_image(self.offset[0], self.offset[1], image=self.display, anchor="nw")
+
+
+class CanvasDialog(tk.Toplevel):
+    """Canvas mesh and border allowances for a project. result = (values, as_default) or None."""
+
+    FIELDS = (("holes_per_inch", "Holes per inch", "mesh count of the canvas"),
+              ("border_side", "Border, each side", "holes folded under on the left and right"),
+              ("border_top", "Border, top", "holes folded over at the top (e.g. hanging loop)"),
+              ("border_bottom", "Border, bottom", "holes folded under + empty rows at the bottom"))
+
+    def __init__(self, parent, values):
+        super().__init__(parent)
+        self.result = None
+        self.title("Canvas")
+        self.configure(bg=BG, padx=16, pady=14)
+        self.resizable(False, False)
+        self.transient(parent)
+        self.vars = {}
+        for row, (key, text, hint) in enumerate(self.FIELDS):
+            tk.Label(self, text=text, font=UI_FONT, bg=BG).grid(row=row, column=0, sticky="w",
+                                                                pady=3)
+            v = tk.StringVar(value="%g" % values[key])
+            ttk.Entry(self, textvariable=v, width=7).grid(row=row, column=1, sticky="w", padx=8)
+            tk.Label(self, text=hint, font=("Segoe UI", 9), bg=BG, fg="#777").grid(
+                row=row, column=2, sticky="w")
+            v.trace_add("write", lambda *_: self.update_view())
+            self.vars[key] = v
+        self.default = tk.BooleanVar(value=False)
+        ttk.Checkbutton(self, text="Also use these for new projects", variable=self.default).grid(
+            row=len(self.FIELDS), column=0, columnspan=3, sticky="w", pady=(10, 0))
+        self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020")
+        self.error.grid(row=len(self.FIELDS) + 1, column=0, columnspan=3, sticky="w")
+        btns = tk.Frame(self, bg=BG)
+        btns.grid(row=len(self.FIELDS) + 2, column=0, columnspan=3, sticky="e", pady=(8, 0))
+        self.ok = ttk.Button(btns, text="Save", command=self.accept)
+        self.ok.pack(side="left", padx=4)
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left")
+        self.bind("<Return>", lambda e: self.accept())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.update_view()
+        self.update_idletasks()
+        x = parent.winfo_rootx() + 40
+        y = parent.winfo_rooty() + 200
+        self.geometry("+%d+%d" % (x, y))
+        self.grab_set()
+        self.wait_window()
+
+    def check(self):
+        out = {}
+        for key, text, _ in self.FIELDS:
+            try:
+                v = float(self.vars[key].get())
+            except ValueError:
+                return None, "%s must be a number" % text
+            if key == "holes_per_inch":
+                if v <= 0:
+                    return None, "Holes per inch must be more than 0"
+                out[key] = v
+            else:
+                if v < 0 or v != int(v):
+                    return None, "%s must be a whole number, 0 or more" % text
+                out[key] = int(v)
+        return out, None
+
+    def update_view(self):
+        _, err = self.check()
+        self.error.config(text=err or "")
+        self.ok.state(["disabled"] if err else ["!disabled"])
+
+    def accept(self):
+        values, err = self.check()
+        if not err:
+            self.result = (values, self.default.get())
+            self.destroy()

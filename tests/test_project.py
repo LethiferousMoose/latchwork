@@ -148,8 +148,8 @@ class TestProject(unittest.TestCase):
         self.assertEqual(q.assigned_count, 1)
         e = q.entry("#0A141E")
         self.assertEqual((e.yarn, e.confirmed),
-                         ({"name": self.yarns[2].sku, "hex": self.yarns[2].hex, "palette": "sky.csv"},
-                          True))
+                         ({"name": self.yarns[2].sku, "brand": "", "pack": None,
+                           "hex": self.yarns[2].hex, "palette": "sky.csv"}, True))
         self.assertEqual(q.entry("#C86432").yarn["name"], "Orange")   # suggestion kept
         self.assertEqual(q.image.pixels, p.image.pixels)                # image embedded
         self.assertFalse([f for f in os.listdir(self.dir) if f.endswith(".tmp")])
@@ -161,13 +161,34 @@ class TestProject(unittest.TestCase):
         other = sort_yarns([Yarn("Cream", (250, 240, 220)), Yarn("Rust", (180, 80, 40))])
         p.suggest(other, "other.csv")
         self.assertEqual(p.entry("#FFFFFF").yarn["name"], self.yarns[3].sku)
-        self.assertEqual(p.entry("#C86432").yarn, {"name": "Rust", "hex": "#B45028",
-                                                    "palette": "other.csv"})
+        self.assertEqual(p.entry("#C86432").yarn, {"name": "Rust", "brand": "", "pack": None,
+                                                    "hex": "#B45028", "palette": "other.csv"})
         p.unassign("#FFFFFF")
         p.suggest(other, "other.csv")
         self.assertEqual(p.entry("#FFFFFF").yarn["name"], "Cream")
         p.suggest([], "empty.csv")
         self.assertIsNone(p.entry("#FFFFFF").yarn)
+
+    def test_project_saved_before_brands(self):
+        p = self.new()
+        p.save()
+        with open(self.path, encoding="utf-8") as fh:
+            doc = json.load(fh)
+        for c in doc["colors"]:
+            if c["hex"] == "#C86432":
+                c["yarn"], c["confirmed"] = {"name": "Gold RH", "hex": "#D4A017",
+                                             "palette": "palette.csv"}, True
+            if c["hex"] == "#FFFFFF":
+                c["yarn"], c["confirmed"] = {"name": "Avocado", "hex": "#819E30",
+                                             "palette": "palette.csv"}, True
+        with open(self.path, "w", encoding="utf-8") as fh:
+            json.dump(doc, fh)
+        q = Project.load(self.path)
+        self.assertEqual(q.entry("#C86432").yarn["name"], "Gold")
+        self.assertEqual(q.entry("#C86432").yarn["brand"], "Red Heart")
+        self.assertIsNone(q.entry("#C86432").yarn["pack"])
+        self.assertEqual((q.entry("#FFFFFF").yarn["brand"], q.entry("#FFFFFF").yarn["pack"]),
+                         ("Hershner's", 320))
 
     def test_file_is_readable_json(self):
         p = self.new()

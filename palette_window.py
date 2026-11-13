@@ -1,4 +1,4 @@
-"""Palette manager window: add, edit, retire/restore, delete, import and export yarns."""
+"""Palette manager window: yarns (add, edit, brand, retire, delete), brands, import and export."""
 import os
 import tkinter as tk
 import tkinter.font as tkfont
@@ -10,6 +10,7 @@ from widgets import ColorPanel
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
+HINT_FONT = ("Segoe UI", 9)
 
 
 def swatch_image(colors, w=30, h=16, slots=None):
@@ -38,6 +39,24 @@ def center_on(win, parent):
     win.geometry("+%d+%d" % (max(x, 0), max(y, 0)))
 
 
+def iid(yarn):
+    """Tree row id for a yarn (name + brand, so two brands' 'White' are different rows)."""
+    return "\x1f".join(yarn.key)
+
+
+def pack_text(pack):
+    return "%d per pack" % pack if pack else "cut from skein"
+
+
+def duplicates(yarns):
+    seen, dup = set(), []
+    for y in yarns:
+        if y.key in seen:
+            dup.append(y.label)
+        seen.add(y.key)
+    return dup
+
+
 class PaletteWindow(tk.Toplevel):
     def __init__(self, app):
         super().__init__(app.root)
@@ -45,8 +64,8 @@ class PaletteWindow(tk.Toplevel):
         self.images = {}
         self.title("Latchwork - Yarn palette")
         self.configure(bg=BG)
-        self.minsize(640, 480)
-        self.geometry("720x620")
+        self.minsize(760, 480)
+        self.geometry("880x620")
 
         head = tk.Frame(self, bg=BG)
         head.pack(fill="x", padx=12, pady=(12, 0))
@@ -60,19 +79,20 @@ class PaletteWindow(tk.Toplevel):
         self.find_var = tk.StringVar()
         self.find_var.trace_add("write", lambda *_: self.refresh())
         ttk.Entry(top, textvariable=self.find_var, width=24).pack(side="left", padx=6)
+        tk.Label(top, text="name, brand or hex", font=HINT_FONT, bg=BG, fg="#888").pack(side="left")
         self.show_retired = tk.BooleanVar(value=True)
         ttk.Checkbutton(top, text="Show retired", variable=self.show_retired,
-                        command=self.refresh).pack(side="left", padx=10)
+                        command=self.refresh).pack(side="left", padx=12)
         self.count = tk.Label(top, font=UI_FONT, bg=BG, fg="#555")
         self.count.pack(side="right")
 
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True, padx=12)
-        self.tree = ttk.Treeview(body, columns=("hex", "L", "brand", "status"),
+        self.tree = ttk.Treeview(body, columns=("hex", "L", "brand", "pack", "status"),
                                  selectmode="extended")
-        for col, text, width, anchor in (("#0", "Yarn", 200, "w"), ("hex", "Hex", 80, "w"),
-                                         ("L", "L", 55, "e"), ("brand", "Brand", 125, "w"),
-                                         ("status", "Status", 70, "w")):
+        for col, text, width, anchor in (("#0", "Yarn", 190, "w"), ("hex", "Hex", 75, "w"),
+                                         ("L", "L", 50, "e"), ("brand", "Brand", 125, "w"),
+                                         ("pack", "Pack", 95, "w"), ("status", "Status", 65, "w")):
             self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
             # Only the last column stretches; Yarn is sized to the longest name in refresh().
             self.tree.column(col, width=width, minwidth=40, anchor=anchor,
@@ -85,35 +105,46 @@ class PaletteWindow(tk.Toplevel):
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
         self.tree.bind("<Double-1>", lambda e: self.edit())
         self.tree.bind("<Delete>", lambda e: self.delete())
+        self.tree.bind("<Control-a>", lambda e: (self.tree.selection_set(self.tree.get_children()),
+                                                 "break")[1])
 
         buttons = tk.Frame(body, bg=BG)
         buttons.pack(side="left", fill="y", padx=(10, 0))
         self.retire_btn = None
         self.needs_selection = []
-        for text, cmd in (("Add...", self.add), ("Edit...", self.edit), ("Retire", self.retire),
-                          ("Delete...", self.delete), (None, None), ("Import...", self.import_),
+        for text, cmd in (("Add...", self.add), ("Edit...", self.edit),
+                          ("Set brand...", self.set_brand), ("Retire", self.retire),
+                          ("Delete...", self.delete), (None, None), ("Brands...", self.brands),
+                          (None, None), ("Import...", self.import_),
                           ("Export CSV...", self.export_csv), ("Export GPL...", self.export_gpl)):
             if text is None:
-                tk.Frame(buttons, height=16, bg=BG).pack()
+                tk.Frame(buttons, height=14, bg=BG).pack()
                 continue
             b = ttk.Button(buttons, text=text, width=14, command=cmd)
             b.pack(pady=2)
             if text == "Retire":
                 self.retire_btn = b
-            if text in ("Edit...", "Retire", "Delete..."):
+            if text in ("Edit...", "Set brand...", "Retire", "Delete..."):
                 self.needs_selection.append(b)
 
-        tk.Label(self, font=("Segoe UI", 9), bg=BG, fg="#666", anchor="w", justify="left",
-                 text="Changes save to the palette file immediately. Retired yarns are kept but "
-                      "not used for matching.\nSelecting a yarn shows it in the main window. "
+        tk.Label(self, font=HINT_FONT, bg=BG, fg="#666", anchor="w", justify="left",
+                 text="Changes save immediately. Retired yarns are kept but not used for matching. "
+                      "Pack sizes come from the brand unless a yarn has its own.\n"
+                      "Select several yarns (Ctrl+A for all shown) to set their brand at once. "
                       "Double-click to edit.").pack(fill="x", padx=12, pady=(6, 10))
         self.protocol("WM_DELETE_WINDOW", self.close)
         self.refresh()
 
     # ---------- list ----------
     def selected(self):
-        by_sku = {y.sku: y for y in self.app.bank}
-        return [by_sku[i] for i in self.tree.selection() if i in by_sku]
+        by_id = {iid(y): y for y in self.app.bank}
+        return [by_id[i] for i in self.tree.selection() if i in by_id]
+
+    def pack_cell(self, y):
+        if y.pack:
+            return "%d (own)" % y.pack
+        p = pal.effective_pack(y, self.app.brands)
+        return str(p) if p else "cut"
 
     def refresh(self, select=None):
         keep = set(select) if select is not None else set(self.tree.selection())
@@ -123,13 +154,14 @@ class PaletteWindow(tk.Toplevel):
         for y in pal.sort_yarns(self.app.bank):
             if y.retired and not self.show_retired.get():
                 continue
-            if needle and needle not in y.key and needle not in y.hex.lower():
+            if needle and not any(needle in s for s in (y.key[0], y.key[1], y.hex.lower())):
                 continue
             img = self.images.get(y.hex)
             if img is None:
                 img = self.images[y.hex] = swatch_image([y.hex])
-            self.tree.insert("", "end", iid=y.sku, text="  " + y.sku, image=img,
-                             values=(y.hex, "%.1f" % y.L, y.brand, "retired" if y.retired else ""),
+            self.tree.insert("", "end", iid=iid(y), text="  " + y.sku, image=img,
+                             values=(y.hex, "%.1f" % y.L, y.brand or "–", self.pack_cell(y),
+                                     "retired" if y.retired else ""),
                              tags=("retired",) if y.retired else ())
             shown += 1
         sel = [s for s in keep if self.tree.exists(s)]
@@ -143,8 +175,8 @@ class PaletteWindow(tk.Toplevel):
         self.file_label.config(text=os.path.basename(path))
         self.title("Latchwork - Yarn palette - %s" % os.path.basename(path))
         n_act = len(pal.active(self.app.bank))
-        self.count.config(text="%d active, %d retired   (showing %d)" % (
-            n_act, len(self.app.bank) - n_act, shown))
+        self.count.config(text="%d active, %d retired · %d brands   (showing %d)" % (
+            n_act, len(self.app.bank) - n_act, len(self.app.brands), shown))
         self.on_select()
 
     def on_select(self):
@@ -156,18 +188,20 @@ class PaletteWindow(tk.Toplevel):
         else:
             self.retire_btn.config(text="Retire")
         if len(sel) == 1 and not sel[0].retired:
-            self.app.jump_to_sku(sel[0].sku)
+            self.app.jump_to_yarn(sel[0].key)
 
-    def commit(self, new_bank, select=()):
-        if self.app.set_bank(new_bank):
+    def commit(self, new_bank, select=(), brands=None):
+        if self.app.set_bank(new_bank, brands):
             self.refresh(select=list(select))
+            return True
+        return False
 
-    # ---------- actions ----------
+    # ---------- yarn actions ----------
     def add(self):
-        result = YarnDialog(self, self.app.bank).result
-        if result:
-            name, rgb = result
-            self.commit(self.app.bank + [pal.Yarn(name, rgb)], select=[pal.clean_name(name)])
+        r = YarnDialog(self, self.app.bank, self.app.brands).result
+        if r:
+            y = pal.Yarn(r["name"], r["rgb"], brand=r["brand"], pack=r["pack"])
+            self.commit(self.app.bank + [y], select=[iid(y)])
 
     def edit(self):
         sel = self.selected()
@@ -175,32 +209,61 @@ class PaletteWindow(tk.Toplevel):
             messagebox.showinfo("Edit yarn", "Select one yarn to edit.", parent=self)
             return
         y = sel[0]
-        result = YarnDialog(self, self.app.bank, yarn=y).result
-        if result:
-            name, rgb = result
+        r = YarnDialog(self, self.app.bank, self.app.brands, yarn=y).result
+        if r:
             new = [x.copy() for x in self.app.bank]
             target = new[self.app.bank.index(y)]
-            target.sku = pal.clean_name(name)
-            target.set_rgb(rgb)
-            self.commit(new, select=[target.sku])
+            target.sku, target.brand, target.pack = r["name"], r["brand"], r["pack"]
+            target.set_rgb(r["rgb"])
+            self.commit(new, select=[iid(target)])
+
+    def set_brand(self):
+        sel = self.selected()
+        if not sel:
+            return
+        r = BrandChoiceDialog(
+            self, self.app.brands, "Set brand",
+            "Brand for the %d selected yarn%s:" % (len(sel), "" if len(sel) == 1 else "s"),
+            current=sel[0].brand if len({y.key[1] for y in sel}) == 1 else "",
+            offer_clear=any(y.pack for y in sel)).result
+        if not r:
+            return
+        ids = {id(y) for y in sel}
+        new = []
+        for x in self.app.bank:
+            c = x.copy()
+            if id(x) in ids:
+                c.brand = r["brand"]
+                if r["clear"]:
+                    c.pack = None
+            new.append(c)
+        dup = duplicates(new)
+        if dup:
+            messagebox.showerror("Set brand", "That would make two yarns with the same name and "
+                                 "brand:\n\n  %s\n\nRename one of them first." % "\n  ".join(dup[:8]),
+                                 parent=self)
+            return
+        brands = self.app.brands + ([pal.Brand(r["brand"], r["pack"])] if r["new"] else [])
+        self.commit(new, select=[iid(c) for c, x in zip(new, self.app.bank) if id(x) in ids],
+                    brands=brands)
 
     def retire(self):
         sel = self.selected()
         if not sel:
             return
         restore = all(y.retired for y in sel)
-        names = {y.sku for y in sel}
+        ids = {id(y) for y in sel}
         new = [x.copy() for x in self.app.bank]
-        for x in new:
-            if x.sku in names:
-                x.retired = not restore
-        self.commit(new, select=names)
+        for orig, c in zip(self.app.bank, new):
+            if id(orig) in ids:
+                c.retired = not restore
+        self.commit(new, select=[iid(y) for y in sel])
 
     def delete(self):
         sel = self.selected()
         if not sel:
             return
-        listing = "\n".join("  " + y.sku for y in sel[:10]) + ("\n  ..." if len(sel) > 10 else "")
+        listing = "\n".join("  " + y.label for y in sel[:10]) + ("\n  ..." if len(sel) > 10 else "")
         if not messagebox.askyesno(
                 "Delete yarns",
                 "Permanently delete %d yarn(s)?\n\n%s\n\nDelete is for typos and mistakes. For a "
@@ -210,6 +273,10 @@ class PaletteWindow(tk.Toplevel):
         gone = {id(y) for y in sel}
         self.commit([x.copy() for x in self.app.bank if id(x) not in gone])
 
+    def brands(self):
+        BrandsDialog(self)
+
+    # ---------- import / export ----------
     def import_(self):
         path = filedialog.askopenfilename(
             parent=self, title="Import yarns",
@@ -218,13 +285,23 @@ class PaletteWindow(tk.Toplevel):
         if not path:
             return
         try:
-            entries = pal.read_import_file(path)
+            entries, in_brands = pal.read_import_file(path)
         except (OSError, ValueError, UnicodeDecodeError) as e:
             messagebox.showerror("Import", "Could not read %s\n\n%s" % (path, e), parent=self)
             return
         if not entries:
             messagebox.showinfo("Import", "No colors found in that file.", parent=self)
             return
+        if pal.needs_brand(entries):
+            r = BrandChoiceDialog(
+                self, self.app.brands, "Import: brand",
+                "%s has no brand information. Which brand are these %d colors?"
+                % (os.path.basename(path), len(entries))).result
+            if not r:
+                return
+            pal.set_brand(entries, r["brand"])
+            if r["new"]:
+                in_brands = in_brands + [pal.Brand(r["brand"], r["pack"])]
         items = pal.plan_import(self.app.bank, entries)
         if all(it.kind == pal.SAME for it in items):
             messagebox.showinfo(
@@ -236,15 +313,17 @@ class PaletteWindow(tk.Toplevel):
             return
         new = pal.apply_import(self.app.bank, items)
         before = {y.key for y in self.app.bank}
-        self.commit(new, select=[y.sku for y in new if y.key not in before])
+        self.commit(new, select=[iid(y) for y in new if y.key not in before],
+                    brands=pal.merge_brands(self.app.brands, in_brands))
 
     def export_csv(self):
         path = filedialog.asksaveasfilename(parent=self, title="Export yarns as CSV",
                                             defaultextension=".csv", initialfile="yarns.csv",
                                             filetypes=[("CSV", "*.csv")])
         if path:
-            self._export(lambda: pal.save_palette(path, self.app.bank), path,
-                         "%d yarns (including retired)" % len(self.app.bank))
+            self._export(lambda: pal.save_bank(path, self.app.bank, self.app.brands), path,
+                         "%d yarns (including retired) and their brands\n(%s)"
+                         % (len(self.app.bank), os.path.basename(pal.brands_path(path))))
 
     def export_gpl(self):
         path = filedialog.asksaveasfilename(parent=self, title="Export yarns as GIMP palette",
@@ -267,21 +346,277 @@ class PaletteWindow(tk.Toplevel):
         self.destroy()
 
 
-class YarnDialog(tk.Toplevel):
-    """Add or edit one yarn. self.result = (name, rgb) or None."""
+class BrandChoiceDialog(tk.Toplevel):
+    """Pick an existing brand or type a new one (with its pack size).
+    result = {"brand", "new": bool, "pack": int|None (new brands), "clear": bool} or None."""
 
-    def __init__(self, parent, bank, yarn=None):
+    def __init__(self, parent, brands, title, message, current="", offer_clear=False):
         super().__init__(parent)
-        self.bank, self.yarn, self.result = bank, yarn, None
+        self.brands, self.result = brands, None
+        self.title(title)
+        self.configure(bg=BG, padx=16, pady=14)
+        self.resizable(False, False)
+        self.transient(parent)
+        tk.Label(self, text=message, font=UI_FONT, bg=BG, wraplength=380, justify="left").grid(
+            row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        tk.Label(self, text="Brand", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w")
+        self.brand_var = tk.StringVar(value=current)
+        box = ttk.Combobox(self, textvariable=self.brand_var, width=28,
+                           values=[b.name for b in brands])
+        box.grid(row=1, column=1, sticky="w", padx=8)
+        tk.Label(self, text="Pack size", font=UI_FONT, bg=BG).grid(row=2, column=0, sticky="w",
+                                                                   pady=(6, 0))
+        self.pack_var = tk.StringVar()
+        self.pack_entry = ttk.Entry(self, textvariable=self.pack_var, width=8)
+        self.pack_entry.grid(row=2, column=1, sticky="w", padx=8, pady=(6, 0))
+        self.hint = tk.Label(self, font=HINT_FONT, bg=BG, fg="#666", wraplength=380,
+                             justify="left")
+        self.hint.grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        self.clear_var = tk.BooleanVar(value=True)
+        if offer_clear:
+            ttk.Checkbutton(self, text="Use the brand's pack size (clear their own pack sizes)",
+                            variable=self.clear_var).grid(row=4, column=0, columnspan=2,
+                                                          sticky="w", pady=(8, 0))
+        else:
+            self.clear_var.set(False)
+        self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020")
+        self.error.grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        btns = tk.Frame(self, bg=BG)
+        btns.grid(row=6, column=0, columnspan=2, sticky="e", pady=(8, 0))
+        self.ok = ttk.Button(btns, text="OK", command=self.accept)
+        self.ok.pack(side="left", padx=4)
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left")
+        self.bind("<Return>", lambda e: self.accept())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.brand_var.trace_add("write", lambda *_: self.update_view())
+        self.pack_var.trace_add("write", lambda *_: self.update_view())
+        self.update_view()
+        center_on(self, parent)
+        box.focus_set()
+        self.grab_set()
+        self.wait_window()
+
+    def check(self):
+        name = pal.clean_name(self.brand_var.get())
+        if not name:
+            return None, "Choose or type a brand"
+        b = pal.brand_by_key(self.brands, name)
+        if b:
+            return {"brand": b.name, "new": False, "pack": b.pack,
+                    "clear": self.clear_var.get()}, None
+        try:
+            pack = pal.parse_pack(self.pack_var.get())
+        except ValueError:
+            return None, "Pack size must be a whole number (or blank)"
+        return {"brand": name, "new": True, "pack": pack, "clear": self.clear_var.get()}, None
+
+    def update_view(self):
+        b = pal.brand_by_key(self.brands, self.brand_var.get())
+        if b:
+            self.pack_entry.state(["disabled"])
+            self.hint.config(text="Existing brand: %s. Change it under Brands..." % pack_text(b.pack))
+        else:
+            self.pack_entry.state(["!disabled"])
+            self.hint.config(text="New brand. Pack size = pieces per pre-cut pack; leave blank "
+                                  "if it's cut from skeins.")
+        r, err = self.check()
+        self.error.config(text=err if pal.clean_name(self.brand_var.get()) else "")
+        self.ok.state(["disabled"] if err else ["!disabled"])
+
+    def accept(self):
+        r, err = self.check()
+        if not err:
+            self.result = r
+            self.destroy()
+
+
+class BrandsDialog(tk.Toplevel):
+    """The palette's brand list: name and pack size. Changes apply immediately."""
+
+    def __init__(self, win):
+        super().__init__(win)
+        self.win, self.app = win, win.app
+        self.title("Brands")
+        self.configure(bg=BG, padx=14, pady=12)
+        self.transient(win)
+        tk.Label(self, text="Pack size is the number of pre-cut pieces per pack; \"cut\" means "
+                            "you cut it from skeins. Yarns use their brand's pack size unless "
+                            "they have their own.", font=HINT_FONT, bg=BG, fg="#555",
+                 wraplength=440, justify="left").pack(fill="x", pady=(0, 8))
+        body = tk.Frame(self, bg=BG)
+        body.pack(fill="both", expand=True)
+        self.tree = ttk.Treeview(body, columns=("pack", "yarns"), selectmode="browse", height=8)
+        for col, text, width, anchor in (("#0", "Brand", 190, "w"), ("pack", "Pack size", 110, "w"),
+                                         ("yarns", "Yarns", 60, "e")):
+            self.tree.heading(col, text=text, anchor="w" if col != "yarns" else "e")
+            self.tree.column(col, width=width, anchor=anchor, stretch=(col == "#0"))
+        self.tree.pack(side="left", fill="both", expand=True)
+        self.tree.bind("<Double-1>", lambda e: self.edit())
+        self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
+        btns = tk.Frame(body, bg=BG)
+        btns.pack(side="left", fill="y", padx=(10, 0))
+        ttk.Button(btns, text="Add...", width=10, command=self.add).pack(pady=2)
+        self.edit_btn = ttk.Button(btns, text="Edit...", width=10, command=self.edit)
+        self.edit_btn.pack(pady=2)
+        self.del_btn = ttk.Button(btns, text="Delete", width=10, command=self.delete)
+        self.del_btn.pack(pady=2)
+        ttk.Button(self, text="Close", command=self.destroy).pack(anchor="e", pady=(10, 0))
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.refresh()
+        center_on(self, win)
+        self.grab_set()
+
+    def refresh(self, select=None):
+        self.tree.delete(*self.tree.get_children())
+        for b in self.app.brands:
+            n = sum(1 for y in self.app.bank if y.key[1] == b.key)
+            self.tree.insert("", "end", iid=b.key, text="  " + b.name,
+                             values=(str(b.pack) if b.pack else "cut", n))
+        if select and self.tree.exists(select):
+            self.tree.selection_set(select)
+        self.on_select()
+
+    def current(self):
+        sel = self.tree.selection()
+        return pal.brand_by_key(self.app.brands, sel[0]) if sel else None
+
+    def on_select(self):
+        b = self.current()
+        self.edit_btn.state(["!disabled"] if b else ["disabled"])
+        used = b and any(y.key[1] == b.key for y in self.app.bank)
+        self.del_btn.state(["!disabled"] if b and not used else ["disabled"])
+
+    def _save(self, brands, bank=None, select=None):
+        if self.win.commit(bank if bank is not None else [y.copy() for y in self.app.bank],
+                           brands=brands):
+            self.refresh(select)
+
+    def add(self):
+        r = BrandEditDialog(self, self.app.brands).result
+        if r:
+            self._save(self.app.brands + [pal.Brand(r["name"], r["pack"])],
+                       select=pal.name_key(r["name"]))
+
+    def edit(self):
+        b = self.current()
+        if not b:
+            return
+        r = BrandEditDialog(self, self.app.brands, brand=b).result
+        if not r:
+            return
+        brands = [x.copy() for x in self.app.brands]
+        target = pal.brand_by_key(brands, b.name)
+        old_key = target.key
+        target.name, target.pack = r["name"], r["pack"]
+        bank = []
+        for y in self.app.bank:      # a rename carries over to every yarn of the brand
+            c = y.copy()
+            if c.key[1] == old_key:
+                c.brand = r["name"]
+            bank.append(c)
+        self._save(brands, bank, select=target.key)
+
+    def delete(self):
+        b = self.current()
+        if b and messagebox.askyesno("Delete brand", "Delete the brand %s?" % b.name, parent=self):
+            self._save([x.copy() for x in self.app.brands if x.key != b.key])
+
+
+class BrandEditDialog(tk.Toplevel):
+    """Add or edit a brand. result = {"name", "pack"} or None."""
+
+    def __init__(self, parent, brands, brand=None):
+        super().__init__(parent)
+        self.brands, self.brand, self.result = brands, brand, None
+        self.title("Edit brand" if brand else "Add brand")
+        self.configure(bg=BG, padx=16, pady=14)
+        self.resizable(False, False)
+        self.transient(parent)
+        tk.Label(self, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
+        self.name_var = tk.StringVar(value=brand.name if brand else "")
+        e = ttk.Entry(self, textvariable=self.name_var, width=28)
+        e.grid(row=0, column=1, sticky="w", padx=8)
+        tk.Label(self, text="Pack size", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w",
+                                                                   pady=(6, 0))
+        self.pack_var = tk.StringVar(value=str(brand.pack) if brand and brand.pack else "")
+        ttk.Entry(self, textvariable=self.pack_var, width=8).grid(row=1, column=1, sticky="w",
+                                                                 padx=8, pady=(6, 0))
+        tk.Label(self, text="Pieces per pre-cut pack. Leave blank if you cut this brand from "
+                            "skeins.", font=HINT_FONT, bg=BG, fg="#666", wraplength=320,
+                 justify="left").grid(row=2, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020")
+        self.error.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        btns = tk.Frame(self, bg=BG)
+        btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(8, 0))
+        self.ok = ttk.Button(btns, text="Save" if brand else "Add", command=self.accept)
+        self.ok.pack(side="left", padx=4)
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left")
+        self.bind("<Return>", lambda ev: self.accept())
+        self.bind("<Escape>", lambda ev: self.destroy())
+        self.name_var.trace_add("write", lambda *_: self.update_view())
+        self.pack_var.trace_add("write", lambda *_: self.update_view())
+        self.update_view()
+        center_on(self, parent)
+        e.focus_set()
+        self.grab_set()
+        self.wait_window()
+
+    def check(self):
+        name = pal.clean_name(self.name_var.get())
+        if not name:
+            return None, "Name is empty"
+        other = pal.brand_by_key(self.brands, name)
+        if other and (self.brand is None or other.key != self.brand.key):
+            return None, "%s already exists" % other.name
+        try:
+            pack = pal.parse_pack(self.pack_var.get())
+        except ValueError:
+            return None, "Pack size must be a whole number (or blank)"
+        return {"name": name, "pack": pack}, None
+
+    def update_view(self):
+        _, err = self.check()
+        self.error.config(text=err or "")
+        self.ok.state(["disabled"] if err else ["!disabled"])
+
+    def accept(self):
+        r, err = self.check()
+        if not err:
+            self.result = r
+            self.destroy()
+
+
+class YarnDialog(tk.Toplevel):
+    """Add or edit one yarn. result = {"name", "rgb", "brand", "pack"} or None."""
+
+    def __init__(self, parent, bank, brands, yarn=None):
+        super().__init__(parent)
+        self.bank, self.brands, self.yarn, self.result = bank, brands, yarn, None
         self.title("Edit yarn" if yarn else "Add yarn")
         self.configure(bg=BG, padx=16, pady=14)
         self.resizable(False, False)
         self.transient(parent)
 
-        tk.Label(self, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
+        form = tk.Frame(self, bg=BG)
+        form.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        tk.Label(form, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
         self.name_var = tk.StringVar(value=yarn.sku if yarn else "")
-        name_entry = ttk.Entry(self, textvariable=self.name_var, width=34, font=("Segoe UI", 11))
-        name_entry.grid(row=0, column=1, sticky="w", padx=8, pady=(0, 8))
+        name_entry = ttk.Entry(form, textvariable=self.name_var, width=34, font=("Segoe UI", 11))
+        name_entry.grid(row=0, column=1, columnspan=3, sticky="w", padx=8)
+        tk.Label(form, text="Brand", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w",
+                                                               pady=(6, 0))
+        last = yarn.brand if yarn else (brands[0].name if len(brands) == 1 else "")
+        self.brand_var = tk.StringVar(value=last)
+        ttk.Combobox(form, textvariable=self.brand_var, width=24,
+                     values=[b.name for b in brands]).grid(row=1, column=1, sticky="w", padx=8,
+                                                           pady=(6, 0))
+        tk.Label(form, text="Pack size", font=UI_FONT, bg=BG).grid(row=1, column=2, sticky="w",
+                                                                   padx=(8, 0), pady=(6, 0))
+        self.pack_var = tk.StringVar(value=str(yarn.pack) if yarn and yarn.pack else "")
+        ttk.Entry(form, textvariable=self.pack_var, width=7).grid(row=1, column=3, sticky="w",
+                                                                  padx=8, pady=(6, 0))
+        self.pack_hint = tk.Label(form, font=HINT_FONT, bg=BG, fg="#666", anchor="w")
+        self.pack_hint.grid(row=2, column=1, columnspan=3, sticky="w", padx=8)
 
         # Neighbor preview: lighter neighbor | this yarn | darker neighbor, names underneath.
         self.swatch = tk.Canvas(self, width=self.SW_W, height=self.SW_H, bg=BG,
@@ -306,8 +641,8 @@ class YarnDialog(tk.Toplevel):
         self.bind("<Return>", lambda e: self.accept())
         self.bind("<Escape>", lambda e: self.destroy())
 
-        self.name_var.trace_add("write", lambda *_: self.update_view())
-        self.hex_var.trace_add("write", lambda *_: self.update_view())
+        for v in (self.name_var, self.hex_var, self.brand_var, self.pack_var):
+            v.trace_add("write", lambda *_: self.update_view())
         self.update_view()
         center_on(self, parent)
         (self.panel.entry if yarn else name_entry).focus_set()
@@ -318,15 +653,32 @@ class YarnDialog(tk.Toplevel):
 
     def problems(self):
         rgb = parse_hex(self.hex_var.get())
-        name_err = pal.name_problem(self.name_var.get(), self.bank, exclude=self.yarn)
+        brand = pal.clean_name(self.brand_var.get())
+        b = pal.brand_by_key(self.brands, brand)
+        if b:
+            brand = b.name   # use the brand's own spelling
+        name_err = pal.name_problem(self.name_var.get(), brand, self.bank, exclude=self.yarn)
+        try:
+            pack = pal.parse_pack(self.pack_var.get())
+        except ValueError:
+            return None, "Pack size must be a whole number (or blank)"
         if name_err:
-            return rgb, name_err
+            return None, name_err
         if rgb is None:
-            return rgb, "Enter a hex color in HTML notation, e.g. #88A048"
-        return rgb, None
+            return None, "Enter a hex color in HTML notation, e.g. #88A048"
+        return {"name": pal.clean_name(self.name_var.get()), "rgb": rgb, "brand": brand,
+                "pack": pack}, None
 
     def update_view(self):
-        rgb, err = self.problems()
+        r, err = self.problems()
+        rgb = parse_hex(self.hex_var.get())
+        b = pal.brand_by_key(self.brands, self.brand_var.get())
+        if b:
+            self.pack_hint.config(text="blank = brand's pack size (%s)" % pack_text(b.pack))
+        elif pal.clean_name(self.brand_var.get()):
+            self.pack_hint.config(text="new brand (set its pack size under Brands...)")
+        else:
+            self.pack_hint.config(text="blank = cut from skein")
         c = self.swatch
         c.delete("all")
         self.panel.show(rgb)
@@ -344,9 +696,9 @@ class YarnDialog(tk.Toplevel):
             c.create_rectangle(mid0, 0, mid1, self.BLOCK_H, fill=y.hex, outline="#333", width=2)
             c.create_text((mid0 + mid1) / 2, self.BLOCK_H + 2, text=name, anchor="n",
                           width=mid1 - mid0, font=("Segoe UI", 9, "bold"))
-            where = ("between %s and %s" % (lighter.sku, darker.sku) if lighter and darker else
-                     "lightest, before %s" % darker.sku if darker else
-                     "darkest, after %s" % lighter.sku if lighter else "the only yarn")
+            where = ("between %s and %s" % (lighter.label, darker.label) if lighter and darker else
+                     "lightest, before %s" % darker.label if darker else
+                     "darkest, after %s" % lighter.label if lighter else "the only yarn")
             text = "Would sit at %d / %d, %s." % (pos, total, where)
             if self.yarn and self.yarn.retired:
                 text += "\n(This yarn is retired, so it isn't used for matching.)"
@@ -360,10 +712,10 @@ class YarnDialog(tk.Toplevel):
         self.ok.state(["disabled"] if err else ["!disabled"])
 
     def accept(self):
-        rgb, err = self.problems()
+        r, err = self.problems()
         if err:
             return
-        self.result = (pal.clean_name(self.name_var.get()), rgb)
+        self.result = r
         self.destroy()
 
 
@@ -377,7 +729,7 @@ class ImportDialog(tk.Toplevel):
         self.images = []
         self.title("Import from %s" % filename)
         self.configure(bg=BG, padx=12, pady=12)
-        self.geometry("860x560")
+        self.geometry("880x560")
         self.minsize(700, 420)
         self.transient(parent)
 
@@ -389,7 +741,7 @@ class ImportDialog(tk.Toplevel):
                  font=("Segoe UI", 11), bg=BG, fg="#555").pack(side="left", pady=(5, 0))
         self.badges = tk.Canvas(self, height=30, bg=BG, highlightthickness=0)
         self.badges.pack(fill="x", pady=(8, 4))
-        tk.Label(self, font=("Segoe UI", 9), bg=BG, fg="#555", anchor="w",
+        tk.Label(self, font=HINT_FONT, bg=BG, fg="#555", anchor="w",
                  text="Swatches: the file's color on the left, your yarn's on the right. Select rows "
                       "and pick an action below. Nothing changes until you press Import.").pack(
             fill="x", pady=(0, 6))
@@ -398,9 +750,9 @@ class ImportDialog(tk.Toplevel):
         body.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(body, columns=("issue", "file", "mine", "action"),
                                  selectmode="extended")
-        for col, text, width in (("#0", "Name in file", 220), ("issue", "What it is", 230),
-                                 ("file", "File hex", 75), ("mine", "Your yarn", 150),
-                                 ("action", "Action", 230)):
+        for col, text, width in (("#0", "Name in file", 230), ("issue", "What it is", 230),
+                                 ("file", "File hex", 75), ("mine", "Your yarn", 160),
+                                 ("action", "Action", 220)):
             self.tree.heading(col, text=text)
             self.tree.column(col, width=width, stretch=(col in ("#0", "action")))
         self.tree.tag_configure("attention", background="#FFF4CC")
@@ -443,9 +795,10 @@ class ImportDialog(tk.Toplevel):
             self.images.append(img)
             mine = ""
             if it.existing:
-                mine = "%s %s%s" % (it.existing.sku, it.existing.hex,
+                mine = "%s %s%s" % (it.existing.label, it.existing.hex,
                                     " (retired)" if it.existing.retired else "")
-            self.tree.insert("", "end", iid=str(i), text="  " + (it.entry.name or "(no name)"),
+            self.tree.insert("", "end", iid=str(i),
+                             text="  " + (it.entry.label if it.entry.name else "(no name)"),
                              image=img, values=(it.describe(), it.entry.hex, mine, ""),
                              tags=("attention",) if it.kind != pal.NEW else ())
         self.update_rows()
@@ -534,8 +887,8 @@ class ImportDialog(tk.Toplevel):
         action = next((k for k, v in pal.ACTION_LABELS.items() if v == label), None)
         if not action:
             return
-        taken = {y.key for y in self.bank} | {pal.name_key(it.new_name) for it in self.items
-                                              if it.needs_name}
+        taken = {y.key for y in self.bank} | {pal.yarn_key(it.new_name, it.entry.brand or "")
+                                              for it in self.items if it.needs_name}
         for it in self.sel_items():
             if action in it.options:
                 it.action = action
@@ -543,8 +896,9 @@ class ImportDialog(tk.Toplevel):
                     if it.kind == pal.PLACEHOLDER:
                         it.new_name = ""
                     else:
-                        it.new_name = pal.suggest_name(it.entry.name, taken)
-                        taken.add(pal.name_key(it.new_name))
+                        brand = it.entry.brand or ""
+                        it.new_name = pal.suggest_name(it.entry.name, brand, taken)
+                        taken.add(pal.yarn_key(it.new_name, brand))
         self.update_rows()
         self.on_select()
         if len(self.sel_items()) == 1 and self.sel_items()[0].needs_name:

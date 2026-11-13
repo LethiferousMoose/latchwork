@@ -8,9 +8,10 @@ File format (JSON, version 1):
   "image": {"filename": "dragon.png", "format": "png", "width": 64, "height": 48,
             "data": "<base64 of the original file bytes>"},
   "colors": [{"hex": "#88A048", "count": 123,
-              "yarn": {"name": "Sage L&T", "hex": "#959A78", "palette": "palette.csv"} | null,
+              "yarn": {"name": "Sage", "brand": "Loops & Threads", "pack": null,
+                       "hex": "#959A78", "palette": "palette.csv"} | null,
               "confirmed": true}],
-  "settings": {"spare_percent": 0}
+  "settings": {"spare_percent": 0, "holes_per_inch": 3.75, "border_side": 3, ...}
 }
 """
 import base64
@@ -20,6 +21,7 @@ import tempfile
 
 import pixelart
 from colormath import lightness, nearest_index, parse_hex
+from palette import effective_pack, legacy_assignment
 
 FORMAT = "latchwork-project"
 VERSION = 1
@@ -101,8 +103,12 @@ class Project:
             if s and s.get("yarn"):
                 y = s["yarn"]
                 if parse_hex(y.get("hex", "")) and y.get("name"):
-                    entry.yarn = {"name": y["name"], "hex": y["hex"].upper(),
-                                  "palette": y.get("palette", "")}
+                    if "brand" in y:
+                        name, brand, pack = y["name"], y.get("brand") or "", y.get("pack")
+                    else:   # saved before brands existed: 'Gold RH' -> Gold (Red Heart)
+                        name, brand, pack = legacy_assignment(y["name"])
+                    entry.yarn = {"name": name, "brand": brand, "pack": pack,
+                                  "hex": y["hex"].upper(), "palette": y.get("palette", "")}
                     entry.confirmed = bool(s.get("confirmed"))
         project.settings.update(doc.get("settings") or {})
         return project
@@ -130,7 +136,13 @@ class Project:
             raise
 
     # ---------- assignments ----------
-    def suggest(self, yarns, palette_name):
+    @staticmethod
+    def snapshot(yarn, palette_name, brands=()):
+        """What a project stores about a yarn, so it stays readable without the palette."""
+        return {"name": yarn.sku, "brand": yarn.brand, "pack": effective_pack(yarn, brands),
+                "hex": yarn.hex, "palette": palette_name}
+
+    def suggest(self, yarns, palette_name, brands=()):
         """Give every unconfirmed color the nearest-L yarn from `yarns` (active, sorted)."""
         Ls = [y.L for y in yarns]
         changed = False
@@ -141,14 +153,14 @@ class Project:
                 new = None
             else:
                 y = yarns[nearest_index(c.L, Ls)]
-                new = {"name": y.sku, "hex": y.hex, "palette": palette_name}
+                new = self.snapshot(y, palette_name, brands)
             if new != c.yarn:
                 c.yarn, changed = new, True
         return changed
 
-    def assign(self, hex_, yarn, palette_name):
+    def assign(self, hex_, yarn, palette_name, brands=()):
         c = self.entry(hex_)
-        c.yarn = {"name": yarn.sku, "hex": yarn.hex, "palette": palette_name}
+        c.yarn = self.snapshot(yarn, palette_name, brands)
         c.confirmed = True
 
     def unassign(self, hex_):
