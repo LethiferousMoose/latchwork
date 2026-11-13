@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# GIMP working files (keep out of git; palette.csv is the source of truth)
+*.xcf
