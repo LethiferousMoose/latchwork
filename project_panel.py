@@ -152,16 +152,11 @@ class ProjectPanel(tk.Frame):
     def _build_plan_tab(self):
         tab = tk.Frame(self.tabs, bg=BG, padx=4, pady=6)
         self.tabs.add(tab, text="  Plan  ")
-        # Same shape as the Colors tab: table on top, details and buttons below.
-        btns = tk.Frame(tab, bg=BG)
-        btns.pack(side="bottom", fill="x", pady=(8, 0))
-        ttk.Button(btns, text="Export pattern...", command=self.app.export_pattern).pack(
-            side="left")
-        ttk.Button(btns, text="Export yarn list...", command=self.app.export_yarn_list).pack(
-            side="left", padx=6)
-        ttk.Button(btns, text="Save preview image...", command=self.app.save_preview).pack(
-            side="left")
-
+        # Same shape as the Colors tab: table on top, details below. Exports live in the File
+        # menu (Ctrl+E for the pattern).
+        tk.Label(tab, text="Export the pattern, yarn list or preview from the File menu "
+                           "(Ctrl+E = pattern).", font=("Segoe UI", 8), bg=BG, fg="#888",
+                 anchor="w").pack(side="bottom", fill="x", pady=(6, 0))
         lower = tk.Frame(tab, bg=BG)
         lower.pack(side="bottom", fill="x")
         self.totals = tk.Label(lower, font=("Segoe UI", 10, "bold"), bg=BG, anchor="w",

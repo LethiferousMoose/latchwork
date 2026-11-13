@@ -185,7 +185,7 @@ saved color maps never refer to yarns that vanished.
   It moves up and down one row at a time and is remembered on that device.
 - **Print:** an overview page plus one page per color. Large patterns are split across pages
   with labels (A1, A2…).
-- Built: File → Export pattern (Ctrl+E) or the Plan tab button. Unassigned colors appear in
+- Built: File → Export pattern (Ctrl+E). Exports live only in the File menu (no Plan-tab buttons). Unassigned colors appear in
   their original color with a ? symbol (export warns first). Symbols are drawn shapes (20),
   then letters and numbers, so phones never swap them for emoji. Pages are 50 × 70 holes on
   letter paper, A1 = bottom-left. Done marks, row and symbol toggle are saved per pattern in
