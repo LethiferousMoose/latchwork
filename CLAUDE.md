@@ -128,7 +128,10 @@ saved color maps never refer to yarns that vanished.
   - each assignment as yarn name **plus its hex at the time**, so the project survives later
     edits, retirements or deletions in the bank
   - settings (spare margin etc.) and, later, progress
-- The yarn bank (`palette.csv`) stays global, shared by all projects.
+- A project is **not tied to a palette**. It matches against whichever palette is open, and I
+  may switch palettes mid-project (e.g. load a "sky" palette to assign the sky colors). Each
+  assignment is self-contained (name + hex) and is **tagged with the palette file it came
+  from**, for information only. Opening a project never forces or prompts a palette switch.
 
 ## Stage 4: Preview and planning
 - **Yarn-color preview:** the image redrawn with the assigned yarn colors, next to the original.
