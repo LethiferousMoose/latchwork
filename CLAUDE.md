@@ -18,6 +18,9 @@ Keep it simple. This is a personal tool, not a product.
 - `palette.py`: the yarn bank (load/save, .gpl/CSV import-export, import merge rules). No Tk.
 - `palette_window.py`: the palette manager window and its dialogs.
 - `widgets.py`: shared widgets (the GIMP-style ColorPanel used in the main view and edit dialog).
+- `pixelart.py`: exact PNG decode/encode (stdlib zlib), GIF via Tk, color counting. No Tk for PNG.
+- `project.py`: the `.latchwork` project file (embedded image, colors, assignments). No Tk.
+- `project_panel.py`: the project sidebar (image, color list, Assign).
 - `pattern_template.html`: template for the exported phone/print pattern.
 - `palette.csv`: the yarn palette (see below).
 - `export_palette.py`: GIMP 2.10 Python-Fu script that produced `palette.csv` from `AllColors.xcf`.
@@ -122,6 +125,12 @@ saved color maps never refer to yarns that vanished.
   **Assign** records the current yarn for it.
 - One yarn can be assigned to several image colors.
 - The hex field still works for trying a color that isn't in the image.
+- Colors not yet assigned show a **suggested** nearest-L yarn (italic) from the open palette;
+  suggestions follow palette switches. **Assign (A)** locks a yarn in; "Back to suggestion" undoes.
+  Selecting an assigned color jumps to its yarn if the open palette has it.
+- Clicking the image selects that color; the selected color is highlighted in the image (others
+  faded), toggleable. Typing a hex that is in the image selects its row.
+- The last open project is reopened on start (`latchwork_settings.json`).
 - **Project file** per rug, e.g. `dragon.latchwork` (small readable JSON). File → New project
   starts from an image; File → Open loads a saved one. Auto-saves on every change. It holds:
   - the image itself, embedded, so moving or renaming the PNG can't break the project

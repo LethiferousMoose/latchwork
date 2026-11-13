@@ -11,6 +11,8 @@ import palette as pal
 from colormath import gray_for_lightness, nearest_index, parse_hex, rgb_to_lch, to_hex
 from palette import load_palette  # noqa: F401  (re-exported for tests and scripts)
 from palette_window import PaletteWindow
+from project import EXTENSION, MANY_COLORS, Project
+from project_panel import ProjectPanel
 from widgets import ColorPanel
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,6 +35,20 @@ def write_settings(data):
             json.dump(data, fh, indent=2)
     except OSError:
         pass  # remembering is a convenience; never fail over it
+
+
+def remembered_project():
+    path = read_settings().get("project")
+    return path if isinstance(path, str) and os.path.isfile(path) else None
+
+
+def remember_setting(key, value):
+    settings = read_settings()
+    if value is None:
+        settings.pop(key, None)
+    else:
+        settings[key] = value
+    write_settings(settings)
 
 
 def remembered_palette():
@@ -64,10 +80,17 @@ class App:
         self.index = 0
         self.target = None  # (r, g, b) or None
         self.gray = False
+        self.project = None
+        self.selected_hex = None  # the project color being matched, if any
 
         root.title("Latchwork")
         root.configure(bg=BG)
         root.minsize(780, 720)
+        root.columnconfigure(1, weight=1)
+        root.rowconfigure(0, weight=1)
+        self.sidebar = ProjectPanel(root, self)
+        self.main = tk.Frame(root, bg=BG)
+        self.main.grid(row=0, column=1, sticky="nsew")
         self._build_menu()
         self._build_ui()
         self._bind_keys()
@@ -77,6 +100,12 @@ class App:
     def _build_menu(self):
         bar = tk.Menu(self.root)
         file_menu = tk.Menu(bar, tearoff=False)
+        file_menu.add_command(label="New project from image...", accelerator="Ctrl+N",
+                              command=self.new_project)
+        file_menu.add_command(label="Open project...", accelerator="Ctrl+O",
+                              command=self.open_project)
+        file_menu.add_command(label="Close project", command=self.close_project)
+        file_menu.add_separator()
         file_menu.add_command(label="New palette...", command=self.new_palette)
         file_menu.add_command(label="Open palette...", command=self.open_palette)
         file_menu.add_separator()
@@ -88,14 +117,16 @@ class App:
         bar.add_cascade(label="Palette", menu=pal_menu)
         self.root.config(menu=bar)
         self.root.bind("<Control-p>", lambda e: self.open_palette_window())
+        self.root.bind("<Control-n>", lambda e: self.new_project())
+        self.root.bind("<Control-o>", lambda e: self.open_project())
 
     def _build_ui(self):
-        r = self.root
+        r = self.main
         r.columnconfigure(0, weight=1, uniform="half")
         r.columnconfigure(1, weight=1, uniform="half")
 
-        tk.Label(r, text="Target", font=TITLE_FONT, bg=BG, anchor="w").grid(
-            row=0, column=0, sticky="ew", padx=16, pady=(12, 0))
+        self.target_title = tk.Label(r, text="Target", font=TITLE_FONT, bg=BG, anchor="w")
+        self.target_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 0))
         self.yarn_title = tk.Label(r, text="", font=TITLE_FONT, bg=BG, anchor="w")
         self.yarn_title.grid(row=0, column=1, sticky="ew", padx=16, pady=(12, 0))
 
@@ -122,7 +153,8 @@ class App:
         buttons = [("◀  Lighter", lambda: self.step(-1)),
                    ("Nearest match (N)", self.jump_nearest),
                    ("Darker  ▶", lambda: self.step(1)),
-                   ("Grayscale (G)", self.toggle_gray)]
+                   ("Grayscale (G)", self.toggle_gray),
+                   ("Assign (A)", self.assign)]
         for text, cmd in buttons:
             ttk.Button(nav, text=text, width=18, command=cmd).pack(side="left", padx=4)
 
@@ -132,7 +164,8 @@ class App:
 
         tk.Label(r, font=("Segoe UI", 9), bg=BG, fg="#666",
                  text="← → step lighter / darker    N nearest match    G grayscale    "
-                      "Enter or Esc leaves the hex field    click a neighbor to jump").grid(
+                      "A assign to the selected image color    Enter/Esc leaves the hex field"
+                 ).grid(
             row=6, column=0, columnspan=2, pady=(4, 10))
 
     def _bind_keys(self):
@@ -143,6 +176,8 @@ class App:
             self.root.bind_all(k, lambda e: self._key(e, self.jump_nearest))
         for k in ("g", "G"):
             self.root.bind_all(k, lambda e: self._key(e, self.toggle_gray))
+        for k in ("a", "A"):
+            self.root.bind_all(k, lambda e: self._key(e, self.assign))
         for k in ("<Return>", "<Escape>"):
             self.entry.bind(k, lambda e: self.swatch.focus_set())
 
@@ -200,6 +235,9 @@ class App:
     def _use_bank(self, bank, keep_sku):
         self.bank = pal.sort_yarns(bank)
         self.yarns = pal.active(self.bank)
+        if self.project and self.project.suggest(self.yarns, self.palette_name):
+            self.save_project()
+            self.sidebar.refresh_rows()
         n_ret = len(self.bank) - len(self.yarns)
         self.root.title("Latchwork - %s (%d yarns%s)" % (
             os.path.basename(self.palette_path), len(self.yarns),
@@ -238,6 +276,130 @@ class App:
         if sku in names:
             self.jump_to(names.index(sku))
 
+    @property
+    def palette_name(self):
+        return os.path.basename(self.palette_path) if self.palette_path else ""
+
+    def yarn_in_palette(self, y):
+        """Is this assignment's yarn (name + hex) among the active yarns of the open palette?"""
+        key = pal.name_key(y["name"])
+        return any(v.key == key and v.hex == y["hex"].upper() for v in self.yarns)
+
+    # ---------- projects ----------
+    def new_project(self):
+        img_path = filedialog.askopenfilename(
+            title="New project: choose the pixel-art image",
+            filetypes=[("Pixel art", "*.png *.gif"), ("PNG", "*.png"), ("GIF", "*.gif"),
+                       ("All files", "*.*")])
+        if not img_path:
+            return
+        try:
+            project = Project.from_image_file(img_path, "")
+        except (OSError, ValueError) as e:
+            messagebox.showerror("New project", "Could not use %s\n\n%s" % (img_path, e))
+            return
+        n = len(project.colors)
+        if n > MANY_COLORS and not messagebox.askyesno(
+                "New project",
+                "This image has %d different colors, which is a lot for pixel art. It may be a "
+                "photo, scaled with smoothing, or saved as JPEG at some point.\n\n"
+                "Continue anyway?" % n, icon="warning"):
+            return
+        folder, name = os.path.split(img_path)
+        path = filedialog.asksaveasfilename(
+            title="Save the new project as", initialdir=folder,
+            initialfile=os.path.splitext(name)[0] + EXTENSION, defaultextension=EXTENSION,
+            filetypes=[("Latchwork project", "*" + EXTENSION)])
+        if not path:
+            return
+        project.path = path
+        project.suggest(self.yarns, self.palette_name)
+        if self.save_project(project):
+            self.show_project(project)
+
+    def open_project(self, path=None):
+        if path is None:
+            path = filedialog.askopenfilename(
+                title="Open project", filetypes=[("Latchwork project", "*" + EXTENSION),
+                                                 ("All files", "*.*")])
+            if not path:
+                return
+        try:
+            project = Project.load(path)
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            messagebox.showerror("Open project", "Could not open %s\n\n%s" % (path, e))
+            return False
+        if project.suggest(self.yarns, self.palette_name):
+            self.save_project(project)
+        self.show_project(project)
+        return True
+
+    def show_project(self, project):
+        self.project = project
+        self.sidebar.set_project(project)
+        self.sidebar.grid(row=0, column=0, sticky="ns")
+        self.root.title("Latchwork - %s - %s" % (project.name, self.palette_name))
+        self.root.minsize(1240, 760)
+        if self.remember:
+            remember_setting("project", os.path.abspath(project.path))
+        first = project.colors[0].hex
+        self.sidebar.select(first)
+        self.select_project_color(first)
+
+    def close_project(self):
+        self.project = None
+        self.selected_hex = None
+        self.sidebar.grid_remove()
+        self.root.minsize(780, 720)
+        if self.remember:
+            remember_setting("project", None)
+        self.draw_info()
+
+    def save_project(self, project=None):
+        project = project or self.project
+        try:
+            project.save()
+            return True
+        except OSError as e:
+            messagebox.showerror("Latchwork", "Could not save the project to\n%s\n\n%s"
+                                 % (project.path, e))
+            return False
+
+    def select_project_color(self, hex_):
+        """A color was picked in the project sidebar: make it the target."""
+        entry = self.project.entry(hex_)
+        if parse_hex(self.hex_var.get()) == entry.rgb:
+            self._goto_entry(entry)
+        else:
+            self.hex_var.set(entry.hex)  # -> on_hex_changed -> _goto_entry
+
+    def _goto_entry(self, entry):
+        self.selected_hex = entry.hex
+        if entry.confirmed and entry.yarn and self.yarn_in_palette(entry.yarn):
+            key = pal.name_key(entry.yarn["name"])
+            self.index = next(i for i, y in enumerate(self.yarns) if y.key == key)
+            self.refresh()
+        else:
+            self.jump_nearest()
+
+    def assign(self):
+        if not (self.project and self.selected_hex and self.yarns):
+            self.root.bell()
+            return
+        self.project.assign(self.selected_hex, self.yarns[self.index], self.palette_name)
+        self.save_project()
+        self.sidebar.update_row(self.selected_hex)
+        self.draw_info()
+
+    def unassign(self):
+        if not (self.project and self.selected_hex):
+            return
+        self.project.unassign(self.selected_hex)
+        self.project.suggest(self.yarns, self.palette_name)
+        self.save_project()
+        self.sidebar.update_row(self.selected_hex)
+        self._goto_entry(self.project.entry(self.selected_hex))
+
     # ---------- actions ----------
     def on_hex_changed(self):
         text = self.hex_var.get()
@@ -247,7 +409,15 @@ class App:
             return
         self.target_panel.status.config(text="")
         self.target = rgb
-        self.jump_nearest()
+        entry = self.project.entry(to_hex(*rgb)) if self.project else None
+        if entry:
+            self.sidebar.select(entry.hex)
+            self._goto_entry(entry)
+        else:
+            if self.project:
+                self.sidebar.select(None)
+            self.selected_hex = None
+            self.jump_nearest()
 
     def jump_nearest(self):
         if self.target and self.yarns:
@@ -306,6 +476,14 @@ class App:
                           fill="#FF3366")
 
     def draw_info(self):
+        entry = self.project.entry(self.selected_hex) if (self.project and self.selected_hex) \
+            else None
+        if entry:
+            self.target_title.config(text="Target  \u00B7  %s knots" % format(entry.count, ","))
+        else:
+            self.target_title.config(text="Target")
+        if self.project:
+            self.sidebar.update_footer()
         if not self.yarns:
             self.yarn_title.config(text="No yarns")
             self.yarn_hex_var.set("")
@@ -355,6 +533,9 @@ def main():
     app = App(root, path, remember=True)
     if app.palette_path is None and path != DEFAULT_PALETTE:
         app.load(DEFAULT_PALETTE)  # remembered palette failed to load: fall back
+    project = remembered_project()
+    if project and not app.open_project(project):
+        remember_setting("project", None)
     root.mainloop()
 
 
