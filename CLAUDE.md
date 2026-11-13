@@ -17,6 +17,7 @@ Keep it simple. This is a personal tool, not a product.
 - `colormath.py`: the verified color math (sRGB → CIE Lab/LCh, GIMP-exact). Tests target it.
 - `palette.py`: the yarn bank (load/save, .gpl/CSV import-export, import merge rules). No Tk.
 - `palette_window.py`: the palette manager window and its dialogs.
+- `widgets.py`: shared widgets (the GIMP-style ColorPanel used in the main view and edit dialog).
 - `pattern_template.html`: template for the exported phone/print pattern.
 - `palette.csv`: the yarn palette (see below).
 - `export_palette.py`: GIMP 2.10 Python-Fu script that produced `palette.csv` from `AllColors.xcf`.

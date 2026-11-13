@@ -1,10 +1,12 @@
 """Palette manager window: add, edit, retire/restore, delete, import and export yarns."""
 import os
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
 import palette as pal
 from colormath import parse_hex
+from widgets import ColorPanel
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
@@ -56,11 +58,13 @@ class PaletteWindow(tk.Toplevel):
         body.pack(fill="both", expand=True, padx=12)
         self.tree = ttk.Treeview(body, columns=("hex", "L", "brand", "status"),
                                  selectmode="extended")
-        for col, text, width, anchor in (("#0", "Yarn", 250, "w"), ("hex", "Hex", 80, "w"),
-                                         ("L", "L", 60, "e"), ("brand", "Brand", 120, "w"),
+        for col, text, width, anchor in (("#0", "Yarn", 200, "w"), ("hex", "Hex", 80, "w"),
+                                         ("L", "L", 55, "e"), ("brand", "Brand", 125, "w"),
                                          ("status", "Status", 70, "w")):
-            self.tree.heading(col, text=text)
-            self.tree.column(col, width=width, anchor=anchor, stretch=(col == "#0"))
+            self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
+            # Only the last column stretches; Yarn is sized to the longest name in refresh().
+            self.tree.column(col, width=width, minwidth=40, anchor=anchor,
+                             stretch=(col == "status"))
         self.tree.tag_configure("retired", foreground="#999999")
         sb = ttk.Scrollbar(body, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
@@ -117,6 +121,9 @@ class PaletteWindow(tk.Toplevel):
         if sel:
             self.tree.selection_set(sel)
             self.tree.see(sel[0])
+        font = tkfont.nametofont("TkDefaultFont")
+        longest = max((font.measure("  " + y.sku) for y in self.app.bank), default=100)
+        self.tree.column("#0", width=longest + 70)  # + tree indent and swatch image
         n_act = len(pal.active(self.app.bank))
         self.count.config(text="%d active, %d retired   (showing %d)" % (
             n_act, len(self.app.bank) - n_act, shown))
@@ -247,20 +254,23 @@ class YarnDialog(tk.Toplevel):
 
         tk.Label(self, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
         self.name_var = tk.StringVar(value=yarn.sku if yarn else "")
-        name_entry = ttk.Entry(self, textvariable=self.name_var, width=30)
-        name_entry.grid(row=0, column=1, sticky="w", padx=8, pady=3)
-        tk.Label(self, text="HTML notation", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w")
-        self.hex_var = tk.StringVar(value=yarn.hex if yarn else "")
-        ttk.Entry(self, textvariable=self.hex_var, width=12, font=("Consolas", 11)).grid(
-            row=1, column=1, sticky="w", padx=8, pady=3)
+        name_entry = ttk.Entry(self, textvariable=self.name_var, width=34, font=("Segoe UI", 11))
+        name_entry.grid(row=0, column=1, sticky="w", padx=8, pady=(0, 8))
 
-        self.swatch = tk.Canvas(self, width=320, height=90, highlightthickness=1,
-                                highlightbackground="#999", bg="#DDD")
-        self.swatch.grid(row=2, column=0, columnspan=2, pady=10)
-        self.info = tk.Label(self, font=UI_FONT, bg=BG, justify="left", anchor="w", wraplength=320)
-        self.info.grid(row=3, column=0, columnspan=2, sticky="w")
+        # Neighbor preview: lighter neighbor | this yarn | darker neighbor, names underneath.
+        self.swatch = tk.Canvas(self, width=self.SW_W, height=self.SW_H, bg=BG,
+                                highlightthickness=0)
+        self.swatch.grid(row=1, column=0, columnspan=2, pady=(0, 8))
+
+        self.hex_var = tk.StringVar(value=yarn.hex if yarn else "")
+        self.panel = ColorPanel(self, self.hex_var, editable=True)
+        self.panel.grid(row=2, column=0, columnspan=2, sticky="ew")
+
+        self.info = tk.Label(self, font=UI_FONT, bg=BG, justify="left", anchor="w",
+                             wraplength=self.SW_W)
+        self.info.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
         self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020", anchor="w")
-        self.error.grid(row=4, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        self.error.grid(row=4, column=0, columnspan=2, sticky="w", pady=(2, 0))
 
         btns = tk.Frame(self, bg=BG)
         btns.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
@@ -274,9 +284,11 @@ class YarnDialog(tk.Toplevel):
         self.hex_var.trace_add("write", lambda *_: self.update_view())
         self.update_view()
         center_on(self, parent)
-        name_entry.focus_set()
+        (self.panel.entry if yarn else name_entry).focus_set()
         self.grab_set()
         self.wait_window()
+
+    SW_W, SW_H, SIDE_W, BLOCK_H = 420, 96, 100, 70
 
     def problems(self):
         rgb = parse_hex(self.hex_var.get())
@@ -284,26 +296,39 @@ class YarnDialog(tk.Toplevel):
         if name_err:
             return rgb, name_err
         if rgb is None:
-            return rgb, "Enter a hex color, e.g. #88A048"
+            return rgb, "Enter a hex color in HTML notation, e.g. #88A048"
         return rgb, None
 
     def update_view(self):
         rgb, err = self.problems()
-        self.swatch.delete("all")
+        c = self.swatch
+        c.delete("all")
+        self.panel.show(rgb)
+        name = pal.clean_name(self.name_var.get()) or "New yarn"
+        mid0, mid1 = self.SIDE_W + 8, self.SW_W - self.SIDE_W - 8
         if rgb:
             y = pal.Yarn("preview", rgb)
-            self.swatch.configure(bg=y.hex)
             pos, total, lighter, darker = pal.placement(self.bank, y.L, exclude=self.yarn)
-            where = "between %s and %s" % (lighter.sku, darker.sku) if lighter and darker else (
-                "lightest, before %s" % darker.sku if darker else
-                "darkest, after %s" % lighter.sku if lighter else "the only yarn")
-            text = "L %.1f   C %.1f   h %.1f\nWould sit at %d / %d, %s." % (
-                y.L, y.lch[1], y.lch[2], pos, total, where)
+            for x0, x1, nb in ((0, self.SIDE_W, lighter),
+                               (self.SW_W - self.SIDE_W, self.SW_W, darker)):
+                if nb:
+                    c.create_rectangle(x0, 8, x1, self.BLOCK_H - 8, fill=nb.hex, outline="#999")
+                    c.create_text((x0 + x1) / 2, self.BLOCK_H + 2, text=nb.sku, anchor="n",
+                                  width=self.SIDE_W + 4, font=("Segoe UI", 8), fill="#555")
+            c.create_rectangle(mid0, 0, mid1, self.BLOCK_H, fill=y.hex, outline="#333", width=2)
+            c.create_text((mid0 + mid1) / 2, self.BLOCK_H + 2, text=name, anchor="n",
+                          width=mid1 - mid0, font=("Segoe UI", 9, "bold"))
+            where = ("between %s and %s" % (lighter.sku, darker.sku) if lighter and darker else
+                     "lightest, before %s" % darker.sku if darker else
+                     "darkest, after %s" % lighter.sku if lighter else "the only yarn")
+            text = "Would sit at %d / %d, %s." % (pos, total, where)
             if self.yarn and self.yarn.retired:
                 text += "\n(This yarn is retired, so it isn't used for matching.)"
             self.info.config(text=text)
         else:
-            self.swatch.configure(bg="#DDD")
+            c.create_rectangle(mid0, 0, mid1, self.BLOCK_H, fill="#DDD", outline="#BBB")
+            c.create_text((mid0 + mid1) / 2, self.BLOCK_H / 2, text="enter HTML notation below",
+                          font=UI_FONT, fill="#777")
             self.info.config(text="")
         self.error.config(text=err or "")
         self.ok.state(["disabled"] if err else ["!disabled"])
