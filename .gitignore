@@ -3,3 +3,6 @@ __pycache__/
 
 # GIMP working files (keep out of git; palette.csv is the source of truth)
 *.xcf
+
+# per-user app settings (remembered palette file)
+latchwork_settings.json

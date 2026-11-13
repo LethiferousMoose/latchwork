@@ -2,6 +2,7 @@
 
 Stages 1-2: comparison view and palette manager. Run:  python latchwork.py
 """
+import json
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -14,6 +15,29 @@ from widgets import ColorPanel
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_PALETTE = os.path.join(HERE, "palette.csv")
+SETTINGS = os.path.join(HERE, "latchwork_settings.json")  # per-user, not in git
+
+
+def read_settings():
+    try:
+        with open(SETTINGS, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_settings(data):
+    try:
+        with open(SETTINGS, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, indent=2)
+    except OSError:
+        pass  # remembering is a convenience; never fail over it
+
+
+def remembered_palette():
+    path = read_settings().get("palette")
+    return path if isinstance(path, str) and os.path.isfile(path) else DEFAULT_PALETTE
 
 NEIGHBORS = 4          # yarns shown on each side of the current one in the strip
 
@@ -30,8 +54,9 @@ def display_color(rgb, gray):
 
 
 class App:
-    def __init__(self, root, palette_path):
+    def __init__(self, root, palette_path, remember=False):
         self.root = root
+        self.remember = remember  # save the open palette in settings (off for tests/scripts)
         self.bank = []       # every yarn in the palette file, retired ones included
         self.yarns = []      # active yarns, lightest -> darkest: what matching and stepping use
         self.palette_path = None
@@ -52,6 +77,7 @@ class App:
     def _build_menu(self):
         bar = tk.Menu(self.root)
         file_menu = tk.Menu(bar, tearoff=False)
+        file_menu.add_command(label="New palette...", command=self.new_palette)
         file_menu.add_command(label="Open palette...", command=self.open_palette)
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.destroy)
@@ -136,17 +162,40 @@ class App:
         if path:
             self.load(path)
 
+    def new_palette(self):
+        path = filedialog.asksaveasfilename(
+            title="New palette (starts empty)", initialdir=HERE, defaultextension=".csv",
+            initialfile="new_palette.csv", filetypes=[("CSV", "*.csv")])
+        if not path:
+            return
+        try:
+            pal.save_palette(path, [])
+        except OSError as e:
+            messagebox.showerror("Latchwork", "Could not create %s\n\n%s" % (path, e))
+            return
+        if self.load(path):
+            self.open_palette_window()
+
     def load(self, path):
+        """Load a palette file. Returns True on success."""
         try:
             bank = pal.load_palette(path)
         except (OSError, ValueError, UnicodeDecodeError) as e:
             messagebox.showerror("Latchwork", "Could not load palette:\n%s\n\n%s" % (path, e))
-            return
-        self.palette_path = path
+            return False
+        self.palette_path = os.path.abspath(path)
+        if self.remember:
+            settings = read_settings()
+            if os.path.normcase(self.palette_path) == os.path.normcase(DEFAULT_PALETTE):
+                settings.pop("palette", None)
+            else:
+                settings["palette"] = self.palette_path
+            write_settings(settings)
         self.index = 0
         self._use_bank(bank, keep_sku=None)
         if self.palette_window:
             self.palette_window.refresh()
+        return True
 
     def _use_bank(self, bank, keep_sku):
         self.bank = pal.sort_yarns(bank)
@@ -167,10 +216,6 @@ class App:
 
     def set_bank(self, bank):
         """Save an edited yarn bank to the palette file and show it. Returns True on success."""
-        if not pal.active(bank):
-            messagebox.showerror("Latchwork", "At least one yarn has to stay active.",
-                                 parent=self.palette_window or self.root)
-            return False
         try:
             pal.save_palette(self.palette_path, bank)
         except OSError as e:
@@ -238,9 +283,8 @@ class App:
         c = self.swatch
         c.delete("all")
         w, h = c.winfo_width(), c.winfo_height()
-        if w < 4 or not self.yarns:
+        if w < 4:
             return
-        self.index = max(0, min(self.index, len(self.yarns) - 1))
         mid = w // 2
         if self.target:
             c.create_rectangle(0, 0, mid, h, fill=display_color(self.target, self.gray), width=0)
@@ -248,14 +292,26 @@ class App:
             c.create_rectangle(0, 0, mid, h, fill="#DDDDDD", width=0)
             c.create_text(mid // 2, h // 2, text="Paste a hex color into HTML notation below",
                           font=UI_FONT, fill="#666")
-        yarn = self.yarns[self.index]
-        c.create_rectangle(mid, 0, w, h, fill=display_color(yarn.rgb, self.gray), width=0)
+        if self.yarns:
+            self.index = max(0, min(self.index, len(self.yarns) - 1))
+            yarn = self.yarns[self.index]
+            c.create_rectangle(mid, 0, w, h, fill=display_color(yarn.rgb, self.gray), width=0)
+        else:
+            c.create_rectangle(mid, 0, w, h, fill="#E4E4E4", width=0)
+            c.create_text((mid + w) // 2, h // 2, font=UI_FONT, fill="#666", justify="center",
+                          text="This palette has no active yarns yet.\n"
+                               "Add some in Palette \u2192 Manage yarns... (Ctrl+P)")
         if self.gray:
             c.create_text(8, 8, text="GRAYSCALE", anchor="nw", font=("Segoe UI", 9, "bold"),
                           fill="#FF3366")
 
     def draw_info(self):
         if not self.yarns:
+            self.yarn_title.config(text="No yarns")
+            self.yarn_hex_var.set("")
+            self.target_panel.show(self.target)
+            self.yarn_panel.show(None)
+            self.summary.config(text="")
             return
         yarn = self.yarns[self.index]
         self.yarn_title.config(text=yarn.sku)
@@ -295,7 +351,10 @@ class App:
 
 def main():
     root = tk.Tk()
-    App(root, DEFAULT_PALETTE)
+    path = remembered_palette()
+    app = App(root, path, remember=True)
+    if app.palette_path is None and path != DEFAULT_PALETTE:
+        app.load(DEFAULT_PALETTE)  # remembered palette failed to load: fall back
     root.mainloop()
 
 

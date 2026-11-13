@@ -49,6 +49,11 @@ class TestFiles(TempDir):
         self.assertEqual(Ls, sorted(Ls, reverse=True))
         self.assertFalse([f for f in os.listdir(self.dir) if f.endswith(".tmp")])
 
+    def test_empty_palette_round_trip(self):
+        p = self.path("empty.csv")
+        pal.save_palette(p, [])
+        self.assertEqual(pal.load_palette(p), [])
+
     def test_old_csv_without_retired_column_loads(self):
         p = self.write("old.csv", "order,sku,r,g,b,hex,L_gimp,color_stddev\n"
                                   "1,White,247,243,234,#F7F3EA,95.9696,0.0000\n")

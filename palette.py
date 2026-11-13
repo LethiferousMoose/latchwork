@@ -116,8 +116,6 @@ def read_csv_entries(path):
 
 def load_palette(path):
     entries = read_csv_entries(path)
-    if not entries:
-        raise ValueError("palette has no rows")
     for e in entries:
         if not e.name:
             raise ValueError("a row has no name (hex %s)" % e.hex)

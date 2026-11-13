@@ -48,8 +48,16 @@ class PaletteWindow(tk.Toplevel):
         self.minsize(640, 480)
         self.geometry("720x620")
 
+        head = tk.Frame(self, bg=BG)
+        head.pack(fill="x", padx=12, pady=(12, 0))
+        tk.Label(head, text="Editing:", font=("Segoe UI", 11), bg=BG, fg="#555").pack(side="left")
+        self.file_label = tk.Label(head, font=("Segoe UI", 11, "bold"), bg=BG)
+        self.file_label.pack(side="left", padx=(4, 8))
+        self.path_label = tk.Label(head, font=("Segoe UI", 8), bg=BG, fg="#888", anchor="w")
+        self.path_label.pack(side="left", fill="x", expand=True, pady=(3, 0))
+
         top = tk.Frame(self, bg=BG)
-        top.pack(fill="x", padx=12, pady=(12, 6))
+        top.pack(fill="x", padx=12, pady=(8, 6))
         tk.Label(top, text="Find", font=UI_FONT, bg=BG).pack(side="left")
         self.find_var = tk.StringVar()
         self.find_var.trace_add("write", lambda *_: self.refresh())
@@ -130,6 +138,10 @@ class PaletteWindow(tk.Toplevel):
         font = tkfont.nametofont("TkDefaultFont")
         longest = max((font.measure("  " + y.sku) for y in self.app.bank), default=100)
         self.tree.column("#0", width=longest + 70)  # + tree indent and swatch image
+        path = self.app.palette_path or ""
+        self.file_label.config(text=os.path.basename(path))
+        self.path_label.config(text=os.path.dirname(path))
+        self.title("Latchwork - Yarn palette - %s" % os.path.basename(path))
         n_act = len(pal.active(self.app.bank))
         self.count.config(text="%d active, %d retired   (showing %d)" % (
             n_act, len(self.app.bank) - n_act, shown))
