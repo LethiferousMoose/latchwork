@@ -71,10 +71,15 @@ class ProjectPanel(tk.Frame):
                  font=UI_FONT, text="Start a rug from a pixel-art image (PNG or GIF), or open a "
                                     "saved .latchwork project. You can also match single colors "
                                     "on the right without a project.").pack(anchor="w", pady=(4, 12))
-        ttk.Button(self.welcome, text="New project from image...  (Ctrl+N)",
-                   command=app.new_project).pack(anchor="w", ipadx=6, pady=2)
-        ttk.Button(self.welcome, text="Open project...  (Ctrl+O)",
-                   command=app.open_project).pack(anchor="w", ipadx=6, pady=2)
+        start = tk.Frame(self.welcome, bg=BG)
+        start.pack(anchor="w")
+        for row, (text, keys, cmd) in enumerate((
+                ("New project from image...", "Ctrl+N", app.new_project),
+                ("Open project...", "Ctrl+O", app.open_project))):
+            ttk.Button(start, text=text, width=28, command=cmd).grid(
+                row=row, column=0, sticky="ew", ipady=3, pady=3)
+            tk.Label(start, text=keys, font=("Segoe UI", 9), bg=BG, fg="#888").grid(
+                row=row, column=1, sticky="w", padx=(10, 0))
 
         # ----- shown when a project is open -----
         self.content = tk.Frame(self, bg=BG)
@@ -91,8 +96,6 @@ class ProjectPanel(tk.Frame):
         for value, text in (("original", "Original"), ("preview", "Yarn preview")):
             ttk.Radiobutton(views, text=text, value=value, variable=self.view, style="Toolbutton",
                             command=self.on_view).pack(side="left", ipadx=8)
-        tk.Label(views, text="  P switches", font=("Segoe UI", 8), bg=BG, fg="#888").pack(
-            side="left")
         self.mark_unassigned = tk.BooleanVar(value=False)
         self.mark_cb = ttk.Checkbutton(views, text="Mark unassigned", variable=self.mark_unassigned,
                                        command=self.render_image)
