@@ -220,8 +220,8 @@ Done (first pass): grayscale toggle state + badge, single Assign button (main ro
 nothing to assign), image options in one row, selected-color info line, sidebar divider,
 palette manager shows file name only and disables Edit/Retire/Delete without a selection,
 yarn-ball window icon.
+Done (2026-11-14): key hints bar shows keys as bordered keycaps, then plain text.
 Still open:
-- The key hints bar at the bottom of the main window: rethink how shortcuts are shown.
 - Neighbor strip: long yarn names wrap to two lines while short ones use one.
 - Pattern page: maybe make the Symbols button cycle Auto / Always / Off. Symbols are hidden
   below 7 px cells on purpose (tested: under ~6 px they turn into an unreadable texture).

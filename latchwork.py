@@ -105,6 +105,14 @@ def app_icon(size=32):
     return img
 
 
+def keycap(parent, key):
+    """A small bordered key label, like a keyboard key."""
+    arrow = key in "←→↑↓"
+    return tk.Label(parent, text=key, font=("Segoe UI Symbol", 9) if arrow else ("Segoe UI", 8, "bold"),
+                    bg="white", fg="#333", relief="solid", bd=1, padx=3, pady=0,
+                    width=2 if len(key) == 1 else 0, highlightthickness=0)
+
+
 def display_color(rgb, gray):
     if not gray:
         return to_hex(*rgb)
@@ -274,12 +282,17 @@ class App:
         self.strip.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(6, 0))
         self.strip.bind("<Configure>", lambda e: self.draw_strip())
 
-        tk.Label(r, font=("Segoe UI", 9), bg=BG, fg="#666",
-                 text="← → lighter / darker    N next match    B better match    Home best match    "
-                      "G grayscale    "
-                      "A assign    P original/preview    Enter/Esc leaves the hex field"
-                 ).grid(
-            row=6, column=0, columnspan=2, pady=(4, 10))
+        hints = tk.Frame(r, bg=BG)
+        hints.grid(row=6, column=0, columnspan=2, pady=(4, 10))
+        for keys, text in (("←→", "lighter / darker"), ("N", "next match"), ("B", "better match"),
+                           ("Home", "best match"), ("G", "grayscale"), ("A", "assign"),
+                           ("P", "original/preview"), ("F1", "help")):
+            item = tk.Frame(hints, bg=BG)
+            item.pack(side="left", padx=(0, 10))
+            for k in ([keys] if len(keys) > 2 or keys == "F1" else list(keys)):
+                keycap(item, k).pack(side="left", padx=(0, 2))
+            tk.Label(item, text=text, font=("Segoe UI", 9), bg=BG, fg="#666").pack(
+                side="left", padx=(3, 0))
 
     def _bind_keys(self):
         # Arrows step even while typing in the hex field (it's a paste-and-go field).
