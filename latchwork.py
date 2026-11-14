@@ -229,7 +229,10 @@ class App:
         self.yarn_hex_var = tk.StringVar()
         self.target_panel = ColorPanel(r, self.hex_var, editable=True)
         self.target_panel.grid(row=2, column=0, sticky="n", padx=16, pady=4)
-        self.yarn_panel = ColorPanel(r, self.yarn_hex_var, editable=False, on_copy=self.copy_hex)
+        self.yarn_panel = ColorPanel(r, self.yarn_hex_var, editable=True, on_copy=self.copy_hex)
+        self.yarn_entry = self.yarn_panel.entry
+        self.yarn_hex_var.trace_add("write", lambda *_: self.on_yarn_hex_changed())
+        self.yarn_entry.bind("<FocusOut>", lambda e: self.reset_yarn_hex())
         self.yarn_panel.grid(row=2, column=1, sticky="n", padx=16, pady=4)
         self.entry = self.target_panel.entry
         self.hex_var.trace_add("write", lambda *_: self.on_hex_changed())
@@ -295,6 +298,7 @@ class App:
             self.root.bind_all(k, lambda e: self._key(e, self.sidebar.toggle_view))
         for k in ("<Return>", "<Escape>"):
             self.entry.bind(k, lambda e: self.swatch.focus_set())
+            self.yarn_entry.bind(k, lambda e: self.swatch.focus_set())   # FocusOut resets it
 
     def _key(self, event, action, always=False):
         widget = event.widget
@@ -687,6 +691,26 @@ class App:
             self._order = (key, match_order(rgb_to_lab(*self.target),
                                             [y.lab for y in self.yarns], self.weight))
         return self._order[1]
+
+    def on_yarn_hex_changed(self):
+        """Typing a hex in the yarn's box jumps to the active yarn with that hex (first one if
+        several share it). Anything else is left until the box loses focus, then reset."""
+        rgb = parse_hex(self.yarn_hex_var.get())
+        current = self.yarns[self.index] if self.yarns else None
+        if rgb is None or (current and current.rgb == rgb):
+            self.yarn_panel.status.config(text="")
+            return
+        i = next((k for k, y in enumerate(self.yarns) if y.rgb == rgb), None)
+        if i is None:
+            self.yarn_panel.status.config(text="no yarn with this hex")
+            return
+        self.yarn_panel.status.config(text="")
+        self.jump_to(i)
+
+    def reset_yarn_hex(self):
+        self.yarn_panel.status.config(text="")
+        if self.yarns:
+            self.yarn_hex_var.set(self.yarns[self.index].hex)
 
     def jump_nearest(self):
         """Go to the best match for the target (used whenever the target or palette changes)."""

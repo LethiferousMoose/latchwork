@@ -91,6 +91,7 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 - G: grayscale (judge lightness alone).
 - P: sidebar image: original / yarn preview.
 - Enter or Esc: leave the hex field.
+- Typing a hex into the yarn's HTML notation box jumps to the yarn with that color; if no yarn matches, the box resets when you leave it.
 - Ctrl+N new project, Ctrl+O open project, Ctrl+E export pattern, Ctrl+P manage yarns.
 - Ctrl+1 … Ctrl+9: switch to palette 1–9 of the palette list.
 - F1: this help.
