@@ -27,6 +27,9 @@ tidied so others can use it too. Keep it simple.
 - `tests/`: `python -m unittest discover -s tests` (adds `src/` to the path).
 - `tools/export_palette.py`: the GIMP 2.10 script that exported the original palette.
 - `docs/images/`: README screenshots, made from a neutral demo image (not my rug samples).
+  When a change visibly alters a screen shown there (main window, Plan tab, palette manager,
+  help, phone pattern), retake that screenshot the same way: same demo image, the real palette,
+  1300×820 main window, phone pattern at 390 px wide.
 
 ## My setup (the defaults)
 - Hershner's is pre-cut, 320 pieces per pack; Red Heart and Loops & Threads are cut from skeins.
