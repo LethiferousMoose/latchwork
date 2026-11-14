@@ -223,20 +223,23 @@ class App:
         nav = tk.Frame(r, bg=BG)
         nav.grid(row=4, column=0, columnspan=2, pady=6)
         for text, cmd in (("◀  Lighter", lambda: self.step(-1)),
-                          ("Best match (N)", self.next_match),
-                          ("Darker  ▶", lambda: self.step(1))):
-            ttk.Button(nav, text=text, width=18, command=cmd).pack(side="left", padx=4)
-        self.gray_btn = ttk.Button(nav, text="Grayscale (G)", width=18, command=self.toggle_gray)
-        self.gray_btn.pack(side="left", padx=4)
-        self.assign_main = ttk.Button(nav, text="Assign (A)", width=18, command=self.assign)
-        self.assign_main.pack(side="left", padx=4)
+                          ("Darker  ▶", lambda: self.step(1)),
+                          ("▲ Better match (B)", lambda: self.cycle_match(-1)),
+                          ("Next match ▼ (N)", lambda: self.cycle_match(1))):
+            ttk.Button(nav, text=text, width=12 if "match" not in text else 19,
+                       command=cmd).pack(side="left", padx=3)
+        self.gray_btn = ttk.Button(nav, text="Grayscale (G)", width=16, command=self.toggle_gray)
+        self.gray_btn.pack(side="left", padx=3)
+        self.assign_main = ttk.Button(nav, text="Assign (A)", width=16, command=self.assign)
+        self.assign_main.pack(side="left", padx=3)
 
         self.strip = tk.Canvas(r, height=96, bg=BG, highlightthickness=0)
         self.strip.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(6, 0))
         self.strip.bind("<Configure>", lambda e: self.draw_strip())
 
         tk.Label(r, font=("Segoe UI", 9), bg=BG, fg="#666",
-                 text="← → step lighter / darker    N best match (again: next best)    G grayscale    "
+                 text="← → lighter / darker    N next match    B better match    Home best match    "
+                      "G grayscale    "
                       "A assign    P original/preview    Enter/Esc leaves the hex field"
                  ).grid(
             row=6, column=0, columnspan=2, pady=(4, 10))
@@ -245,8 +248,11 @@ class App:
         # Arrows step even while typing in the hex field (it's a paste-and-go field).
         self.root.bind_all("<Left>", lambda e: self._key(e, lambda: self.step(-1), always=True))
         self.root.bind_all("<Right>", lambda e: self._key(e, lambda: self.step(1), always=True))
-        for k in ("n", "N", "<Home>"):
-            self.root.bind_all(k, lambda e: self._key(e, self.next_match))
+        for k in ("n", "N"):
+            self.root.bind_all(k, lambda e: self._key(e, lambda: self.cycle_match(1)))
+        for k in ("b", "B"):
+            self.root.bind_all(k, lambda e: self._key(e, lambda: self.cycle_match(-1)))
+        self.root.bind_all("<Home>", lambda e: self._key(e, self.jump_nearest))
         for k in ("g", "G"):
             self.root.bind_all(k, lambda e: self._key(e, self.toggle_gray))
         for k in ("a", "A"):
@@ -559,13 +565,16 @@ class App:
             self.index = order[0]
         self.refresh()
 
-    def next_match(self):
-        """N: the best match; pressed again while on it, the next best, and so on (wrapping)."""
+    def cycle_match(self, delta):
+        """N (+1) / B (-1): move down or up the best-match ranking from the yarn on screen.
+        After stepping with the arrows, N starts again at the best match. Stops at the ends."""
         order = self.match_ranking()
         if not order:
             return self.refresh()
-        on_cycle = self._cycle < len(order) and order[self._cycle] == self.index
-        self._cycle = (self._cycle + 1) % len(order) if on_cycle else 0
+        if not (self._cycle < len(order) and order[self._cycle] == self.index):
+            self._cycle = 0
+        else:
+            self._cycle = max(0, min(len(order) - 1, self._cycle + delta))
         self.index = order[self._cycle]
         self.refresh()
 
@@ -738,7 +747,7 @@ class App:
         order = self.match_ranking()
         if order:
             self.match_card.set("#%d" % (order.index(self.index) + 1),
-                                "best match" if order[0] == self.index else "N = next best")
+                                "best match" if order[0] == self.index else "B = better")
         else:
             self.match_card.set("\u2013", "", "#888")
         self.pos_card.set("%d of %d" % (self.index + 1, len(self.yarns)),

@@ -98,7 +98,8 @@ Keep it simple. This is a personal tool, not a product.
   saved in settings): my pick came first 24 of 48 times and was nearly always in the top 3.
   Patterns in my picks: L within ~3, hue held within ~6°, chroma allowed to drop a lot (yarn is
   duller than pixel art), dark dull colors treated as neutrals. No brand preference.
-- **Best match (N)**: jumps to the best match; pressing N again cycles to the next best (wraps).
+- **Next match ▼ (N)** / **▲ Better match (B)** walk down/up the best-match ranking (stop at the
+  ends); Home jumps to the best match. After stepping with ← →, N starts again at the best.
   A Match rank card shows where the current yarn ranks. ← → and the neighbor strip stay in L
   order. Hollow markers on the L, C and h bars show the other side's values (no h marker for
   near-grays).
