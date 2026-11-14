@@ -22,6 +22,7 @@ Keep it simple. This is a personal tool, not a product.
 - `project.py`: the `.latchwork` project file (embedded image, colors, assignments). No Tk.
 - `project_panel.py`: the project sidebar (image/preview, Colors and Plan tabs, Assign).
 - `plan.py`: quantities, packs, canvas size, merged colors, yarn-list CSV, preview PNG. No Tk.
+- `help.py`: the Help menu / F1 window (topics as plain text). Keep it in step when features change.
 - `pattern_template.html`: the phone/print pattern page (HTML/CSS/JS, no external files).
 - `pattern.py`: embeds a project into the template as JSON (one cell per knot). No Tk.
 - `palette.csv`: the yarn palette (see below).

@@ -12,6 +12,7 @@ import pattern
 import plan as pl
 from colormath import (DEFAULT_COLOR_WEIGHT, gray_for_lightness, match_order, parse_hex,
                        rgb_to_lab, rgb_to_lch, to_hex)
+from help import TOPICS as help_topics, open_help
 from palette import load_palette  # noqa: F401  (re-exported for tests and scripts)
 from palette_window import PaletteWindow
 from project import EXTENSION, MANY_COLORS, Project
@@ -169,7 +170,13 @@ class App:
         pal_menu.add_command(label="Manage yarns...", accelerator="Ctrl+P",
                              command=self.open_palette_window)
         bar.add_cascade(label="Palette", menu=pal_menu)
+        help_menu = tk.Menu(bar, tearoff=False)
+        for i, (topic, _) in enumerate(help_topics):
+            help_menu.add_command(label=topic, accelerator="F1" if i == 0 else "",
+                                  command=lambda t=topic: open_help(self.root, t))
+        bar.add_cascade(label="Help", menu=help_menu)
         self.root.config(menu=bar)
+        self.root.bind("<F1>", lambda e: open_help(self.root))
         self.root.bind("<Control-p>", lambda e: self.open_palette_window())
         self.root.bind("<Control-n>", lambda e: self.new_project())
         self.root.bind("<Control-o>", lambda e: self.open_project())
