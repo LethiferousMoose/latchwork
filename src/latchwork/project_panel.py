@@ -99,7 +99,7 @@ class ProjectPanel(tk.Frame):
         self.canvas.bind("<Button-1>", self.on_image_click)
         opts = tk.Frame(c, bg=BG)
         opts.pack(fill="x")
-        self.highlight = tk.BooleanVar(value=True)
+        self.highlight = tk.BooleanVar(value=False)
         ttk.Checkbutton(opts, text="Highlight selected color", variable=self.highlight,
                         command=self.render_image).pack(side="left")
         self.mark_unassigned = tk.BooleanVar(value=False)
