@@ -906,6 +906,22 @@ class App:
         self.draw_swatch()
         self.draw_strip()
         self.draw_info()
+        self._refresh_live_preview()
+
+    def live_preview(self):
+        """(image color, yarn hex) for the Yarn preview: the selected image color shown with the
+        yarn currently in the comparison view, or None."""
+        if self.project and self.selected_hex and self.yarns and self.project.entry(
+                self.selected_hex):
+            return self.selected_hex, self.yarns[self.index].hex
+        return None
+
+    def _refresh_live_preview(self):
+        """Repaint the sidebar preview when the yarn shown for the selected color changes."""
+        key = self.live_preview() if self.sidebar.view.get() == "preview" else None
+        if key != getattr(self, "_live_key", None):
+            self._live_key = key
+            self.sidebar.render_image()
 
     def draw_swatch(self):
         c = self.swatch

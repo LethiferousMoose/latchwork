@@ -157,6 +157,8 @@ A `.latchwork` file is readable JSON:
     one empty row, because the cut edge isn't stable enough to hook into.
 - Yarn preview (sidebar, and the preview PNG export, one pixel per knot): assigned colors show
   their yarn, unassigned ones their suggested yarn; "Mark unassigned" stripes those in the sidebar.
+  In the sidebar, the selected color shows the yarn currently in the comparison view, updating
+  live as you step (preview only; nothing is stored until Assign).
 
 ## Pattern export (`pattern.py`, `pattern_template.html`)
 

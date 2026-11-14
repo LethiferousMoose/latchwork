@@ -89,7 +89,7 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 - Home: best match (#1).
 - A: assign the yarn on screen to the selected color; press again to undo.
 - G: grayscale (judge lightness alone).
-- P: sidebar image: original / yarn preview (assigned yarns, and suggested yarns for unassigned colors; Mark unassigned stripes those).
+- P: sidebar image: original / yarn preview (assigned yarns, and suggested yarns for unassigned colors; Mark unassigned stripes those). The selected color shows the yarn currently on screen, live as you step, so you can judge it in the whole picture; nothing changes until you Assign. Turn off Highlight selected color to see it without the fading.
 - Enter or Esc: leave the hex field.
 - Typing a hex into the yarn's HTML notation box jumps to the yarn with that color; if no yarn matches, the box resets when you leave it.
 - Ctrl+N new project, Ctrl+O open project, Ctrl+E export pattern, Ctrl+P manage yarns.
