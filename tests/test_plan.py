@@ -6,13 +6,13 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import pixelart  # noqa: E402
-import plan as pl  # noqa: E402
-from palette import Brand, Yarn  # noqa: E402
-from project import Project  # noqa: E402
+from latchwork import pixelart  # noqa: E402
+from latchwork import plan as pl  # noqa: E402
+from latchwork.palette import Brand, Yarn  # noqa: E402
+from latchwork.project import Project  # noqa: E402
 from test_project import RGB_ROWS, make_png  # noqa: E402
 
 

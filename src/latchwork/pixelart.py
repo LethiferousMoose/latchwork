@@ -8,7 +8,7 @@ import struct
 import zlib
 from collections import Counter
 
-from colormath import to_hex
+from .colormath import to_hex
 
 PNG_SIG = b"\x89PNG\r\n\x1a\n"
 TRANSPARENT_BELOW = 128  # alpha < this counts as transparent (no knot)

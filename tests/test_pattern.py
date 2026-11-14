@@ -8,12 +8,12 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import pattern  # noqa: E402
-from palette import Yarn  # noqa: E402
-from project import Project  # noqa: E402
+from latchwork import pattern  # noqa: E402
+from latchwork.palette import Yarn  # noqa: E402
+from latchwork.project import Project  # noqa: E402
 from test_project import make_png  # noqa: E402
 
 # 3x2: white, rust, navy / navy, black, transparent

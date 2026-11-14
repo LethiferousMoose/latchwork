@@ -13,21 +13,26 @@ Keep it simple. This is a personal tool, not a product.
 - Build in the stages below. Stop after each stage so I can try it before the next one starts.
 
 ## Files
-- `latchwork.py`: the app (run this).
-- `colormath.py`: the verified color math (sRGB → CIE Lab/LCh, GIMP-exact). Tests target it.
-- `palette.py`: the yarn bank (load/save, .gpl/CSV import-export, import merge rules). No Tk.
-- `palette_window.py`: the palette manager window and its dialogs.
-- `widgets.py`: shared widgets (the GIMP-style ColorPanel used in the main view and edit dialog).
-- `pixelart.py`: exact PNG decode/encode (stdlib zlib), GIF via Tk, color counting. No Tk for PNG.
-- `project.py`: the `.latchwork` project file (embedded image, colors, assignments). No Tk.
-- `project_panel.py`: the project sidebar (image/preview, Colors and Plan tabs, Assign).
-- `plan.py`: quantities, packs, canvas size, merged colors, yarn-list CSV, preview PNG. No Tk.
-- `help.py`: the Help menu / F1 window (topics as plain text). Keep it in step when features change.
-- `pattern_template.html`: the phone/print pattern page (HTML/CSS/JS, no external files).
-- `pattern.py`: embeds a project into the template as JSON (one cell per knot). No Tk.
-- `palette.csv`: the yarn palette (see below).
-- `export_palette.py`: GIMP 2.10 Python-Fu script that produced `palette.csv` from `AllColors.xcf`.
-- `tests/`: unit tests.
+- `latchwork.py`: launcher (run this: `python latchwork.py`). Puts `src/` on the path.
+- `src/latchwork/`: the app package (relative imports; `python -m latchwork` with `src/` on the path).
+  - `app.py`: the main window. Paths: `data/` for palettes, `settings/` for per-user settings.
+  - `colormath.py`: the verified color math (sRGB → CIE Lab/LCh, GIMP-exact) and best-match ranking.
+  - `palette.py`: the yarn bank (load/save, .gpl/CSV import-export, import merge rules). No Tk.
+  - `palette_window.py`: the palette manager window and its dialogs.
+  - `widgets.py`: shared widgets (the GIMP-style ColorPanel used in the main view and edit dialog).
+  - `pixelart.py`: exact PNG decode/encode (stdlib zlib), GIF via Tk, color counting. No Tk for PNG.
+  - `project.py`: the `.latchwork` project file (embedded image, colors, assignments). No Tk.
+  - `project_panel.py`: the project sidebar (image/preview, Colors and Plan tabs, Assign).
+  - `plan.py`: quantities, packs, canvas size, merged colors, yarn-list CSV, preview PNG. No Tk.
+  - `help.py`: the Help menu / F1 window (topics as plain text). Keep it in step with features.
+  - `pattern_template.html`: the phone/print pattern page (HTML/CSS/JS, no external files).
+  - `pattern.py`: embeds a project into the template as JSON (one cell per knot). No Tk.
+- `data/palette.csv` + `data/palette.brands.csv`: my yarn palette (see below).
+- `settings/latchwork_settings.json`: per-user settings (git-ignored; moved here from the root
+  automatically).
+- `tools/export_palette.py`: GIMP 2.10 Python-Fu script that produced `palette.csv` from `AllColors.xcf`.
+- `tests/`: unit tests (`python -m unittest discover -s tests`).
+- `samples/`: my past rugs used to fit the color weight (git-ignored).
 - `AllColors.xcf`: my palette reference in GIMP. Read only.
 
 ## Phase 1 results (done, verified)

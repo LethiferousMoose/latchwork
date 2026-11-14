@@ -4,9 +4,9 @@ import math
 import os
 import tempfile
 
-import pixelart
-from colormath import parse_hex
-from palette import label, name_key
+from . import pixelart
+from .colormath import parse_hex
+from .palette import label, name_key
 
 # Canvas defaults (my setup); each project can override them in its settings.
 CANVAS_DEFAULTS = {

@@ -11,7 +11,7 @@ import os
 import re
 import tempfile
 
-from colormath import lightness, parse_hex, rgb_to_lab, rgb_to_lch, to_hex
+from .colormath import lightness, parse_hex, rgb_to_lab, rgb_to_lch, to_hex
 
 FIELDS = ["order", "sku", "brand", "r", "g", "b", "hex", "L_gimp", "pack_size", "retired"]
 BRAND_FIELDS = ["brand", "pack_size"]

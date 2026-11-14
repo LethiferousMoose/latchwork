@@ -7,8 +7,8 @@ import json
 import os
 import tempfile
 
-import plan as pl
-from colormath import lightness, parse_hex, to_hex
+from . import plan as pl
+from .colormath import lightness, parse_hex, to_hex
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(HERE, "pattern_template.html")

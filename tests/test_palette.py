@@ -5,10 +5,10 @@ import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "src"))
 
-import palette as pal  # noqa: E402
-from palette import Brand, Entry, Yarn  # noqa: E402
+from latchwork import palette as pal  # noqa: E402
+from latchwork.palette import Brand, Entry, Yarn  # noqa: E402
 
 H, RH = "Hershner's", "Red Heart"
 

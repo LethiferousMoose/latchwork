@@ -8,11 +8,11 @@ import unittest
 import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "src"))
 
-import pixelart  # noqa: E402
-from palette import Yarn, sort_yarns  # noqa: E402
-from project import Project  # noqa: E402
+from latchwork import pixelart  # noqa: E402
+from latchwork.palette import Yarn, sort_yarns  # noqa: E402
+from latchwork.project import Project  # noqa: E402
 
 
 # ---------- helpers to build test PNGs of every flavor ----------

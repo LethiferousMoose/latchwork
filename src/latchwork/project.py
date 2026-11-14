@@ -19,9 +19,9 @@ import json
 import os
 import tempfile
 
-import pixelart
-from colormath import lightness, match_order, parse_hex, rgb_to_lab
-from palette import effective_pack, legacy_assignment
+from . import pixelart
+from .colormath import lightness, match_order, parse_hex, rgb_to_lab
+from .palette import effective_pack, legacy_assignment
 
 FORMAT = "latchwork-project"
 VERSION = 1

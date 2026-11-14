@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from colormath import lch_to_rgb, rgb_to_lch, to_hex
+from .colormath import lch_to_rgb, rgb_to_lch, to_hex
 
 BAR_W, BAR_H = 240, 14  # channel gradient bars
 MARK_H = 7              # marker zone under each bar

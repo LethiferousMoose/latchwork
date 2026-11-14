@@ -4,9 +4,9 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk
 
-import plan as pl
-from palette import label as yarn_label
-from colormath import gray_for_lightness, lightness, parse_hex, to_hex
+from . import plan as pl
+from .palette import label as yarn_label
+from .colormath import gray_for_lightness, lightness, parse_hex, to_hex
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)

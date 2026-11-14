@@ -4,9 +4,9 @@ import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
-import palette as pal
-from colormath import parse_hex
-from widgets import ColorPanel
+from . import palette as pal
+from .colormath import parse_hex
+from .widgets import ColorPanel
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)

@@ -4,13 +4,13 @@ import sys
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "src"))
 
-from colormath import (gray_for_lightness, lch_to_rgb, lightness, match_order,  # noqa: E402
+from latchwork.colormath import (gray_for_lightness, lch_to_rgb, lightness, match_order,  # noqa: E402
                        nearest_index, parse_hex, rgb_to_lab, rgb_to_lch, to_hex)
-from latchwork import load_palette  # noqa: E402
+from latchwork.palette import load_palette  # noqa: E402
 
-PALETTE = os.path.join(ROOT, "palette.csv")
+PALETTE = os.path.join(ROOT, "data", "palette.csv")
 
 
 def palette_rows():
