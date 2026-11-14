@@ -1,6 +1,6 @@
 #!/bin/sh
 # Double-click in Finder to start Latchwork on macOS.
-# (First time: if macOS blocks it, right-click > Open, or run: chmod +x Latchwork.command)
+# (First time: if macOS blocks it, right-click > Open, or run: chmod +x latchwork.command)
 cd "$(dirname "$0")" || exit 1
 
 for candidate in python3 python; do

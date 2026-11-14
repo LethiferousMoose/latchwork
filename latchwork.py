@@ -1,4 +1,4 @@
-"""Start Latchwork: python latchwork.py (or the Latchwork.bat / .command / .sh wrappers).
+"""Start Latchwork: python latchwork.py (or the latchwork.bat / .command / .sh wrappers).
 
 The app lives in src/latchwork/; this launcher checks Python and Tkinter, puts src/ on the path
 and starts it.
