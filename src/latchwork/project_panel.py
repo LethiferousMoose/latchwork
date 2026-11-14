@@ -446,7 +446,8 @@ class ProjectPanel(tk.Frame):
         img = p.image
         w, h = img.width, img.height
         preview = self.view.get() == "preview"
-        swap = {e.hex: e.yarn["hex"] for e in p.colors if e.confirmed and e.yarn} if preview else {}
+        # assigned colors show their yarn, unassigned ones their suggested yarn
+        swap = {e.hex: e.yarn["hex"] for e in p.colors if e.yarn} if preview else {}
         unassigned = {e.hex for e in p.colors if not e.confirmed} \
             if preview and self.mark_unassigned.get() else set()
         sel = self.selected_hex() if self.highlight.get() else None

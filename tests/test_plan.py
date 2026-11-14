@@ -111,10 +111,13 @@ class TestPlan(unittest.TestCase):
 
     def test_preview_pixels_and_png(self):
         px = pl.preview_pixels(self.p)
-        self.assertEqual(px[3], (255, 255, 255, 255))      # unassigned stays original
+        self.assertEqual(px[3], (255, 255, 255, 255))      # no yarn at all: stays original
         self.assertEqual(px[0], (20, 25, 60, 255))         # #0A141E -> Navy
         self.assertEqual(px[4], (20, 25, 60, 255))         # #000000 -> Navy (merged)
         self.assertEqual(px[1], (180, 80, 40, 255))        # orange -> Rust
+        self.p.suggest([Yarn("Cream", (250, 240, 220))], "x.csv")
+        self.assertEqual(pl.preview_pixels(self.p)[3], (250, 240, 220, 255))  # suggestion shown
+        px = pl.preview_pixels(self.p)
         path = os.path.join(self.dir, "prev.png")
         pl.write_preview_png(self.p, path)
         with open(path, "rb") as fh:

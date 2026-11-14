@@ -164,10 +164,11 @@ def write_yarn_list(plan, path):
 
 
 def preview_pixels(project):
-    """Image pixels with assigned colors replaced by their yarn; unassigned stay original."""
+    """Image pixels with each color replaced by its yarn: the assigned one, or the suggested one
+    for unassigned colors. Colors with no yarn at all stay original."""
     swap = {}
     for c in project.colors:
-        if c.confirmed and c.yarn:
+        if c.yarn:
             swap[c.rgb] = parse_hex(c.yarn["hex"])
     out = []
     for r, g, b, a in project.image.pixels:

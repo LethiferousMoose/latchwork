@@ -155,7 +155,8 @@ A `.latchwork` file is readable JSON:
   - Canvas to cut = (width + 2 × side) × (height + top + bottom) holes. The defaults come from
     folding 3 holes on each side, 8 at the top for the hanging loop, and 3 at the bottom plus
     one empty row, because the cut edge isn't stable enough to hook into.
-- Exports: yarn list CSV and a preview PNG (one pixel per knot, unassigned colors original).
+- Yarn preview (sidebar, and the preview PNG export, one pixel per knot): assigned colors show
+  their yarn, unassigned ones their suggested yarn; "Mark unassigned" stripes those in the sidebar.
 
 ## Pattern export (`pattern.py`, `pattern_template.html`)
 
