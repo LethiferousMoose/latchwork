@@ -18,6 +18,8 @@ and export a pattern you can read on your phone while hooking.
   paper split into labelled pages.
 - **Manages your yarn palette.** Add, edit, retire and import yarns (CSV or GIMP `.gpl`), with
   brands and pack sizes. Keep several palettes and switch between them instantly.
+- **Comes with a ready-made palette** of 198 yarns from Hershner's, Red Heart and Loops &
+  Threads, so you can start matching right away (see [The yarn palette](#the-yarn-palette)).
 
 <p>
   <img src="docs/images/plan.png" alt="Plan tab with yarn quantities and canvas size" width="48%">
