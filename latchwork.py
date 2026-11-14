@@ -55,6 +55,14 @@ def remember_setting(key, value):
     write_settings(settings)
 
 
+def remembered_palettes():
+    """The palette list from settings (existing files only)."""
+    paths = read_settings().get("palettes")
+    if not isinstance(paths, list):
+        return []
+    return [q for q in paths if isinstance(q, str) and os.path.isfile(q)]
+
+
 def remembered_palette():
     path = read_settings().get("palette")
     return path if isinstance(path, str) and os.path.isfile(path) else DEFAULT_PALETTE
@@ -108,6 +116,10 @@ class App:
     def __init__(self, root, palette_path, remember=False):
         self.root = root
         self.remember = remember  # save the open palette in settings (off for tests/scripts)
+        # Palettes I've opened, for quick switching (paths), and loaded ones kept in memory:
+        # normcase(path) -> (file mtime, bank, brands). Reloaded only if the file changed.
+        self.palette_list = remembered_palettes() if remember else []
+        self._palette_cache = {}
         self.bank = []       # every yarn in the palette file, retired ones included
         self.brands = []     # the palette's brand list (name, pack size)
         self.yarns = []      # active yarns, lightest -> darkest: what matching and stepping use
@@ -166,10 +178,8 @@ class App:
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.destroy)
         bar.add_cascade(label="File", menu=file_menu)
-        pal_menu = tk.Menu(bar, tearoff=False)
-        pal_menu.add_command(label="Manage yarns...", accelerator="Ctrl+P",
-                             command=self.open_palette_window)
-        bar.add_cascade(label="Palette", menu=pal_menu)
+        self.pal_menu = tk.Menu(bar, tearoff=False)
+        bar.add_cascade(label="Palette", menu=self.pal_menu)
         help_menu = tk.Menu(bar, tearoff=False)
         for i, (topic, _) in enumerate(help_topics):
             help_menu.add_command(label=topic, accelerator="F1" if i == 0 else "",
@@ -178,19 +188,36 @@ class App:
         self.root.config(menu=bar)
         self.root.bind("<F1>", lambda e: open_help(self.root))
         self.root.bind("<Control-p>", lambda e: self.open_palette_window())
+        for n in range(1, 10):
+            self.root.bind("<Control-Key-%d>" % n, lambda e, n=n: self.switch_palette(n - 1))
         self.root.bind("<Control-n>", lambda e: self.new_project())
         self.root.bind("<Control-o>", lambda e: self.open_project())
         self.root.bind("<Control-e>", lambda e: self.export_pattern())
 
     def _build_ui(self):
-        r = self.main
+        bar = tk.Frame(self.main, bg=BG)
+        bar.pack(side="top", fill="x", padx=16, pady=(10, 0))
+        tk.Label(bar, text="Palette", font=UI_FONT, bg=BG, fg="#555").pack(side="left")
+        self.palette_button = ttk.Menubutton(bar, text="", width=26)
+        self.palette_button.pack(side="left", padx=(6, 8))
+        self.palette_dropdown = tk.Menu(self.palette_button, tearoff=False)
+        self.palette_button["menu"] = self.palette_dropdown
+        self.palette_info = tk.Label(bar, font=("Segoe UI", 9), bg=BG, fg="#777")
+        self.palette_info.pack(side="left")
+        manage = tk.Label(bar, text="Manage yarns…", font=("Segoe UI", 9, "underline"),
+                          bg=BG, fg="#1565C0", cursor="hand2")
+        manage.pack(side="left", padx=(10, 0))
+        manage.bind("<Button-1>", lambda e: self.open_palette_window())
+
+        r = tk.Frame(self.main, bg=BG)
+        r.pack(side="top", fill="both", expand=True)
         r.columnconfigure(0, weight=1, uniform="half")
         r.columnconfigure(1, weight=1, uniform="half")
 
         self.target_title = tk.Label(r, text="Target", font=TITLE_FONT, bg=BG, anchor="w")
-        self.target_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 0))
+        self.target_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(6, 0))
         self.yarn_title = tk.Label(r, text="", font=TITLE_FONT, bg=BG, anchor="w")
-        self.yarn_title.grid(row=0, column=1, sticky="ew", padx=16, pady=(12, 0))
+        self.yarn_title.grid(row=0, column=1, sticky="ew", padx=16, pady=(6, 0))
 
         self.swatch = tk.Canvas(r, height=220, bg=BG, highlightthickness=0)
         self.swatch.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=16, pady=6)
@@ -299,26 +326,120 @@ class App:
         if self.load(path):
             self.open_palette_window()
 
-    def load(self, path):
-        """Load a palette file. Returns True on success."""
+    @staticmethod
+    def _mtime(path):
         try:
-            bank, brands = pal.load_bank(path)
-        except (OSError, ValueError, UnicodeDecodeError) as e:
-            messagebox.showerror("Latchwork", "Could not load palette:\n%s\n\n%s" % (path, e))
-            return False
-        self.palette_path = os.path.abspath(path)
-        if self.remember:
-            settings = read_settings()
-            if os.path.normcase(self.palette_path) == os.path.normcase(DEFAULT_PALETTE):
-                settings.pop("palette", None)
-            else:
-                settings["palette"] = self.palette_path
-            write_settings(settings)
+            return (os.path.getmtime(path),
+                    os.path.getmtime(pal.brands_path(path)) if os.path.exists(
+                        pal.brands_path(path)) else None)
+        except OSError:
+            return None
+
+    def load(self, path):
+        """Make a palette file the active one (from memory when the file hasn't changed) and add
+        it to the palette list. Returns True on success."""
+        path = os.path.abspath(path)
+        key = os.path.normcase(path)
+        cached = self._palette_cache.get(key)
+        mtime = self._mtime(path)
+        if cached and cached[0] == mtime and mtime is not None:
+            bank, brands = [y.copy() for y in cached[1]], [b.copy() for b in cached[2]]
+        else:
+            try:
+                bank, brands = pal.load_bank(path)
+            except (OSError, ValueError, UnicodeDecodeError) as e:
+                messagebox.showerror("Latchwork", "Could not load palette:\n%s\n\n%s" % (path, e))
+                return False
+            self._palette_cache[key] = (mtime, bank, brands)
+            bank, brands = [y.copy() for y in bank], [b.copy() for b in brands]
+        self.palette_path = path
+        if key not in [os.path.normcase(q) for q in self.palette_list]:
+            self.palette_list.append(path)
+        self._save_palette_settings()
         self.index = 0
         self._use_bank(bank, keep_key=None, brands=brands)
         if self.palette_window:
             self.palette_window.refresh()
+        self.update_palette_menus()
         return True
+
+    def _save_palette_settings(self):
+        if not self.remember:
+            return
+        settings = read_settings()
+        if self.palette_path and os.path.normcase(self.palette_path) != os.path.normcase(
+                DEFAULT_PALETTE):
+            settings["palette"] = self.palette_path
+        else:
+            settings.pop("palette", None)
+        settings["palettes"] = list(self.palette_list)
+        write_settings(settings)
+
+    def switch_palette(self, i):
+        """Ctrl+1..9 / the dropdown: make palette number i of the list active."""
+        if 0 <= i < len(self.palette_list):
+            path = self.palette_list[i]
+            if self.palette_path and os.path.normcase(path) == os.path.normcase(
+                    self.palette_path):
+                return
+            if not os.path.isfile(path):
+                if messagebox.askyesno("Latchwork", "%s no longer exists.\n\nRemove it from the "
+                                       "palette list?" % path):
+                    self.remove_palette(path)
+                return
+            self.load(path)
+
+    def remove_palette(self, path=None):
+        """Take a palette off the list (the file stays). The active one can't be removed."""
+        path = path or self.palette_path
+        if self.palette_path and os.path.normcase(path) == os.path.normcase(self.palette_path):
+            messagebox.showinfo("Latchwork", "Switch to another palette first; the active "
+                                             "palette stays on the list.")
+            return
+        self.palette_list = [q for q in self.palette_list
+                             if os.path.normcase(q) != os.path.normcase(path)]
+        self._palette_cache.pop(os.path.normcase(path), None)
+        self._save_palette_settings()
+        self.update_palette_menus()
+
+    def _palette_labels(self):
+        """Short names for the palette list; the folder is added when two files share a name."""
+        names = [os.path.basename(q) for q in self.palette_list]
+        return ["%s  (%s)" % (n, os.path.basename(os.path.dirname(q))) if names.count(n) > 1
+                else n for n, q in zip(names, self.palette_list)]
+
+    def update_palette_menus(self):
+        """Rebuild the palette dropdown and the Palette menu from the palette list."""
+        active = os.path.normcase(self.palette_path) if self.palette_path else None
+        self._palette_choice = tk.IntVar(value=-1)
+        labels = self._palette_labels()
+        for menu in (self.palette_dropdown, self.pal_menu):
+            menu.delete(0, "end")
+            for i, (q, label) in enumerate(zip(self.palette_list, labels)):
+                if os.path.normcase(q) == active:
+                    self._palette_choice.set(i)
+                menu.add_radiobutton(label=label, variable=self._palette_choice, value=i,
+                                     accelerator="Ctrl+%d" % (i + 1) if i < 9 else "",
+                                     command=lambda i=i: self.switch_palette(i))
+            menu.add_separator()
+            menu.add_command(label="Open palette...", command=self.open_palette)
+            menu.add_command(label="New palette...", command=self.new_palette)
+            others = [q for q in self.palette_list if os.path.normcase(q) != active]
+            if others:
+                remove = tk.Menu(menu, tearoff=False)
+                for q, label in zip(self.palette_list, labels):
+                    if os.path.normcase(q) != active:
+                        remove.add_command(label=label,
+                                           command=lambda q=q: self.remove_palette(q))
+                menu.add_cascade(label="Remove from list", menu=remove)
+            menu.add_separator()
+            menu.add_command(label="Manage yarns...", accelerator="Ctrl+P",
+                             command=self.open_palette_window)
+        name = labels[self._palette_choice.get()] if self._palette_choice.get() >= 0 else ""
+        self.palette_button.config(text=name)
+        n_ret = len(self.bank) - len(self.yarns)
+        self.palette_info.config(text="%d yarns%s" % (
+            len(self.yarns), ", %d retired" % n_ret if n_ret else ""))
 
     def _use_bank(self, bank, keep_key, brands=None):
         if brands is not None:
@@ -350,8 +471,11 @@ class App:
             messagebox.showerror("Latchwork", "Could not save %s\n\n%s" % (self.palette_path, e),
                                  parent=self.palette_window or self.root)
             return False
+        self._palette_cache[os.path.normcase(self.palette_path)] = (
+            self._mtime(self.palette_path), [y.copy() for y in bank], [b.copy() for b in brands])
         current = self.yarns[self.index].key if self.yarns else None
         self._use_bank(bank, keep_key=current, brands=brands)
+        self.update_palette_menus()
         return True
 
     def open_palette_window(self):

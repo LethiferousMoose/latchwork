@@ -92,13 +92,18 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 - P: sidebar image: original / yarn preview.
 - Enter or Esc: leave the hex field.
 - Ctrl+N new project, Ctrl+O open project, Ctrl+E export pattern, Ctrl+P manage yarns.
+- Ctrl+1 … Ctrl+9: switch to palette 1–9 of the palette list.
 - F1: this help.
 
 The hollow markers on the L, C and h bars show the other side's value, so the difference between target and yarn is visible at a glance (no hue marker for near-grays, whose hue means little).
 """),
     ("Palettes and brands", """
 # Palettes and brands
-Palette → Manage yarns (Ctrl+P) edits the open palette. Changes save immediately.
+One palette is active at a time. The Palette dropdown above the comparison view (and the Palette menu) lists every palette I've opened; picking one switches instantly (Ctrl+1…9 for the first nine). Palettes are kept in memory and only re-read if the file changed on disk. "Remove from list" only takes it off the list; the file stays.
+
+Unassigned colors are re-suggested from the active palette when switching; assigned colors never change.
+
+Palette → Manage yarns (Ctrl+P) edits the active palette. Changes save immediately.
 
 - A yarn is identified by name + brand and shown as "Name (Brand)".
 - Pack size comes from the brand (Brands…): pieces per pre-cut pack, or blank when the yarn is cut from skeins. A yarn can override it with its own pack size.

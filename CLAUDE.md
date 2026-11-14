@@ -130,6 +130,10 @@ saved color maps never refer to yarns that vanished.
 - **File → New palette** (starts empty) and **File → Open palette** switch to a different
   palette file. The last one opened is remembered in `latchwork_settings.json` (git-ignored),
   falling back to `palette.csv`. The manager shows which file is being edited.
+- **Palette list** (2026-11-14): one palette active at a time, but every palette opened is kept
+  on a list (settings `palettes`) shown in a Palette dropdown above the comparison view and in
+  the Palette menu. Switching is instant (kept in memory, re-read only if the file changed);
+  Ctrl+1…9 switch; "Remove from list" never touches the file.
 - `palette.csv` gets a `retired` column. `L_gimp` is computed by `colormath` for new or edited
   yarns, and the file stays sorted lightest to darkest.
 
