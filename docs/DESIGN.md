@@ -94,7 +94,6 @@ ties keep their order.
 blank means cut from skeins. A pack size change applies to open projects too.
 
 **A yarn is identified by name + brand** (case-insensitive) and shown as "Name (Brand)".
-Older palettes used name suffixes (`Gold RH`, `L&T`); those are converted on load.
 
 **Retire** hides a yarn from matching but keeps it (discontinued colors). **Delete** is for
 mistakes.
@@ -179,8 +178,7 @@ JSON, one cell per knot, safely escaped.
 ## Settings
 
 `settings/latchwork_settings.json` (per user, not in git): the active palette, the palette
-list, the last project, the color weight and canvas defaults for new projects. Settings from
-older versions (in the repository root) are moved there automatically.
+list, the last project, the color weight and canvas defaults for new projects.
 
 ## Future possibilities
 
