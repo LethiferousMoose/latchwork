@@ -1,0 +1,10 @@
+# Normalize text files to LF in the repository.
+* text=auto
+# Windows batch files need CRLF; shell scripts must stay LF on every OS.
+*.bat text eol=crlf
+*.sh text eol=lf
+*.command text eol=lf
+# Binary
+*.png binary
+*.gif binary
+*.xcf binary
