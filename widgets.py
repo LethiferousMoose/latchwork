@@ -47,6 +47,9 @@ def describe_delta_L(dL):
 
 
 # Each channel: label, displayed value, position 0..1, gradient sampler t(0..1) -> rgb.
+HUE_MIN_C = 5.0   # below this chroma a color is grayish and its hue means little
+
+
 def _channels(rgb, lch):
     r, g, b = rgb
     L, C, h = lch
@@ -90,8 +93,9 @@ class ColorPanel(tk.Frame):
         self.status = tk.Label(html, text="", font=("Segoe UI", 9), bg=PANEL_BG, fg="#B00020")
         self.status.pack(side="left", padx=4)
 
-    def show(self, rgb, other_L=None):
-        """Draw the channels for rgb (or blank if None). other_L adds a faint marker on L."""
+    def show(self, rgb, other=None):
+        """Draw the channels for rgb (or blank if None). `other` (an rgb) adds faint markers on
+        L, C and h for comparison; no hue marker when either color is near gray."""
         self.images = []
         if rgb is None:
             for bar, val in zip(self.bars, self.values):
@@ -99,7 +103,13 @@ class ColorPanel(tk.Frame):
                 bar.create_rectangle(0, 0, BAR_W - 1, BAR_H - 1, fill="#DDD", outline="#BBB")
                 val.config(text="")
             return
-        for (name, value, pos, sample), bar, val in zip(_channels(rgb, rgb_to_lch(*rgb)),
+        lch = rgb_to_lch(*rgb)
+        ghost = {}
+        if other is not None:
+            olch = rgb_to_lch(*other)
+            ghost = {name: pos for name, _, pos, _ in _channels(other, olch)
+                     if name in "LC" or (name == "h" and min(lch[1], olch[1]) >= HUE_MIN_C)}
+        for (name, value, pos, sample), bar, val in zip(_channels(rgb, lch),
                                                         self.bars, self.values):
             bar.delete("all")
             img = tk.PhotoImage(width=BAR_W, height=BAR_H)
@@ -108,8 +118,8 @@ class ColorPanel(tk.Frame):
             self.images.append(img)  # keep a reference or Tk drops the image
             bar.create_image(0, 0, image=img, anchor="nw")
             bar.create_rectangle(0, 0, BAR_W - 1, BAR_H - 1, outline="#999")
-            if name == "L" and other_L is not None:
-                self._marker(bar, other_L / 100, fill="", outline="#888")
+            if name in ghost:
+                self._marker(bar, ghost[name], fill="", outline="#888")
             self._marker(bar, pos, fill="#111", outline="#111")
             val.config(text="%.1f" % value)
 

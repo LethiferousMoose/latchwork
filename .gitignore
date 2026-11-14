@@ -6,3 +6,4 @@ __pycache__/
 
 # per-user app settings (remembered palette file)
 latchwork_settings.json
+samples/

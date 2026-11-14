@@ -255,7 +255,7 @@ class ProjectPanel(tk.Frame):
             self.row_images[key] = _pair_image(c.hex, yhex)
         name = yarn_label(c.yarn["name"], c.yarn.get("brand")) if c.yarn \
             else "(no yarns in palette)"
-        state = "assigned" if c.confirmed else "nearest"
+        state = "assigned" if c.confirmed else "suggested"
         self.tree.item(hex_, text="  " + c.hex, image=self.row_images[key],
                        values=(format(c.count, ","), name, state),
                        tags=() if c.confirmed else ("suggested",))
@@ -317,7 +317,7 @@ class ProjectPanel(tk.Frame):
             if not self.app.yarn_in_palette(y):
                 sub += "\nNot in the open palette."
         else:
-            sub = "Nearest match (not assigned yet) \u00B7 %s \u00B7 %s" % (
+            sub = "Suggested (not assigned yet) \u00B7 %s \u00B7 %s" % (
                 y["hex"], y.get("palette") or "?")
         self.info_sub.config(text=sub)
 

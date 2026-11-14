@@ -6,8 +6,8 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from colormath import (gray_for_lightness, lch_to_rgb, lightness, nearest_index,  # noqa: E402
-                       parse_hex, rgb_to_lch, to_hex)
+from colormath import (gray_for_lightness, lch_to_rgb, lightness, match_order,  # noqa: E402
+                       nearest_index, parse_hex, rgb_to_lab, rgb_to_lch, to_hex)
 from latchwork import load_palette  # noqa: E402
 
 PALETTE = os.path.join(ROOT, "palette.csv")
@@ -96,6 +96,29 @@ class TestMatching(unittest.TestCase):
         self.assertEqual(nearest_index(50.0, [60.0, 40.0]), 0)
         self.assertEqual(nearest_index(50.0, [70.0, 55.0, 45.0, 55.0]), 1)
         self.assertEqual(nearest_index(10.0, [30.0, 20.0, 20.0]), 1)
+
+
+class TestWeightedMatch(unittest.TestCase):
+    def test_weight_zero_is_nearest_lightness(self):
+        yarns = load_palette(PALETTE)
+        labs = [y.lab for y in yarns]
+        for hx in ("#987050", "#4040D8", "#F8F8F8", "#000000", "#88A048"):
+            with self.subTest(hex=hx):
+                lab = rgb_to_lab(*parse_hex(hx))
+                self.assertEqual(match_order(lab, labs, 0)[0],
+                                 nearest_index(lab[0], [y.L for y in yarns]))
+
+    def test_brown_beats_closer_gray(self):
+        brown, gray = (152, 112, 80), (118, 118, 118)        # gray is closer in L
+        target = rgb_to_lab(140, 100, 70)
+        labs = [rgb_to_lab(*gray), rgb_to_lab(*brown)]
+        self.assertLess(abs(labs[0][0] - target[0]), abs(labs[1][0] - target[0]))
+        self.assertEqual(match_order(target, labs, 0)[0], 0)
+        self.assertEqual(match_order(target, labs, 0.5)[0], 1)
+
+    def test_order_is_complete_and_ties_keep_list_order(self):
+        labs = [(50, 0, 0), (50, 0, 0), (60, 0, 0)]
+        self.assertEqual(match_order((50, 0, 0), labs, 0.5), [0, 1, 2])
 
 
 class TestHex(unittest.TestCase):

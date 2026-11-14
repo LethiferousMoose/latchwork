@@ -99,6 +99,25 @@ def to_hex(r, g, b):
     return "#%02X%02X%02X" % (int(round(r)), int(round(g)), int(round(b)))
 
 
+DEFAULT_COLOR_WEIGHT = 0.5
+
+
+def match_order(target_lab, labs, weight=DEFAULT_COLOR_WEIGHT):
+    """Indexes of `labs`, best match first, for a target Lab color.
+
+    Distance = dL^2 + (weight * color difference in a/b)^2. Lightness leads; the weight lets
+    hue and colorfulness count too (0 = lightness only). Fitted on my own yarn picks: 0.5 put
+    my pick first half the time and nearly always in the top 3 (lightness only: 5 of 48).
+    Ties keep list order (earlier yarn first)."""
+    L, a, b = target_lab
+    w2 = weight * weight
+
+    def d(i):
+        yl, ya, yb = labs[i]
+        return (yl - L) ** 2 + w2 * ((ya - a) ** 2 + (yb - b) ** 2)
+    return sorted(range(len(labs)), key=d)
+
+
 def nearest_index(target_L, Ls):
     """Index of the value in Ls closest to target_L. Ties go to the earliest index."""
     best, best_d = None, None

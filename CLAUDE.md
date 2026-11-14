@@ -83,8 +83,8 @@ Keep it simple. This is a personal tool, not a product.
   position (e.g. `87 / 198`) and ΔL from the target.
 - **Target input:** one hex field. Accept `#88A048`, `88a048`, stray spaces. Update as soon as
   the value is a valid hex, without needing Enter.
-- When the target changes, jump to the yarn with the **nearest L\***. Ties go to the earlier
-  yarn in the list.
+- When the target changes, jump to the **best match** (see Color weight below). Ties go to the
+  earlier yarn in the list.
 - **Navigation:** ← → keys and on-screen buttons step one yarn at a time. A key/button jumps
   back to the nearest match.
 - **Neighbor strip:** a few yarns on each side of the current one, with names. Clicking one
@@ -92,8 +92,16 @@ Keep it simple. This is a personal tool, not a product.
 - **Grayscale toggle:** one key shows both halves as gray at their L\*, for judging lightness
   alone.
 - **Copy button** next to the yarn's hex.
-- Matching is by **L only**. No hue-weighted (ΔE) matching, because I often have to switch
-  color families anyway.
+- Matching was by **L only** at first. Changed 2026-11-14 after testing on my own past picks
+  (4 rugs, 48 choices): L-only suggested my actual yarn 5 of 48 times. Now the best match uses
+  `ΔL² + (w·Δab)²` in Lab with a **Color weight** w (main window, default 0.5, 0 = L only,
+  saved in settings): my pick came first 24 of 48 times and was nearly always in the top 3.
+  Patterns in my picks: L within ~3, hue held within ~6°, chroma allowed to drop a lot (yarn is
+  duller than pixel art), dark dull colors treated as neutrals. No brand preference.
+- **Best match (N)**: jumps to the best match; pressing N again cycles to the next best (wraps).
+  A Match rank card shows where the current yarn ranks. ← → and the neighbor strip stay in L
+  order. Hollow markers on the L, C and h bars show the other side's values (no h marker for
+  near-grays).
 - Load `palette.csv` from next to the script by default.
 
 ## Stage 2: Palette manager
@@ -134,7 +142,7 @@ saved color maps never refer to yarns that vanished.
   **Assign** records the current yarn for it.
 - One yarn can be assigned to several image colors.
 - The hex field still works for trying a color that isn't in the image.
-- Colors not yet assigned show their **nearest match** (nearest-L yarn, gray italic, state "nearest") from the open palette;
+- Colors not yet assigned show their **best match** (gray italic, state "suggested") from the open palette;
   suggestions follow palette switches. **Assign (A)** is a toggle for the yarn on screen:
   Assign / ✓ Assigned (press again to undo) / Reassign (assigned to a different yarn).
   Selecting an assigned color jumps to its yarn if the open palette has it.

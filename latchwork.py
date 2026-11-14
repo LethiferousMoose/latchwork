@@ -10,7 +10,8 @@ from tkinter import filedialog, messagebox, ttk
 import palette as pal
 import pattern
 import plan as pl
-from colormath import gray_for_lightness, nearest_index, parse_hex, rgb_to_lch, to_hex
+from colormath import (DEFAULT_COLOR_WEIGHT, gray_for_lightness, match_order, parse_hex,
+                       rgb_to_lab, rgb_to_lch, to_hex)
 from palette import load_palette  # noqa: F401  (re-exported for tests and scripts)
 from palette_window import PaletteWindow
 from project import EXTENSION, MANY_COLORS, Project
@@ -117,6 +118,13 @@ class App:
         self.project = None
         self.selected_hex = None  # the project color being matched, if any
 
+        try:
+            self.weight = min(1.0, max(0.0, float(read_settings().get("color_weight",
+                                                                      DEFAULT_COLOR_WEIGHT))))
+        except (TypeError, ValueError):
+            self.weight = DEFAULT_COLOR_WEIGHT
+        self._order = None   # cached best-first order for (target, yarn list, weight)
+        self._cycle = 0      # position in that order that N last jumped to
         root.title("Latchwork")
         root.configure(bg=BG)
         root.minsize(1240, 780)
@@ -198,11 +206,24 @@ class App:
         self.delta_card.pack(side="left", padx=6)
         self.pos_card = StatCard(stats, "Position in palette", width=190)
         self.pos_card.pack(side="left", padx=6)
+        self.match_card = StatCard(stats, "Match rank", width=150)
+        self.match_card.pack(side="left", padx=6)
+        wbox = tk.Frame(stats, bg=BG)
+        wbox.pack(side="left", padx=(10, 0))
+        tk.Label(wbox, text="Color weight", font=UI_FONT, bg=BG).pack(anchor="w")
+        self.weight_var = tk.StringVar(value="%g" % self.weight)
+        sp = ttk.Spinbox(wbox, from_=0, to=1, increment=0.1, width=5,
+                         textvariable=self.weight_var, command=self.on_weight)
+        sp.pack(anchor="w", pady=2)
+        sp.bind("<Return>", lambda e: self.on_weight())
+        sp.bind("<FocusOut>", lambda e: self.on_weight())
+        tk.Label(wbox, text="0 = lightness only", font=("Segoe UI", 8), bg=BG,
+                 fg="#888").pack(anchor="w")
 
         nav = tk.Frame(r, bg=BG)
         nav.grid(row=4, column=0, columnspan=2, pady=6)
         for text, cmd in (("◀  Lighter", lambda: self.step(-1)),
-                          ("Nearest match (N)", self.jump_nearest),
+                          ("Best match (N)", self.next_match),
                           ("Darker  ▶", lambda: self.step(1))):
             ttk.Button(nav, text=text, width=18, command=cmd).pack(side="left", padx=4)
         self.gray_btn = ttk.Button(nav, text="Grayscale (G)", width=18, command=self.toggle_gray)
@@ -215,7 +236,7 @@ class App:
         self.strip.bind("<Configure>", lambda e: self.draw_strip())
 
         tk.Label(r, font=("Segoe UI", 9), bg=BG, fg="#666",
-                 text="← → step lighter / darker    N nearest match    G grayscale    "
+                 text="← → step lighter / darker    N best match (again: next best)    G grayscale    "
                       "A assign    P original/preview    Enter/Esc leaves the hex field"
                  ).grid(
             row=6, column=0, columnspan=2, pady=(4, 10))
@@ -225,7 +246,7 @@ class App:
         self.root.bind_all("<Left>", lambda e: self._key(e, lambda: self.step(-1), always=True))
         self.root.bind_all("<Right>", lambda e: self._key(e, lambda: self.step(1), always=True))
         for k in ("n", "N", "<Home>"):
-            self.root.bind_all(k, lambda e: self._key(e, self.jump_nearest))
+            self.root.bind_all(k, lambda e: self._key(e, self.next_match))
         for k in ("g", "G"):
             self.root.bind_all(k, lambda e: self._key(e, self.toggle_gray))
         for k in ("a", "A"):
@@ -291,8 +312,9 @@ class App:
             self.brands = brands
         self.bank = pal.sort_yarns(bank)
         self.yarns = pal.active(self.bank)
+        self._order = None
         if self.project:
-            if self.project.suggest(self.yarns, self.palette_name, self.brands):
+            if self.project.suggest(self.yarns, self.palette_name, self.brands, self.weight):
                 self.save_project()
             self.sidebar.refresh_rows()   # also refreshes the plan (pack sizes may have changed)
         self.update_title()
@@ -388,7 +410,7 @@ class App:
             return
         project.path = path
         project.settings.update(read_settings().get("canvas_defaults") or {})
-        project.suggest(self.yarns, self.palette_name, self.brands)
+        project.suggest(self.yarns, self.palette_name, self.brands, self.weight)
         if self.save_project(project):
             self.show_project(project)
 
@@ -404,7 +426,7 @@ class App:
         except (OSError, ValueError, KeyError, TypeError) as e:
             messagebox.showerror("Open project", "Could not open %s\n\n%s" % (path, e))
             return False
-        if project.suggest(self.yarns, self.palette_name, self.brands):
+        if project.suggest(self.yarns, self.palette_name, self.brands, self.weight):
             self.save_project(project)
         self.show_project(project)
         return True
@@ -495,7 +517,7 @@ class App:
         if not (self.project and self.selected_hex):
             return
         self.project.unassign(self.selected_hex)
-        self.project.suggest(self.yarns, self.palette_name, self.brands)
+        self.project.suggest(self.yarns, self.palette_name, self.brands, self.weight)
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
         self.draw_info()  # stay on the same yarn; the button flips back to "Assign"
@@ -519,11 +541,50 @@ class App:
             self.selected_hex = None
             self.jump_nearest()
 
+    def match_ranking(self):
+        """Active yarn indexes, best match for the target first (cached)."""
+        if not (self.target and self.yarns):
+            return []
+        key = (self.target, self.weight)
+        if not self._order or self._order[0] != key:
+            self._order = (key, match_order(rgb_to_lab(*self.target),
+                                            [y.lab for y in self.yarns], self.weight))
+        return self._order[1]
+
     def jump_nearest(self):
-        if self.target and self.yarns:
-            L = rgb_to_lch(*self.target)[0]
-            self.index = nearest_index(L, [y.L for y in self.yarns])
+        """Go to the best match for the target (used whenever the target or palette changes)."""
+        order = self.match_ranking()
+        self._cycle = 0
+        if order:
+            self.index = order[0]
         self.refresh()
+
+    def next_match(self):
+        """N: the best match; pressed again while on it, the next best, and so on (wrapping)."""
+        order = self.match_ranking()
+        if not order:
+            return self.refresh()
+        on_cycle = self._cycle < len(order) and order[self._cycle] == self.index
+        self._cycle = (self._cycle + 1) % len(order) if on_cycle else 0
+        self.index = order[self._cycle]
+        self.refresh()
+
+    def on_weight(self):
+        try:
+            w = round(min(1.0, max(0.0, float(self.weight_var.get()))), 2)
+        except ValueError:
+            w = self.weight
+        self.weight_var.set("%g" % w)
+        if w == self.weight:
+            return
+        self.weight = w
+        remember_setting("color_weight", w)
+        if self.project:
+            if self.project.suggest(self.yarns, self.palette_name, self.brands, self.weight):
+                self.save_project()
+            self.sidebar.refresh_rows()
+        if self.target:
+            self.jump_nearest()
 
     def step(self, delta):
         if self.yarns:
@@ -665,14 +726,21 @@ class App:
             self.target_panel.show(self.target)
             self.yarn_panel.show(None)
             self.delta_card.set("\u2013", "no yarns in this palette", "#888")
+            self.match_card.set("\u2013", "", "#888")
             self.pos_card.set("\u2013", "", "#888")
             return
         yarn = self.yarns[self.index]
         self.yarn_title.config(text=yarn.label)
         self.yarn_hex_var.set(yarn.hex)
         t_L = rgb_to_lch(*self.target)[0] if self.target else None
-        self.target_panel.show(self.target, other_L=yarn.L)
-        self.yarn_panel.show(yarn.rgb, other_L=t_L)
+        self.target_panel.show(self.target, other=yarn.rgb)
+        self.yarn_panel.show(yarn.rgb, other=self.target)
+        order = self.match_ranking()
+        if order:
+            self.match_card.set("#%d" % (order.index(self.index) + 1),
+                                "best match" if order[0] == self.index else "N = next best")
+        else:
+            self.match_card.set("\u2013", "", "#888")
         self.pos_card.set("%d of %d" % (self.index + 1, len(self.yarns)),
                           "lightest \u2192 darkest")
         if t_L is None:

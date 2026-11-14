@@ -20,7 +20,7 @@ import os
 import tempfile
 
 import pixelart
-from colormath import lightness, nearest_index, parse_hex
+from colormath import lightness, match_order, parse_hex, rgb_to_lab
 from palette import effective_pack, legacy_assignment
 
 FORMAT = "latchwork-project"
@@ -142,9 +142,10 @@ class Project:
         return {"name": yarn.sku, "brand": yarn.brand, "pack": effective_pack(yarn, brands),
                 "hex": yarn.hex, "palette": palette_name}
 
-    def suggest(self, yarns, palette_name, brands=()):
-        """Give every unconfirmed color the nearest-L yarn from `yarns` (active, sorted)."""
-        Ls = [y.L for y in yarns]
+    def suggest(self, yarns, palette_name, brands=(), weight=0.0):
+        """Give every unconfirmed color the best match from `yarns` (active, sorted); see
+        colormath.match_order for `weight` (0 = nearest lightness)."""
+        labs = [y.lab for y in yarns]
         changed = False
         for c in self.colors:
             if c.confirmed:
@@ -152,7 +153,7 @@ class Project:
             if not yarns:
                 new = None
             else:
-                y = yarns[nearest_index(c.L, Ls)]
+                y = yarns[match_order(rgb_to_lab(*c.rgb), labs, weight)[0]]
                 new = self.snapshot(y, palette_name, brands)
             if new != c.yarn:
                 c.yarn, changed = new, True
