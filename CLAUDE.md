@@ -14,7 +14,7 @@ tidied so others can use it too. Keep it simple.
 - **Ask instead of guessing** on anything that affects L, the color math, matching or the yarn
   order. L must stay exactly GIMP's L\* (see DESIGN.md); the tests check every palette row.
 - Ask before big changes, and stop after each step so I can try it.
-- I push myself (the SSH key has a passphrase). Commit, don't push.
+- Commit, but don't push; I push myself.
 
 ## Layout
 - `latchwork.py`: launcher (checks Python/Tkinter, adds `src/` to the path).
@@ -34,7 +34,7 @@ tidied so others can use it too. Keep it simple.
 ## My setup (the defaults)
 - Hershner's is pre-cut, 320 pieces per pack; Red Heart and Loops & Threads are cut from skeins.
 - Canvas 3.75 holes per inch; borders 3 per side, 8 top (hanging loop), 3 bottom + 1 empty row.
-- I hook bottom to top, generally left to right. Phone: Android (Galaxy S25 Ultra).
+- I hook bottom to top, generally left to right, reading the pattern on an Android phone.
 - Color weight 0.5 was fitted on my own rugs (see DESIGN.md).
 
 ## Verifying UI changes

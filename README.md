@@ -98,3 +98,7 @@ tools/              the GIMP script that exported the original palette
 ## More
 
 - [docs/DESIGN.md](docs/DESIGN.md): color math, matching, file formats and design decisions.
+
+## License
+
+[MIT](LICENSE)
