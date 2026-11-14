@@ -283,16 +283,37 @@ class App:
         self.strip.bind("<Configure>", lambda e: self.draw_strip())
 
         hints = tk.Frame(r, bg=BG)
-        hints.grid(row=6, column=0, columnspan=2, pady=(4, 10))
+        hints.grid(row=6, column=0, columnspan=2, padx=16, pady=(4, 10))
+        self.hint_rows = [tk.Frame(hints, bg=BG), tk.Frame(hints, bg=BG)]
+        self.hint_items = []
         for keys, text in (("←→", "lighter / darker"), ("N", "next match"), ("B", "better match"),
                            ("Home", "best match"), ("G", "grayscale"), ("A", "assign"),
                            ("P", "original/preview"), ("F1", "help")):
             item = tk.Frame(hints, bg=BG)
-            item.pack(side="left", padx=(0, 10))
+            self.hint_items.append(item)
             for k in ([keys] if len(keys) > 2 or keys == "F1" else list(keys)):
                 keycap(item, k).pack(side="left", padx=(0, 2))
             tk.Label(item, text=text, font=("Segoe UI", 9), bg=BG, fg="#666").pack(
                 side="left", padx=(3, 0))
+        self._hint_split = None
+        r.bind("<Configure>", lambda e: self.layout_hints(e.width), add="+")
+
+    def layout_hints(self, width):
+        """One line of key hints when it fits, otherwise two centered lines."""
+        gap = 10
+        total = sum(i.winfo_reqwidth() + gap for i in self.hint_items)
+        split = len(self.hint_items) if total + 32 <= width else (len(self.hint_items) + 1) // 2
+        if split == self._hint_split:
+            return
+        self._hint_split = split
+        for row in self.hint_rows:
+            row.pack_forget()
+        for n, item in enumerate(self.hint_items):
+            item.pack_forget()
+            item.pack(in_=self.hint_rows[0 if n < split else 1], side="left", padx=(0, gap))
+        self.hint_rows[0].pack()
+        if split < len(self.hint_items):
+            self.hint_rows[1].pack(pady=(3, 0))
 
     def _bind_keys(self):
         # Arrows step even while typing in the hex field (it's a paste-and-go field).
