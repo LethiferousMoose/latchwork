@@ -68,6 +68,8 @@ To use your own yarns, open **Palette → Manage yarns** (Ctrl+P) to add or edit
 an empty palette with **File → New palette**. Palettes are plain CSV files you can also edit in
 a spreadsheet.
 
+![Palette manager](docs/images/palette-manager.png)
+
 ## How matching works
 
 Every color is converted to CIE Lab, the same color space as GIMP's LCh selector. Each yarn is
@@ -76,6 +78,8 @@ best match. Lightness leads; the **Color weight** (default 0.5) lets hue and col
 too, so a brown target finds a brown yarn rather than a gray of nearly the same lightness. The
 default was fitted on real finished rugs. Details are in [docs/DESIGN.md](docs/DESIGN.md) and
 in the app under **Help → How matching works**.
+
+![Built-in help](docs/images/help.png)
 
 ## Project layout
 
