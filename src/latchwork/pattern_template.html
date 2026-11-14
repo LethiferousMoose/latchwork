@@ -119,7 +119,7 @@
   <div class="grow"></div>
   <div class="actions">
     <button id="fitBtn" title="Show the whole pattern">Fit</button>
-    <button id="symBtn" aria-pressed="true" title="Show symbols in the cells">Symbols</button>
+    <button id="symBtn" aria-pressed="true" title="Symbols: Auto (when big enough) / Always / Off">Symbols: Auto</button>
     <button id="legendBtn">Yarns</button>
     <button id="printBtn">Print…</button>
   </div>
@@ -174,13 +174,18 @@ const cells = (() => {
   return out;
 })();
 const PALE = "#E6E6E6", EMPTY = "#FFFFFF";
-const SYM_MIN = 7;   // smallest cell (CSS px) that gets a symbol
+const SYM_MIN = 7;   // smallest cell (CSS px) that gets a symbol in Auto mode
+const SYM_FLOOR = 3; // Always mode: below this a symbol can't be drawn at all
+const SYM_MODES = ["auto", "always", "off"];
 const fmt = n => n.toLocaleString("en-US");
 
 // ---------- saved state (per pattern, on this device) ----------
 const STORE = "latchwork:" + D.key;
-const state = { done: [], rowOn: false, row: 1, sym: true };
+const state = { done: [], rowOn: false, row: 1, sym: "auto" };
 try { Object.assign(state, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) {}
+// older patterns saved sym as true/false
+if (state.sym === true) state.sym = "auto";
+if (!SYM_MODES.includes(state.sym)) state.sym = "off";
 function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
 let sel = -1;   // highlighted yarn index, -1 = all
 
@@ -277,7 +282,9 @@ function drawGrid(ctx, o) {
   const r0 = Math.max(0, Math.floor(-oy / s)), r1 = Math.min(o.h, Math.ceil((vh - oy) / s));
   if (c1 <= c0 || r1 <= r0) return;
   // symbols
-  if (o.sym && s >= SYM_MIN) {
+  // o.sym: "auto"/true = only when cells are big enough, "always" = down to SYM_FLOOR
+  const symMin = o.sym === "always" ? SYM_FLOOR : SYM_MIN;
+  if (o.sym && o.sym !== "off" && s >= symMin) {
     for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) {
       const v = cells[(o.y0 + r) * W + o.x0 + c];
       if (v === NONE || (o.highlight >= 0 && v !== o.highlight)) continue;
@@ -377,7 +384,7 @@ function paint() {
   g.fillStyle = "rgba(250,250,250,1)"; g.fillRect(0, 0, GL, GT);
   g.strokeStyle = "#BBB"; g.lineWidth = 1;
   g.beginPath(); g.moveTo(0, GT + .5); g.lineTo(vw, GT + .5); g.moveTo(GL + .5, 0); g.lineTo(GL + .5, vh); g.stroke();
-  if (state.sym && scale < SYM_MIN) {   // say why no symbols are showing
+  if (state.sym === "auto" && scale < SYM_MIN) {   // say why no symbols are showing
     const msg = "Zoom in to see symbols";
     g.font = "600 12px Segoe UI, Arial, sans-serif"; g.textAlign = "right"; g.textBaseline = "bottom";
     const tw = g.measureText(msg).width;
@@ -510,8 +517,14 @@ document.getElementById("sub").textContent = document.getElementById("legendInfo
   W + " × " + H + " holes · " + fmt(D.knots) + " knots · finished " + D.finished +
   " · canvas " + D.canvas;
 const symBtn = document.getElementById("symBtn");
-function syncSym() { symBtn.setAttribute("aria-pressed", state.sym ? "true" : "false"); }
-symBtn.onclick = () => { state.sym = !state.sym; syncSym(); save(); draw(); };
+function syncSym() {
+  symBtn.setAttribute("aria-pressed", state.sym === "off" ? "false" : "true");
+  symBtn.textContent = "Symbols: " + { auto: "Auto", always: "Always", off: "Off" }[state.sym];
+}
+symBtn.onclick = () => {   // Auto -> Always -> Off -> Auto
+  state.sym = SYM_MODES[(SYM_MODES.indexOf(state.sym) + 1) % SYM_MODES.length];
+  syncSym(); save(); draw();
+};
 document.getElementById("fitBtn").onclick = fit;
 const legendEl = document.getElementById("legend");
 document.getElementById("legendBtn").onclick = () => legendEl.classList.toggle("open");

@@ -138,7 +138,8 @@ File menu: export the yarn list (CSV) and the yarn-color preview (PNG, one pixel
 File → Export pattern (Ctrl+E) writes one self-contained HTML file. Copy it to the phone and open it in the browser; it works offline.
 
 - Pinch to zoom; the grid stays sharp. Rows are numbered from the bottom (row 1 = bottom).
-- Symbols appear once cells are big enough (about 7 px); zoom in if they're hidden.
+- Symbols button cycles Auto / Always / Off. Auto shows symbols once cells are big enough (about 7 px; zoom in if they're hidden). Always draws them even when tiny. Off hides them.
+- Remembered on that device, per pattern: done checkmarks, the row tracker (on/off and which row) and the Symbols mode. Zoom and the tapped yarn are not.
 - Tap a yarn in the legend to show only that color.
 - Done checkmarks and the row tracker are remembered on that device, per pattern.
 - Printing: an overview plus pages of 50 × 70 holes, labelled A1 (bottom-left), A2…

@@ -166,11 +166,13 @@ JSON, one cell per knot, safely escaped.
 - Canvas-drawn grid that stays sharp at every zoom; pinch to zoom and pan. Bold line every 10
   cells; **rows numbered from the bottom** (row 1 = bottom), since hooking goes bottom to top.
 - Each yarn gets a symbol: 20 drawn shapes, then letters and digits (drawn, so phones never
-  turn them into emoji), black or white by the yarn's L\*. Symbols are hidden below 7 px cells,
-  where they become an unreadable texture.
+  turn them into emoji), black or white by the yarn's L\*. The Symbols button cycles **Auto**
+  (hidden below 7 px cells, where they become an unreadable texture, with a "Zoom in" hint),
+  **Always** (drawn down to 3 px) and **Off**.
 - Legend with swatch, name, symbol and count; tapping a yarn shows only that color.
-- Done checkmarks per yarn and a row tracker, stored per pattern in the browser's local
-  storage on that device.
+- Done checkmarks per yarn and a row tracker. Stored per pattern in the browser's local
+  storage on that device: done marks, row tracker on/off and its row, Symbols mode. Zoom and
+  the tapped legend yarn are not stored.
 - Unassigned colors appear in their original color with a `?` symbol (export warns first).
 - Print: an overview plus pages of 50 × 70 holes on letter paper, labelled A1 (bottom-left), A2…
 
@@ -180,8 +182,12 @@ JSON, one cell per knot, safely escaped.
 list, the last project, the color weight and canvas defaults for new projects. Settings from
 older versions (in the repository root) are moved there automatically.
 
-## Ideas not done
+## Future possibilities
 
-- Pattern page: Symbols button cycling Auto / Always / Off.
-- Neighbor strip: long names wrap to two lines while short ones use one.
-- Yarn inventory (what you own), skein estimates, a brand filter.
+Not planned, but noted so the reasoning isn't lost:
+
+- **Yarn inventory:** record which yarns you own, to prefer them in matching or list what to buy.
+- **Skein estimates** for cut-from-skein yarn (pieces → skeins). Left out because yarn per piece
+  varies too much by brand and cut length.
+- **Brand filter** for matching. Left out because mixing brands is usually needed to have enough
+  colors.
