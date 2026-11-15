@@ -18,6 +18,8 @@
     border-radius: 8px; padding: 7px 12px; cursor: pointer; }
   button[aria-pressed="true"] { background: #DCE8F7; border-color: #90B4E0; }
   button:active { background: #eee; }
+  button:disabled { opacity: .35; cursor: default; }
+  button:disabled:active { background: #fff; }
 
   #bar { grid-area: bar; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -63,8 +65,11 @@
   #rowbar .short { display: none; }
   #rowbar .dbl { letter-spacing: -.42em; margin-right: .42em; }   /* two triangles as one icon */
   /* both trackers on: what's in the tracked cell, and how many of it run to the right */
+  /* both trackers on: the run jumps sit either side of the cell readout */
   #readout { display: none; align-items: center; justify-content: center; gap: 10px;
     font-size: 15px; min-height: 34px; }
+  #readout .cell { display: flex; align-items: center; justify-content: center; gap: 10px;
+    min-width: 0; }
   #readout.on { display: flex; }
   #readout canvas { width: 30px; height: 30px; border-radius: 4px; flex: none;
     box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
@@ -106,7 +111,8 @@
     #rowbar button.toggle { min-width: 80px; }
     #rowbar .long { display: none; }
     #rowbar .short { display: inline; }
-    #readout { justify-content: flex-start; padding: 0 4px; }
+    #readout { justify-content: space-between; gap: 5px; }
+    #readout .cell { flex: 1; gap: 8px; }
   }
   @media (min-width: 821px) { #legendBtn { display: none; } #closeLegend { display: none; } }
   #legendInfo { display: none; padding: 8px 12px; color: var(--muted); font-size: 12.5px;
@@ -159,8 +165,12 @@
 </aside>
 
 <div id="rowbar">
-  <div id="readout"><canvas id="readSw" width="60" height="60"></canvas>
-    <span class="name" id="readName"></span><span class="run" id="readRun"></span></div>
+  <div id="readout">
+    <button id="runBack" class="big" aria-label="Start of this or the previous color run" title="Previous color run"><span class="dbl">◀︎◀︎</span></button>
+    <div class="cell"><canvas id="readSw" width="60" height="60"></canvas>
+      <span class="name" id="readName"></span><span class="run" id="readRun"></span></div>
+    <button id="runNext" class="big" aria-label="Next color run" title="Next color run"><span class="dbl">▶︎▶︎</span></button>
+  </div>
   <div class="line">
     <button id="rowTrack" class="toggle" aria-pressed="false" title="Highlight one row at a time"><span class="long">Row tracker</span><span class="short">Row</span></button>
     <button id="rowDown" class="big" aria-label="Row down">▼</button>
@@ -169,11 +179,9 @@
   </div>
   <div class="line">
     <button id="colTrack" class="toggle" aria-pressed="false" title="Highlight one column at a time; with the row tracker, read one cell"><span class="long">Column tracker</span><span class="short">Column</span></button>
-    <button id="runBack" class="big" aria-label="Start of this or the previous color run" title="Previous color run"><span class="dbl">◀︎◀︎</span></button>
     <button id="colLeft" class="big" aria-label="Column left">◀︎</button>
     <span class="label" id="colLabel"></span>
     <button id="colRight" class="big" aria-label="Column right">▶︎</button>
-    <button id="runNext" class="big" aria-label="Next color run" title="Next color run"><span class="dbl">▶︎▶︎</span></button>
   </div>
 </div>
 
@@ -596,7 +604,6 @@ function syncTrack() {
   $("rowUp").disabled = $("rowDown").disabled = !state.rowOn;
   $("colLeft").disabled = $("colRight").disabled = !state.colOn;
   const both = state.rowOn && state.colOn;
-  $("runBack").disabled = $("runNext").disabled = !both;   // runs need a row and a column
   $("readout").classList.toggle("on", both);
   if (both) {
     const v = cellAt(state.row, state.col), [, last] = runAt(state.row, state.col);
