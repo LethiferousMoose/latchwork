@@ -14,8 +14,8 @@ and export a pattern you can read on your phone while hooking.
 - **Plans the rug.** Packs (for pre-cut yarn) or pieces to cut per yarn, finished size, and
   how much canvas to cut including the folded borders.
 - **Exports a pattern.** One self-contained HTML file: pinch-zoom grid with symbols, a legend,
-  done checkmarks per yarn and a row tracker. Works offline on a phone, and prints on letter
-  paper split into labelled pages.
+  done checkmarks per yarn, and row and column trackers that read out the yarn at your spot.
+  Works offline on a phone, and prints on letter paper split into labelled pages.
 - **Manages your yarn palette.** Add, edit, retire and import yarns (CSV or GIMP `.gpl`), with
   brands and pack sizes. Keep several palettes and switch between them instantly.
 - **Comes with a ready-made palette** of 198 yarns from Hershner's, Red Heart and Loops &

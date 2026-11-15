@@ -53,11 +53,24 @@
     color: var(--muted); gap: 2px; padding: 4px; }
   #legend input[type=checkbox] { width: 22px; height: 22px; margin: 0; }
 
-  #rowbar { grid-area: rowbar; display: flex; align-items: center; justify-content: center; gap: 10px;
+  #rowbar { grid-area: rowbar; display: flex; flex-direction: column; gap: 6px;
     padding: 8px; background: var(--panel); border-top: 1px solid var(--line); }
+  #rowbar .line { display: flex; align-items: center; justify-content: center; gap: 10px; }
   #rowbar .label { min-width: 150px; text-align: center; }
   #rowbar .label b { font-size: 18px; }
   #rowbar button.big { min-width: 56px; font-size: 18px; padding: 6px 14px; }
+  #rowbar button.toggle { min-width: 132px; }
+  #rowbar .short { display: none; }
+  /* both trackers on: what's in the tracked cell, and how many of it run to the right */
+  #readout { display: none; align-items: center; justify-content: center; gap: 10px;
+    font-size: 15px; min-height: 34px; }
+  #readout.on { display: flex; }
+  #readout canvas { width: 30px; height: 30px; border-radius: 4px; flex: none;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+  #readout .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0; }
+  #readout .run { white-space: nowrap; color: var(--muted); }
+  #readout .run b { color: var(--ink); font-size: 18px; }
 
   #printDlg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none;
     align-items: center; justify-content: center; z-index: 10; }
@@ -85,10 +98,14 @@
     #bar .actions { flex: none; flex-wrap: nowrap; gap: 4px; }
     #bar button { padding: 6px 8px; font-size: 14px; }
     #legendInfo { display: block; }
-    #rowbar { gap: 6px; }
-    #rowbar .label { min-width: 0; flex: 1; }
+    #rowbar .line { gap: 5px; }
+    #rowbar .label { min-width: 0; flex: 1; white-space: nowrap; }
     #rowbar button { padding: 6px 9px; }
-    #rowbar button.big { min-width: 48px; padding: 6px 10px; }
+    #rowbar button.big { min-width: 42px; padding: 6px 8px; }
+    #rowbar button.toggle { min-width: 62px; }
+    #rowbar .long { display: none; }
+    #rowbar .short { display: inline; }
+    #readout { justify-content: flex-start; padding: 0 4px; }
   }
   @media (min-width: 821px) { #legendBtn { display: none; } #closeLegend { display: none; } }
   #legendInfo { display: none; padding: 8px 12px; color: var(--muted); font-size: 12.5px;
@@ -141,10 +158,22 @@
 </aside>
 
 <div id="rowbar">
-  <button id="rowTrack" aria-pressed="false" title="Highlight one row at a time">Row tracker</button>
-  <button id="rowDown" class="big" aria-label="Row down">▼</button>
-  <span class="label" id="rowLabel"></span>
-  <button id="rowUp" class="big" aria-label="Row up">▲</button>
+  <div id="readout"><canvas id="readSw" width="60" height="60"></canvas>
+    <span class="name" id="readName"></span><span class="run" id="readRun"></span></div>
+  <div class="line">
+    <button id="rowTrack" class="toggle" aria-pressed="false" title="Highlight one row at a time"><span class="long">Row tracker</span><span class="short">Row</span></button>
+    <button id="rowDown" class="big" aria-label="Row down">▼</button>
+    <span class="label" id="rowLabel"></span>
+    <button id="rowUp" class="big" aria-label="Row up">▲</button>
+  </div>
+  <div class="line">
+    <button id="colTrack" class="toggle" aria-pressed="false" title="Highlight one column at a time; with the row tracker, read one cell"><span class="long">Column tracker</span><span class="short">Col</span></button>
+    <button id="runBack" class="big" aria-label="Start of this or the previous color run" title="Previous color run">«</button>
+    <button id="colLeft" class="big" aria-label="Column left">◀</button>
+    <span class="label" id="colLabel"></span>
+    <button id="colRight" class="big" aria-label="Column right">▶</button>
+    <button id="runNext" class="big" aria-label="Next color run" title="Next color run">»</button>
+  </div>
 </div>
 
 <div id="printDlg" role="dialog" aria-modal="true">
@@ -181,7 +210,7 @@ const fmt = n => n.toLocaleString("en-US");
 
 // ---------- saved state (per pattern, on this device) ----------
 const STORE = "latchwork:" + D.key;
-const state = { done: [], rowOn: false, row: 1, sym: "auto" };
+const state = { done: [], rowOn: false, row: 1, colOn: false, col: 1, sym: "auto" };
 try { Object.assign(state, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) {}
 // older patterns saved sym as true/false
 if (state.sym === true) state.sym = "auto";
@@ -349,14 +378,22 @@ function paint() {
   g.fillStyle = "#DADADA"; g.fillRect(0, 0, vw, vh);
   drawGrid(g, { x0: 0, y0: 0, w: W, h: H, s: scale, ox, oy, highlight: sel, sym: state.sym,
                 bmp: bitmap, clip: [vw, vh] });
-  // row tracker: dim everything but the current row
-  if (state.rowOn) {
-    const ry = oy + (H - state.row) * scale;
+  // trackers: dim everything but the tracked row and/or column
+  if (state.rowOn || state.colOn) {
+    const ry = oy + (H - state.row) * scale, cx = ox + (state.col - 1) * scale;
+    const xs = state.colOn ? [[ox, cx], [cx + scale, ox + W * scale]] : [[ox, ox + W * scale]];
+    const ys = state.rowOn ? [[oy, ry], [ry + scale, oy + H * scale]] : [[oy, oy + H * scale]];
     g.fillStyle = "rgba(255,255,255,.55)";
-    g.fillRect(ox, oy, W * scale, Math.max(0, ry - oy));
-    g.fillRect(ox, ry + scale, W * scale, Math.max(0, oy + H * scale - ry - scale));
+    for (const [x0, x1] of xs) for (const [y0, y1] of ys)
+      if (x1 > x0 && y1 > y0) g.fillRect(x0, y0, x1 - x0, y1 - y0);
     g.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--row") || "#E53935";
-    g.lineWidth = 2.5; g.strokeRect(ox - 1, ry - 1, W * scale + 2, scale + 2);
+    g.lineWidth = 2.5;
+    if (state.rowOn) g.strokeRect(ox - 1, ry - 1, W * scale + 2, scale + 2);
+    if (state.colOn) g.strokeRect(cx - 1, oy - 1, scale + 2, H * scale + 2);
+    if (state.rowOn && state.colOn) {   // the cell being read: dark frame with a white edge
+      g.lineWidth = 4; g.strokeStyle = "#1E1E1E"; g.strokeRect(cx - 2, ry - 2, scale + 4, scale + 4);
+      g.lineWidth = 1.5; g.strokeStyle = "#fff"; g.strokeRect(cx + .5, ry + .5, scale - 1, scale - 1);
+    }
   }
   // gutters with numbers
   g.fillStyle = "rgba(250,250,250,.96)";
@@ -366,7 +403,12 @@ function paint() {
   const cs = labelStep(scale, 26);
   for (let c = cs; c <= W; c += cs) {
     const x = ox + (c - .5) * scale;
-    if (x > GL - 4 && x < vw) g.fillText(String(c), x, GT / 2);
+    if (x > GL - 4 && x < vw && !(state.colOn && c === state.col)) g.fillText(String(c), x, GT / 2);
+  }
+  if (state.colOn) {   // always label the tracked column
+    const x = ox + (state.col - .5) * scale;
+    if (x > GL && x < vw) { g.fillStyle = "#E53935"; g.fillText(String(state.col), x, GT / 2); }
+    g.fillStyle = "#555";
   }
   g.textAlign = "right";
   const rs = labelStep(scale, 15);
@@ -530,26 +572,90 @@ const legendEl = document.getElementById("legend");
 document.getElementById("legendBtn").onclick = () => legendEl.classList.toggle("open");
 document.getElementById("closeLegend").onclick = () => legendEl.classList.remove("open");
 
-const rowBtn = document.getElementById("rowTrack");
-function syncRow() {
+const rowBtn = document.getElementById("rowTrack"), colBtn = document.getElementById("colTrack");
+const $ = id => document.getElementById(id);
+const cellAt = (row, col) => cells[(H - row) * W + col - 1];   // row 1 = bottom, col 1 = left
+function runAt(row, col) {   // [first, last] column of the same-yarn run containing col
+  const v = cellAt(row, col);
+  let a = col, b = col;
+  while (a > 1 && cellAt(row, a - 1) === v) a--;
+  while (b < W && cellAt(row, b + 1) === v) b++;
+  return [a, b];
+}
+function counter(name, n, of) {   // "Row 37 of 80" (phones: "Row 37/80")
+  return name + " <b>" + n + "</b><span class='long'> of " + of + "</span><span class='short'>/" + of + "</span>";
+}
+function syncTrack() {
   state.row = Math.max(1, Math.min(H, state.row));
+  state.col = Math.max(1, Math.min(W, state.col));
   rowBtn.setAttribute("aria-pressed", state.rowOn ? "true" : "false");
-  document.getElementById("rowLabel").innerHTML = state.rowOn
-    ? "Row <b>" + state.row + "</b> of " + H : "<span style='color:#888'>Row tracker off</span>";
-  document.getElementById("rowUp").disabled = document.getElementById("rowDown").disabled = !state.rowOn;
+  colBtn.setAttribute("aria-pressed", state.colOn ? "true" : "false");
+  $("rowLabel").innerHTML = state.rowOn ? counter("Row", state.row, H) : "<span style='color:#888'>off</span>";
+  $("colLabel").innerHTML = state.colOn ? counter("Col", state.col, W) : "<span style='color:#888'>off</span>";
+  $("rowUp").disabled = $("rowDown").disabled = !state.rowOn;
+  $("colLeft").disabled = $("colRight").disabled = !state.colOn;
+  const both = state.rowOn && state.colOn;
+  $("runBack").disabled = $("runNext").disabled = !both;   // runs need a row and a column
+  $("readout").classList.toggle("on", both);
+  if (both) {
+    const v = cellAt(state.row, state.col), [, last] = runAt(state.row, state.col);
+    const n = last - state.col + 1, sw = $("readSw"), g = sw.getContext("2d");
+    g.clearRect(0, 0, 60, 60);
+    g.fillStyle = v === NONE ? EMPTY : Y[v].hex; g.fillRect(0, 0, 60, 60);
+    if (v !== NONE) drawSymbol(g, v, 30, 30, 60, Y[v].ink);
+    $("readName").textContent = v === NONE ? "Empty (no knot)" : Y[v].name;
+    $("readRun").innerHTML = "· <b>" + n + "</b>" + (n > 1 ? " (cols " + state.col + "–" + last + ")" : "");
+  }
 }
-function showRow() {   // pan so the tracked row is on screen
-  const ry = oy + (H - state.row) * scale;
-  if (ry < GT + 10 || ry + scale > vh - 10) oy += (vh + GT) / 2 - (ry + scale / 2);
+function showCell() {   // pan only when the tracked row / column is (partly) off screen
+  if (state.rowOn) {
+    const ry = oy + (H - state.row) * scale;
+    if (ry < GT || ry + scale > vh) oy += (vh + GT) / 2 - (ry + scale / 2);
+  }
+  if (state.colOn) {
+    const cx = ox + (state.col - 1) * scale;
+    if (cx < GL || cx + scale > vw) ox += (vw + GL) / 2 - (cx + scale / 2);
+  }
 }
-rowBtn.onclick = () => { state.rowOn = !state.rowOn; syncRow(); save(); if (state.rowOn) showRow(); draw(); };
-function moveRow(d) { if (!state.rowOn) return; state.row += d; syncRow(); save(); showRow(); draw(); }
-document.getElementById("rowUp").onclick = () => moveRow(1);
-document.getElementById("rowDown").onclick = () => moveRow(-1);
+function changed() { syncTrack(); save(); showCell(); draw(); }
+rowBtn.onclick = () => { state.rowOn = !state.rowOn; changed(); };
+colBtn.onclick = () => { state.colOn = !state.colOn; changed(); };
+function moveRow(d) { if (!state.rowOn) return; state.row += d; changed(); }
+// Columns: with the row tracker on, stepping past either end wraps to the next row up
+// (or back down), since rows are hooked bottom to top, left to right.
+function moveCol(d) {
+  if (!state.colOn) return;
+  let c = state.col + d;
+  if (state.rowOn && c > W && state.row < H) { state.row++; c = 1; }
+  else if (state.rowOn && c < 1 && state.row > 1) { state.row--; c = W; }
+  state.col = c; changed();
+}
+function jumpRun(d) {   // » start of the next run; « start of this run, or of the one before
+  if (!(state.rowOn && state.colOn)) return;
+  const [first, last] = runAt(state.row, state.col);
+  if (d > 0) {
+    if (last < W) state.col = last + 1;
+    else if (state.row < H) { state.row++; state.col = 1; }
+  } else if (state.col > first) state.col = first;
+  else if (first > 1) state.col = runAt(state.row, first - 1)[0];
+  else if (state.row > 1) { state.row--; state.col = runAt(state.row, W)[0]; }
+  changed();
+}
+$("rowUp").onclick = () => moveRow(1);
+$("rowDown").onclick = () => moveRow(-1);
+$("colLeft").onclick = () => moveCol(-1);
+$("colRight").onclick = () => moveCol(1);
+$("runBack").onclick = () => jumpRun(-1);
+$("runNext").onclick = () => jumpRun(1);
 document.addEventListener("keydown", e => {
-  if (e.key === "ArrowUp") { moveRow(1); e.preventDefault(); }
-  else if (e.key === "ArrowDown") { moveRow(-1); e.preventDefault(); }
-  else if (e.key === "Escape") { highlight(-1); closePrint(); }
+  const k = e.key;
+  if (k === "ArrowUp") moveRow(1);
+  else if (k === "ArrowDown") moveRow(-1);
+  else if (k === "ArrowLeft") e.shiftKey ? jumpRun(-1) : moveCol(-1);
+  else if (k === "ArrowRight") e.shiftKey ? jumpRun(1) : moveCol(1);
+  else if (k === "Escape") { highlight(-1); closePrint(); return; }
+  else return;
+  e.preventDefault();
 });
 
 // ---------- print ----------
@@ -662,7 +768,7 @@ document.getElementById("pGo").onclick = doPrint;
 window.addEventListener("afterprint", () => { document.getElementById("printArea").innerHTML = ""; });
 
 // ---------- start ----------
-syncSym(); syncRow(); buildLegend();
+syncSym(); syncTrack(); buildLegend();
 window.addEventListener("resize", () => { resize(); });
 resize(); fit();
 document.documentElement.setAttribute("data-ready", "1");

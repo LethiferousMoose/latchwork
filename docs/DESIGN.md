@@ -190,9 +190,14 @@ JSON, one cell per knot, safely escaped.
   (hidden below 7 px cells, where they become an unreadable texture, with a "Zoom in" hint),
   **Always** (drawn down to 3 px) and **Off**.
 - Legend with swatch, name, symbol and count; tapping a yarn shows only that color.
-- Done checkmarks per yarn and a row tracker. Stored per pattern in the browser's local
-  storage on that device: done marks, row tracker on/off and its row, Symbols mode. Zoom and
-  the tapped legend yarn are not stored.
+- Done checkmarks per yarn, a row tracker and a column tracker. With both trackers on, a
+  readout names the yarn in the cell where they cross and how many cells of it run to the
+  right; ◀ ▶ step a cell and wrap to the next row up / back down at the row ends (hooking goes
+  bottom to top, left to right), « » jump a color run. Tapping the grid deliberately doesn't
+  move the trackers (a stray touch mustn't lose your place). The view pans only when the
+  tracked row / column is off screen.
+- Stored per pattern in the browser's local storage on that device: done marks, both trackers
+  (on/off and position), Symbols mode. Zoom and the tapped legend yarn are not stored.
 - Unassigned colors appear in their original color with a `?` symbol (export warns first).
 - Print: an overview plus pages of 50 × 70 holes on letter paper, labelled A1 (bottom-left), A2…
 
