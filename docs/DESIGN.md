@@ -198,7 +198,8 @@ JSON, one cell per knot, safely escaped.
   tracked row / column is off screen.
 - Hooked cells: a tall Done button beside the tracker lines marks what's tracked (the rest of
   the run with both trackers on, else the row or the column) and moves to the next one; on
-  something already fully marked it becomes Undo and clears it. Hooked cells get a white veil
+  something already fully marked it becomes Undo and clears it (a run: the whole run, from any
+  cell of it, returning to its first cell). Hooked cells get a white veil
   and no symbol on screen (print ignores them). Progress shows in the header / yarn sheet,
   knots left per yarn, and a yarn counts as done once all its knots are hooked (or ticked).
   Kept as a bitset (one bit per cell, base64) in the saved state.

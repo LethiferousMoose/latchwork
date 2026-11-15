@@ -691,10 +691,12 @@ function syncTrack() {
 // Done marks what's tracked: the rest of the run (both trackers), the row, or the column.
 function doneTarget() {
   const idx = [], r = H - state.row;
-  if (state.rowOn && state.colOn) {
-    const [, last] = runAt(state.row, state.col);
-    for (let c = state.col; c <= last; c++) idx.push(r * W + c - 1);
-    return { idx, what: "run", next: () => jumpRun(1) };
+  if (state.rowOn && state.colOn) {   // Done: from here to the end of the run; Undo: the whole run
+    const [first, last] = runAt(state.row, state.col), whole = [];
+    for (let c = first; c <= last; c++) (c >= state.col ? idx : whole).push(r * W + c - 1);
+    whole.push(...idx);
+    return { idx, whole, what: "run", next: () => jumpRun(1),
+             back: () => { state.col = first; changed(); } };
   }
   if (state.rowOn) {
     for (let c = 0; c < W; c++) idx.push(r * W + c);
@@ -717,15 +719,18 @@ function syncDone() {
     : undo ? "This " + t.what + " is marked hooked; press to clear it"
     : "Mark this " + t.what + " as hooked, then move on (Enter)";
 }
-// Not done yet: mark it and move to the next one. Already done: clear it and stay put.
+// Not done yet: mark it and move to the next one. Already done: clear it (a run: all of it,
+// back to its first cell, so it can be redone from the start).
 function markDone() {
   const t = doneTarget();
   if (!t) return;
   const undo = t.idx.every(isDone);
-  t.idx.forEach(i => setDone(i, !undo));
+  (undo && t.whole ? t.whole : t.idx).forEach(i => setDone(i, !undo));
   buildDoneLayer(); refreshProgress();
   toast((t.what[0].toUpperCase() + t.what.slice(1)) + (undo ? " cleared" : " marked hooked"));
-  if (undo) changed(); else t.next();   // both end in changed(): saves, redraws, updates the button
+  if (!undo) t.next();                  // each of these ends in changed(): saves, redraws, updates the button
+  else if (t.back) t.back();
+  else changed();
 }
 function showCell() {   // pan only when the tracked row / column is (partly) off screen
   if (state.rowOn) {
