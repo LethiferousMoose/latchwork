@@ -18,7 +18,7 @@ from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
 from .project_panel import ProjectPanel
-from .widgets import ColorPanel, StatCard, describe_delta_L
+from .widgets import ColorPanel, StatCard, Tooltip, describe_delta_L
 
 # src/latchwork/app.py -> the repository folder
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -255,8 +255,14 @@ class App:
 
         self.target_title = tk.Label(r, text="Target", font=TITLE_FONT, bg=BG, anchor="w")
         self.target_title.grid(row=0, column=0, sticky="ew", padx=16, pady=(6, 0))
-        self.yarn_title = tk.Label(r, text="", font=TITLE_FONT, bg=BG, anchor="w")
+        # width=1: a long name never widens its column; it's cut with "..." to fit instead,
+        # and the full name shows on hover
+        self.yarn_title = tk.Label(r, text="", font=TITLE_FONT, bg=BG, anchor="w", width=1)
         self.yarn_title.grid(row=0, column=1, sticky="ew", padx=16, pady=(6, 0))
+        self._title_font = tkfont.Font(font=TITLE_FONT)
+        self._title_text, self._title_cut = "", False
+        self.yarn_title.bind("<Configure>", lambda e: self._fit_yarn_title())
+        Tooltip(self.yarn_title, lambda e: (self._title_text, []) if self._title_cut else None)
 
         self.swatch = tk.Canvas(r, height=220, bg=BG, highlightthickness=0)
         self.swatch.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=16, pady=6)
@@ -1037,7 +1043,7 @@ class App:
         self.assign_main.config(text={"this": "\u2713 Assigned",
                                       "other": "Reassign"}.get(state, "Assign"))
         if not self.yarns:
-            self.yarn_title.config(text="No yarns")
+            self.set_yarn_title("No yarns")
             self.yarn_hex_var.set("")
             self.target_panel.show(self.target)
             self.yarn_panel.show(None)
@@ -1046,7 +1052,7 @@ class App:
             self.pos_card.set("\u2013", "", "#888")
             return
         yarn = self.yarns[self.index]
-        self.yarn_title.config(text=yarn.label)
+        self.set_yarn_title(yarn.label)
         self.yarn_hex_var.set(yarn.hex)
         t_L = rgb_to_lch(*self.target)[0] if self.target else None
         self.target_panel.show(self.target, other=yarn.rgb)
@@ -1063,6 +1069,27 @@ class App:
             self.delta_card.set("\u2013", "enter a target color", "#888")
         else:
             self.delta_card.set(*describe_delta_L(yarn.L - t_L))
+
+    def set_yarn_title(self, text):
+        self._title_text = text
+        self._fit_yarn_title()
+
+    def _fit_yarn_title(self):
+        """Show the yarn title, cut with '...' when it's wider than its half of the view."""
+        text, f = self._title_text, self._title_font
+        room = self.yarn_title.winfo_width() - 6
+        self._title_cut = room > 20 and f.measure(text) > room
+        if self._title_cut:
+            lo, hi = 0, len(text)          # longest prefix that fits with the ellipsis
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                if f.measure(text[:mid].rstrip() + "\u2026") <= room:
+                    lo = mid
+                else:
+                    hi = mid - 1
+            text = text[:lo].rstrip() + "\u2026"
+        if self.yarn_title.cget("text") != text:
+            self.yarn_title.config(text=text)
 
     def draw_strip(self):
         c = self.strip
