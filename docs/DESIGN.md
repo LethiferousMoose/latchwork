@@ -78,9 +78,12 @@ brand preference.
 
 **In the UI:** the target jumps to the best match. **N** / **B** walk down / up the ranking
 (stopping at the ends), **Home** returns to #1; after stepping with ← → (palette order), N
-starts at #1 again. The Match rank card shows the current yarn's rank. Hollow markers on the
-L, C and h bars show the other side's value (no hue marker below chroma 5, where hue means
-little).
+starts at #1 again. The Match rank card shows the current yarn's rank. A yarn already
+assigned to another color of the rug gets an "Already used for" badge listing those colors
+and a dot on its strip tile (assignments only, not suggestions; the ranking is unchanged,
+since a shared yarn merges two colors on the rug, which is sometimes wanted and sometimes
+not). Hollow markers on the L, C and h bars show the other side's value (no hue marker
+below chroma 5, where hue means little).
 
 ## Palettes (`palette.py`, `palette_window.py`)
 

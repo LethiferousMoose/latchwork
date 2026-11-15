@@ -5,6 +5,7 @@ Stages 1-2: comparison view and palette manager. Run:  python latchwork.py
 import json
 import os
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
 from . import palette as pal
@@ -581,6 +582,17 @@ class App:
     def palette_name(self):
         return os.path.basename(self.palette_path) if self.palette_path else ""
 
+    def used_yarns(self):
+        """{(yarn key, hex): [image hexes]} for colors assigned (or carried over) in this rug,
+        leaving out the selected color itself. Suggestions don't count."""
+        used = {}
+        if self.project:
+            for c in self.project.colors:
+                if c.confirmed and c.yarn and c.hex != self.selected_hex:
+                    k = (self.assignment_key(c.yarn), c.yarn["hex"].upper())
+                    used.setdefault(k, []).append(c.hex)
+        return used
+
     def yarn_in_palette(self, y):
         """Is this assignment's yarn (name + brand + hex) among the active yarns of the palette?"""
         key = self.assignment_key(y)
@@ -740,7 +752,7 @@ class App:
                             self.brands)
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
-        self.draw_info()
+        self.refresh()
 
     def unassign(self):
         if not (self.project and self.selected_hex):
@@ -749,7 +761,7 @@ class App:
         self.project.suggest(self.yarns, self.palette_name, self.brands, self.weight)
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
-        self.draw_info()  # stay on the same yarn; the button flips back to "Assign"
+        self.refresh()  # stay on the same yarn; the button flips back to "Assign"
 
     # ---------- actions ----------
     def on_hex_changed(self):
@@ -974,6 +986,42 @@ class App:
         if self.gray:
             c.create_rectangle(8, 8, 104, 30, fill="#2B2B2B", outline="")
             c.create_text(56, 19, text="Grayscale", font=("Segoe UI", 9, "bold"), fill="white")
+        if self.yarns:
+            others = self.used_yarns().get((yarn.key, yarn.hex), [])
+            if others:
+                self._draw_used_badge(c, mid + 8, h - 8, others, w - mid - 16)
+
+    def _draw_used_badge(self, c, x, bottom, hexes, room):
+        """'Already used for [#87BEEB] [#5A9646] and 2 more' at the bottom-left of the yarn,
+        listing as many colors as fit in `room` px."""
+        if not hasattr(self, "_badge_font"):
+            self._badge_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
+        font = self._badge_font
+
+        def layout(most):   # [(kind, text, x)], right edge
+            parts, cx = [], x + 10
+            rest = ["and %d more" % (len(hexes) - most)] if len(hexes) > most else []
+            for i, text in enumerate(["Already used for"] + hexes[:most] + rest):
+                if 0 < i <= most:
+                    parts.append(("box", text, cx))
+                    cx += 16
+                parts.append(("text", text, cx))
+                cx += font.measure(text) + (8 if i == 0 else 10)
+            return parts, cx
+
+        for most in range(min(3, len(hexes)), -1, -1):
+            parts, right = layout(most)
+            if right - x <= room:
+                break
+        y0, y1 = bottom - 24, bottom
+        c.create_rectangle(x, y0, right, y1, fill="#2B2B2B", outline="")
+        for kind, text, px in parts:
+            if kind == "box":
+                c.create_rectangle(px, y0 + 6, px + 12, y1 - 6, outline="white",
+                                   fill=display_color(parse_hex(text), self.gray))
+            else:
+                c.create_text(px, (y0 + y1) / 2, text=text, font=font, fill="white",
+                              anchor="w")
 
     def draw_info(self):
         entry = self.project.entry(self.selected_hex) if (self.project and self.selected_hex) \
@@ -1024,6 +1072,7 @@ class App:
             return
         slots = 2 * NEIGHBORS + 1
         sw = w / slots
+        used = self.used_yarns()
         for s in range(slots):
             i = self.index - NEIGHBORS + s
             if not 0 <= i < len(self.yarns):
@@ -1035,6 +1084,9 @@ class App:
             c.create_rectangle(x0, 2, x1, 52, fill=display_color(y.rgb, self.gray),
                                outline="#000" if current else "#BBB", width=3 if current else 1,
                                tags=tag)
+            if (y.key, y.hex) in used:   # already assigned to another color of this rug
+                c.create_oval(x1 - 15, 6, x1 - 5, 16, fill="#2B2B2B", outline="white",
+                              tags=tag)
             c.create_text((x0 + x1) / 2, 58, text=y.sku, width=sw - 6, anchor="n",
                           font=("Segoe UI", 8, "bold" if current else "normal"), tags=tag)
             c.tag_bind(tag, "<Button-1>", lambda e, i=i: self.jump_to(i))

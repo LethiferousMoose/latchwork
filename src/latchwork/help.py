@@ -57,6 +57,9 @@ Medium Brown wins. With weight 0 only ΔL² counts, and Delft Blue would win (0.
 # The ranking
 Every active yarn is scored and sorted: that list is the match ranking. The Match rank card shows where the yarn on screen sits in it; Next match (N) and Better match (B) walk down and up it, Home jumps back to #1.
 
+# Already used in this rug
+When the yarn on screen is already assigned (or carried over) to another color of this rug, a dark "Already used for" badge on the yarn lists those colors, and its tile in the strip below gets a dot. Two colors on one yarn become one color on the rug: fine for colors you want merged, worth a second look in a gradient. Suggestions don't count, and matching is unchanged.
+
 # Why 0.5
 Fitted on four of my finished rugs (48 color choices). Lightness only suggested my actual yarn 5 times out of 48; weight 0.5 suggested it 24 times and almost always had it in the top 3. In my picks lightness stays within about 3 L and hue within about 6°, while colorfulness drops a lot (yarn is duller than pixel art). Half weight tolerates that drop; a weight of 1 chases colorfulness and lets lightness drift.
 """),
