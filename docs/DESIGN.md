@@ -196,8 +196,15 @@ JSON, one cell per knot, safely escaped.
   bottom to top, left to right), ◀◀ ▶▶ jump a color run. Tapping the grid deliberately doesn't
   move the trackers (a stray touch mustn't lose your place). The view pans only when the
   tracked row / column is off screen.
-- Stored per pattern in the browser's local storage on that device: done marks, both trackers
-  (on/off and position), Symbols mode. Zoom and the tapped legend yarn are not stored.
+- Hooked cells: a tall Done button beside the tracker lines marks what's tracked (the rest of
+  the run with both trackers on, else the row or the column) and moves to the next one; on
+  something already fully marked it becomes Undo and clears it. Hooked cells get a white veil
+  and no symbol on screen (print ignores them). Progress shows in the header / yarn sheet,
+  knots left per yarn, and a yarn counts as done once all its knots are hooked (or ticked).
+  Kept as a bitset (one bit per cell, base64) in the saved state.
+- Stored per pattern in the browser's local storage on that device, keyed by project name and
+  image size: hooked cells, done marks, both trackers (on/off and position), Symbols mode.
+  Zoom and the tapped legend yarn are not stored.
 - Unassigned colors appear in their original color with a `?` symbol (export warns first).
 - Print: an overview plus pages of 50 × 70 holes on letter paper, labelled A1 (bottom-left), A2…
 

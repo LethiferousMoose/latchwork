@@ -58,6 +58,15 @@
   #rowbar { grid-area: rowbar; display: flex; flex-direction: column; gap: 6px;
     padding: 8px; background: var(--panel); border-top: 1px solid var(--line); }
   #rowbar .line { display: flex; align-items: center; justify-content: center; gap: 10px; }
+  /* the two tracker lines, with one tall Done button beside them (on the thumb side) */
+  #tracks { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px;
+    align-items: center; width: min(100%, 620px); margin: 0 auto; }
+  #doneBtn { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; min-width: 76px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0; padding: 4px 10px; line-height: 1.15; }
+  #doneBtn .ic { font-size: 20px; }
+  #doneBtn .what { font-size: 12px; color: var(--muted); }
+  #doneBtn.undo .ic, #doneBtn.undo .txt { color: var(--muted); }
   #rowbar .label { min-width: 150px; text-align: center; }
   #rowbar .label b { font-size: 18px; }
   #rowbar button.big { min-width: 56px; font-size: 18px; padding: 6px 14px; }
@@ -111,6 +120,8 @@
     #rowbar button { padding: 6px 9px; }
     #rowbar button.big { min-width: 42px; padding: 6px 8px; }
     #rowbar button.toggle { min-width: 80px; }
+    #tracks { gap: 6px 5px; width: 100%; }
+    #doneBtn { min-width: 62px; padding: 4px 6px; }
     #rowbar .long { display: none; }
     #rowbar .short { display: inline; }
     #readout { gap: 5px; width: 100%; }
@@ -173,6 +184,7 @@
       <span class="name" id="readName"></span><span class="run" id="readRun"></span></div>
     <button id="runNext" class="big" aria-label="Next color run" title="Next color run"><span class="dbl">▶︎▶︎</span></button>
   </div>
+  <div id="tracks">
   <div class="line">
     <button id="rowTrack" class="toggle" aria-pressed="false" title="Highlight one row at a time">Row</button>
     <button id="rowDown" class="big" aria-label="Row down">▼</button>
@@ -184,6 +196,8 @@
     <button id="colLeft" class="big" aria-label="Column left">◀︎</button>
     <span class="label" id="colLabel"></span>
     <button id="colRight" class="big" aria-label="Column right">▶︎</button>
+  </div>
+  <button id="doneBtn" title="Mark what's tracked as hooked, then move on (Enter)"><span class="ic" id="doneIc">✓</span><span class="txt" id="doneTxt">Done</span><span class="what" id="doneWhat"></span></button>
   </div>
 </div>
 
@@ -221,12 +235,27 @@ const fmt = n => n.toLocaleString("en-US");
 
 // ---------- saved state (per pattern, on this device) ----------
 const STORE = "latchwork:" + D.key;
-const state = { done: [], rowOn: false, row: 1, colOn: false, col: 1, sym: "auto" };
+// done: yarns ticked by hand; knotted: hooked cells, a bitset (cell index = row from the top * W + col)
+const state = { done: [], knotted: "", rowOn: false, row: 1, colOn: false, col: 1, sym: "auto" };
 try { Object.assign(state, JSON.parse(localStorage.getItem(STORE) || "{}")); } catch (e) {}
 // older patterns saved sym as true/false
 if (state.sym === true) state.sym = "auto";
 if (!SYM_MODES.includes(state.sym)) state.sym = "off";
-function save() { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} }
+const doneBits = new Uint8Array(Math.ceil(W * H / 8));
+try {
+  const b = atob(state.knotted || "");
+  if (b.length === doneBits.length) for (let i = 0; i < b.length; i++) doneBits[i] = b.charCodeAt(i);
+} catch (e) {}
+const isDone = i => (doneBits[i >> 3] >> (i & 7)) & 1;
+function setDone(i, on) {
+  if (on) doneBits[i >> 3] |= 1 << (i & 7); else doneBits[i >> 3] &= ~(1 << (i & 7));
+}
+function save() {
+  let b = "";
+  for (let i = 0; i < doneBits.length; i++) b += String.fromCharCode(doneBits[i]);
+  state.knotted = doneBits.some(v => v) ? btoa(b) : "";
+  try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {}
+}
 let sel = -1;   // highlighted yarn index, -1 = all
 
 // ---------- symbols: drawn shapes (consistent everywhere), then letters/numbers ----------
@@ -309,14 +338,29 @@ function buildBitmap(highlight, x0 = 0, y0 = 0, w = W, h = H) {
   return c;
 }
 let bitmap = buildBitmap(-1);
+// hooked cells: a white veil (1 pixel per cell), drawn over the pattern on screen only
+let doneLayer = null;
+function buildDoneLayer() {
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d"), img = g.createImageData(W, H), px = img.data;
+  let any = false;
+  for (let i = 0; i < W * H; i++) if (isDone(i)) {
+    px[4 * i] = px[4 * i + 1] = px[4 * i + 2] = 255; px[4 * i + 3] = 175; any = true;
+  }
+  g.putImageData(img, 0, 0);
+  doneLayer = any ? c : null;
+}
+buildDoneLayer();
 
 // ---------- grid drawing shared by screen and print ----------
 // opts: {x0, y0, w, h (cell window), s (px per cell), ox, oy (where cell x0,y0 lands), highlight,
-//        sym, bmp (bitmap of that window), clip: [vw, vh] or null}
+//        sym, bmp (bitmap of that window), clip: [vw, vh] or null, done: hooked-cell veil or null
+//        (screen only: whole pattern, hooked cells get no symbol)}
 function drawGrid(ctx, o) {
   const { s, ox, oy } = o;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(o.bmp, ox, oy, o.w * s, o.h * s);
+  if (o.done) ctx.drawImage(o.done, ox, oy, o.w * s, o.h * s);
   const vw = o.clip ? o.clip[0] : ox + o.w * s, vh = o.clip ? o.clip[1] : oy + o.h * s;
   const c0 = Math.max(0, Math.floor(-ox / s)), c1 = Math.min(o.w, Math.ceil((vw - ox) / s));
   const r0 = Math.max(0, Math.floor(-oy / s)), r1 = Math.min(o.h, Math.ceil((vh - oy) / s));
@@ -326,8 +370,8 @@ function drawGrid(ctx, o) {
   const symMin = o.sym === "always" ? SYM_FLOOR : SYM_MIN;
   if (o.sym && o.sym !== "off" && s >= symMin) {
     for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) {
-      const v = cells[(o.y0 + r) * W + o.x0 + c];
-      if (v === NONE || (o.highlight >= 0 && v !== o.highlight)) continue;
+      const i = (o.y0 + r) * W + o.x0 + c, v = cells[i];
+      if (v === NONE || (o.highlight >= 0 && v !== o.highlight) || (o.done && isDone(i))) continue;
       drawSymbol(ctx, v, ox + (c + .5) * s, oy + (r + .5) * s, s, Y[v].ink);
     }
   }
@@ -388,7 +432,7 @@ function paint() {
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = "#DADADA"; g.fillRect(0, 0, vw, vh);
   drawGrid(g, { x0: 0, y0: 0, w: W, h: H, s: scale, ox, oy, highlight: sel, sym: state.sym,
-                bmp: bitmap, clip: [vw, vh] });
+                bmp: bitmap, clip: [vw, vh], done: doneLayer });
   // trackers: dim everything but the tracked row and/or column
   if (state.rowOn || state.colOn) {
     const ry = oy + (H - state.row) * scale, cx = ox + (state.col - 1) * scale;
@@ -525,8 +569,6 @@ function buildLegend() {
     const txt = document.createElement("div"); txt.className = "txt";
     const name = document.createElement("div"); name.className = "name"; name.textContent = y.name;
     const meta = document.createElement("div"); meta.className = "meta";
-    meta.textContent = y.unassigned ? fmt(y.count) + " · not assigned to a yarn yet"
-      : [y.brand, fmt(y.count) + " knots", y.need].filter(Boolean).join(" · ");
     txt.append(name, meta); li.appendChild(txt);
     const lab = document.createElement("label"); lab.className = "done";
     const cb = document.createElement("input"); cb.type = "checkbox";
@@ -545,14 +587,33 @@ function buildLegend() {
   });
   refreshLegend();
 }
+// knots hooked so far, per yarn and in all
+let hooked = [], hookedAll = 0, knotsAll = 0;
+function countHooked() {
+  hooked = Y.map(() => 0); hookedAll = 0; knotsAll = 0;
+  for (let i = 0; i < W * H; i++) {
+    const v = cells[i];
+    if (v === NONE) continue;
+    knotsAll++;
+    if (isDone(i)) { hooked[v]++; hookedAll++; }
+  }
+}
+// a yarn is done when ticked by hand, or when every one of its knots is marked hooked
+const yarnDone = i => state.done.includes(Y[i].id || Y[i].name) || (Y[i].count > 0 && hooked[i] >= Y[i].count);
 function refreshLegend() {
   [...list.children].forEach(li => {
-    const i = +li.dataset.i;
+    const i = +li.dataset.i, y = Y[i], left = y.count - hooked[i];
     li.classList.toggle("sel", i === sel);
-    li.classList.toggle("done", state.done.includes(Y[i].id || Y[i].name));
+    li.classList.toggle("done", yarnDone(i));
+    const cb = li.querySelector("input");
+    cb.checked = yarnDone(i); cb.disabled = hooked[i] >= y.count && y.count > 0;
+    const knots = hooked[i] && left > 0 ? fmt(left) + " of " + fmt(y.count) + " knots left"
+      : fmt(y.count) + " knots";
+    li.querySelector(".meta").textContent = y.unassigned ? knots + " · not assigned to a yarn yet"
+      : [y.brand, knots, y.need].filter(Boolean).join(" · ");
   });
   const real = Y.filter(y => !y.unassigned);
-  const done = real.filter(y => state.done.includes(y.id || y.name)).length;
+  const done = Y.filter((y, i) => !y.unassigned && yarnDone(i)).length;
   document.getElementById("legendCount").textContent =
     real.length + " yarn" + (real.length === 1 ? "" : "s") + " · " + done + " done";
 }
@@ -566,9 +627,15 @@ document.getElementById("showAll").onclick = () => highlight(-1);
 
 // ---------- header, toolbar, row tracker ----------
 document.getElementById("title").textContent = D.name;
-document.getElementById("sub").textContent = document.getElementById("legendInfo").textContent =
-  W + " × " + H + " holes · " + fmt(D.knots) + " knots · finished " + D.finished +
-  " · canvas " + D.canvas;
+function refreshProgress() {   // header (desktop) and the top of the yarn sheet (phone)
+  countHooked();
+  const pct = knotsAll ? Math.floor(100 * hookedAll / knotsAll) : 0;
+  document.getElementById("sub").textContent = document.getElementById("legendInfo").textContent =
+    W + " × " + H + " holes · " + fmt(D.knots) + " knots · finished " + D.finished +
+    " · canvas " + D.canvas + (hookedAll ? " · " + fmt(hookedAll) + " of " + fmt(knotsAll) +
+    " hooked (" + pct + "%)" : "");
+  if (list.children.length) refreshLegend();
+}
 const symBtn = document.getElementById("symBtn");
 function syncSym() {
   symBtn.setAttribute("aria-pressed", state.sym === "off" ? "false" : "true");
@@ -616,6 +683,46 @@ function syncTrack() {
     $("readName").textContent = v === NONE ? "Empty (no knot)" : Y[v].name;
     $("readRun").innerHTML = "· <b>" + n + "</b>";   // what's left of the run, this cell included
   }
+  syncDone();
+}
+// Done marks what's tracked: the rest of the run (both trackers), the row, or the column.
+function doneTarget() {
+  const idx = [], r = H - state.row;
+  if (state.rowOn && state.colOn) {
+    const [, last] = runAt(state.row, state.col);
+    for (let c = state.col; c <= last; c++) idx.push(r * W + c - 1);
+    return { idx, what: "run", next: () => jumpRun(1) };
+  }
+  if (state.rowOn) {
+    for (let c = 0; c < W; c++) idx.push(r * W + c);
+    return { idx, what: "row", next: () => moveRow(1) };
+  }
+  if (state.colOn) {
+    for (let y = 0; y < H; y++) idx.push(y * W + state.col - 1);
+    return { idx, what: "column", next: () => moveCol(1) };
+  }
+  return null;
+}
+function syncDone() {
+  const t = doneTarget(), btn = $("doneBtn"), undo = !!t && t.idx.every(isDone);
+  btn.disabled = !t;
+  btn.classList.toggle("undo", undo);
+  $("doneIc").textContent = undo ? "\u21BA\uFE0E" : "\u2713";
+  $("doneTxt").textContent = undo ? "Undo" : "Done";
+  $("doneWhat").textContent = t ? t.what : "";
+  btn.title = !t ? "Turn on a tracker to mark rows, columns or runs as hooked"
+    : undo ? "This " + t.what + " is marked hooked; press to clear it"
+    : "Mark this " + t.what + " as hooked, then move on (Enter)";
+}
+// Not done yet: mark it and move to the next one. Already done: clear it and stay put.
+function markDone() {
+  const t = doneTarget();
+  if (!t) return;
+  const undo = t.idx.every(isDone);
+  t.idx.forEach(i => setDone(i, !undo));
+  buildDoneLayer(); refreshProgress();
+  toast((t.what[0].toUpperCase() + t.what.slice(1)) + (undo ? " cleared" : " marked hooked"));
+  if (undo) changed(); else t.next();   // both end in changed(): saves, redraws, updates the button
 }
 function showCell() {   // pan only when the tracked row / column is (partly) off screen
   if (state.rowOn) {
@@ -657,12 +764,14 @@ $("colLeft").onclick = () => moveCol(-1);
 $("colRight").onclick = () => moveCol(1);
 $("runBack").onclick = () => jumpRun(-1);
 $("runNext").onclick = () => jumpRun(1);
+$("doneBtn").onclick = markDone;
 document.addEventListener("keydown", e => {
   const k = e.key;
   if (k === "ArrowUp") moveRow(1);
   else if (k === "ArrowDown") moveRow(-1);
   else if (k === "ArrowLeft") e.shiftKey ? jumpRun(-1) : moveCol(-1);
   else if (k === "ArrowRight") e.shiftKey ? jumpRun(1) : moveCol(1);
+  else if (k === "Enter" && e.target.tagName !== "BUTTON" && !dlg.classList.contains("open")) markDone();
   else if (k === "Escape") { highlight(-1); closePrint(); return; }
   else return;
   e.preventDefault();
@@ -778,7 +887,7 @@ document.getElementById("pGo").onclick = doPrint;
 window.addEventListener("afterprint", () => { document.getElementById("printArea").innerHTML = ""; });
 
 // ---------- start ----------
-syncSym(); syncTrack(); buildLegend();
+syncSym(); syncTrack(); refreshProgress(); buildLegend();
 window.addEventListener("resize", () => { resize(); });
 resize(); fit();
 document.documentElement.setAttribute("data-ready", "1");
