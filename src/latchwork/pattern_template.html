@@ -614,7 +614,7 @@ function syncTrack() {
     g.fillStyle = v === NONE ? EMPTY : Y[v].hex; g.fillRect(0, 0, 60, 60);
     if (v !== NONE) drawSymbol(g, v, 30, 30, 60, Y[v].ink);
     $("readName").textContent = v === NONE ? "Empty (no knot)" : Y[v].name;
-    $("readRun").innerHTML = "· <b>" + n + "</b>" + (n > 1 ? " (cols " + state.col + "–" + last + ")" : "");
+    $("readRun").innerHTML = "· <b>" + n + "</b>";   // what's left of the run, this cell included
   }
 }
 function showCell() {   // pan only when the tracked row / column is (partly) off screen
