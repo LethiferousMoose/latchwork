@@ -368,11 +368,15 @@ function drawGrid(ctx, o) {
   // symbols
   // o.sym: "auto"/true = only when cells are big enough, "always" = down to SYM_FLOOR
   const symMin = o.sym === "always" ? SYM_FLOOR : SYM_MIN;
+  // The widest symbols (outlined star, hexagon) reach 0.47 of their size from the centre. Keep
+  // 1.5 px clear of the cell edge (the bold 10-line is 2 px, centred on the edge), but never
+  // shrink a symbol below 72% of the cell, where it would stop being readable.
+  const symSize = Math.min(s, Math.max(s * 0.72, (s / 2 - 1.5) / 0.47));
   if (o.sym && o.sym !== "off" && s >= symMin) {
     for (let r = r0; r < r1; r++) for (let c = c0; c < c1; c++) {
       const i = (o.y0 + r) * W + o.x0 + c, v = cells[i];
       if (v === NONE || (o.highlight >= 0 && v !== o.highlight) || (o.done && isDone(i))) continue;
-      drawSymbol(ctx, v, ox + (c + .5) * s, oy + (r + .5) * s, s, Y[v].ink);
+      drawSymbol(ctx, v, ox + (c + .5) * s, oy + (r + .5) * s, symSize, Y[v].ink);
     }
   }
   // grid lines: thin per cell when large enough, bold every 10 (rows counted from the bottom)
@@ -455,28 +459,25 @@ function paint() {
   g.fillRect(0, 0, vw, GT); g.fillRect(0, 0, GL, vh);
   g.fillStyle = "#555"; g.font = "11px Segoe UI, Arial, sans-serif"; g.textBaseline = "middle";
   g.textAlign = "center";
-  const cs = labelStep(scale, 26);
+  // a label needs its own width plus a gap; numbers near the tracked one give way to it
+  const colGap = g.measureText(String(W)).width + 14, rowGap = 18;
+  const tx = ox + (state.col - .5) * scale, ty = oy + (H - state.row + .5) * scale;
+  const cs = labelStep(scale, colGap);
   for (let c = cs; c <= W; c += cs) {
     const x = ox + (c - .5) * scale;
-    if (x > GL - 4 && x < vw && !(state.colOn && c === state.col)) g.fillText(String(c), x, GT / 2);
+    if (x > GL - 4 && x < vw && !(state.colOn && Math.abs(x - tx) < colGap)) g.fillText(String(c), x, GT / 2);
   }
-  if (state.colOn) {   // always label the tracked column
-    const x = ox + (state.col - .5) * scale;
-    if (x > GL && x < vw) { g.fillStyle = "#E53935"; g.fillText(String(state.col), x, GT / 2); }
-    g.fillStyle = "#555";
+  if (state.colOn && tx > GL && tx < vw) {   // always label the tracked column
+    g.fillStyle = "#E53935"; g.fillText(String(state.col), tx, GT / 2); g.fillStyle = "#555";
   }
   g.textAlign = "right";
-  const rs = labelStep(scale, 15);
+  const rs = labelStep(scale, rowGap);
   for (let rn = rs; rn <= H; rn += rs) {
     const y = oy + (H - rn + .5) * scale;
-    if (y > GT - 4 && y < vh) {
-      g.fillStyle = state.rowOn && rn === state.row ? "#E53935" : "#555";
-      g.fillText(String(rn), GL - 6, y);
-    }
+    if (y > GT - 4 && y < vh && !(state.rowOn && Math.abs(y - ty) < rowGap)) g.fillText(String(rn), GL - 6, y);
   }
-  if (state.rowOn && rs > 1) {   // always label the tracked row
-    const y = oy + (H - state.row + .5) * scale;
-    if (y > GT && y < vh) { g.fillStyle = "#E53935"; g.fillText(String(state.row), GL - 6, y); }
+  if (state.rowOn && ty > GT && ty < vh) {   // always label the tracked row
+    g.fillStyle = "#E53935"; g.fillText(String(state.row), GL - 6, ty);
   }
   g.fillStyle = "rgba(250,250,250,1)"; g.fillRect(0, 0, GL, GT);
   g.strokeStyle = "#BBB"; g.lineWidth = 1;
