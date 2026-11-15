@@ -61,6 +61,7 @@
   #rowbar button.big { min-width: 56px; font-size: 18px; padding: 6px 14px; }
   #rowbar button.toggle { min-width: 132px; }
   #rowbar .short { display: none; }
+  #rowbar .dbl { letter-spacing: -.42em; margin-right: .42em; }   /* two triangles as one icon */
   /* both trackers on: what's in the tracked cell, and how many of it run to the right */
   #readout { display: none; align-items: center; justify-content: center; gap: 10px;
     font-size: 15px; min-height: 34px; }
@@ -168,11 +169,11 @@
   </div>
   <div class="line">
     <button id="colTrack" class="toggle" aria-pressed="false" title="Highlight one column at a time; with the row tracker, read one cell"><span class="long">Column tracker</span><span class="short">Col</span></button>
-    <button id="runBack" class="big" aria-label="Start of this or the previous color run" title="Previous color run">«</button>
-    <button id="colLeft" class="big" aria-label="Column left">◀</button>
+    <button id="runBack" class="big" aria-label="Start of this or the previous color run" title="Previous color run"><span class="dbl">◀︎◀︎</span></button>
+    <button id="colLeft" class="big" aria-label="Column left">◀︎</button>
     <span class="label" id="colLabel"></span>
-    <button id="colRight" class="big" aria-label="Column right">▶</button>
-    <button id="runNext" class="big" aria-label="Next color run" title="Next color run">»</button>
+    <button id="colRight" class="big" aria-label="Column right">▶︎</button>
+    <button id="runNext" class="big" aria-label="Next color run" title="Next color run"><span class="dbl">▶︎▶︎</span></button>
   </div>
 </div>
 

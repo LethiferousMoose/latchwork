@@ -193,7 +193,7 @@ JSON, one cell per knot, safely escaped.
 - Done checkmarks per yarn, a row tracker and a column tracker. With both trackers on, a
   readout names the yarn in the cell where they cross and how many cells of it run to the
   right; ◀ ▶ step a cell and wrap to the next row up / back down at the row ends (hooking goes
-  bottom to top, left to right), « » jump a color run. Tapping the grid deliberately doesn't
+  bottom to top, left to right), ◀◀ ▶▶ jump a color run. Tapping the grid deliberately doesn't
   move the trackers (a stray touch mustn't lose your place). The view pans only when the
   tracked row / column is off screen.
 - Stored per pattern in the browser's local storage on that device: done marks, both trackers
