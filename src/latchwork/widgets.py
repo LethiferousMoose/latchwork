@@ -13,6 +13,70 @@ UI_FONT = ("Segoe UI", 10)
 VALUE_FONT = ("Consolas", 11)
 
 
+class Tooltip:
+    """Hover popup for a widget. content(event) returns None (nothing to show) or
+    (title, rows), rows = [(swatch hexes, text)]. Shown after a short pause; it changes when
+    the content under the pointer changes (e.g. another table row)."""
+
+    DELAY = 400   # ms
+    BG = "#FFFFF0"
+
+    def __init__(self, widget, content):
+        self.widget, self.content = widget, content
+        self.tip = self.job = self.key = None
+        widget.bind("<Motion>", self._motion, add="+")
+        widget.bind("<Leave>", lambda e: self.hide(), add="+")
+        widget.bind("<ButtonPress>", lambda e: self.hide(), add="+")
+
+    def _motion(self, event):
+        c = self.content(event)
+        key = repr(c) if c else None
+        if key == self.key:
+            return
+        self.hide()
+        self.key = key
+        if c:
+            x, y = event.x_root, event.y_root
+            self.job = self.widget.after(self.DELAY, lambda: self.show(c, x, y))
+
+    def show(self, content, x, y):
+        self.job = None
+        title, rows = content
+        tip = self.tip = tk.Toplevel(self.widget)
+        tip.wm_overrideredirect(True)
+        box = tk.Frame(tip, bg=self.BG, padx=8, pady=6, highlightthickness=1,
+                       highlightbackground="#999")
+        box.pack()
+        box.columnconfigure(1, weight=1)   # a long title widens the text, not the swatches
+        if title:
+            tk.Label(box, text=title, font=("Segoe UI", 9, "bold"), bg=self.BG, anchor="w",
+                     justify="left").grid(row=0, column=0, columnspan=2, sticky="w",
+                                          pady=(0, 3))
+        for r, (swatches, text) in enumerate(rows, start=1):
+            sw = tk.Frame(box, bg=self.BG)
+            sw.grid(row=r, column=0, sticky="w", padx=(0, 6), pady=1)
+            for hx in swatches:
+                tk.Frame(sw, bg=hx, width=14, height=12, highlightthickness=1,
+                         highlightbackground="#888").pack(side="left", padx=(0, 2))
+            tk.Label(box, text=text, font=("Segoe UI", 9), bg=self.BG, anchor="w",
+                     justify="left").grid(row=r, column=1, sticky="w")
+        tip.update_idletasks()
+        w, h = tip.winfo_reqwidth(), tip.winfo_reqheight()
+        sw_, sh = tip.winfo_screenwidth(), tip.winfo_screenheight()
+        x = min(x + 14, sw_ - w - 4)
+        y = y + 18 if y + 18 + h < sh else max(0, y - h - 8)
+        tip.wm_geometry("+%d+%d" % (x, y))
+
+    def hide(self):
+        if self.job:
+            self.widget.after_cancel(self.job)
+            self.job = None
+        if self.tip:
+            self.tip.destroy()
+            self.tip = None
+        self.key = None
+
+
 class StatCard(tk.Frame):
     """A small boxed readout: caption, big value, short explanatory note."""
 

@@ -163,6 +163,9 @@ A `.latchwork` file is readable JSON:
 ## Planning (`plan.py`)
 
 - Only **assigned** colors are counted. Colors sharing a yarn are added up before rounding.
+  Such merged yarns are highlighted in the table; the note below it is one line however
+  many there are (so the table and sizes never get pushed out), and tooltips on the rows
+  and the note list the image colors.
 - Pre-cut yarn: `packs = ceil(knots × (1 + spare%) / pack size)`. Cut from skeins: the number of
   pieces. No skein estimates.
 - Canvas, per project (defaults: 3.75 holes per inch, borders 3 per side, 8 top, 4 bottom):

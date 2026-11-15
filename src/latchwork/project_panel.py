@@ -7,6 +7,7 @@ from tkinter import ttk
 from . import plan as pl
 from .palette import label as yarn_label
 from .colormath import gray_for_lightness, lightness, parse_hex, to_hex
+from .widgets import Tooltip
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
@@ -204,6 +205,9 @@ class ProjectPanel(tk.Frame):
                                   stretch=(col == "#0"))
         self.plan_tree.tag_configure("merged", background="#FFF4CC")
         _scrolled(body, self.plan_tree)
+        self._plan = None
+        Tooltip(self.plan_tree, self._merged_row_tip)
+        Tooltip(self.notes, self._merged_summary_tip)
 
     # ---------- project ----------
     def show_welcome(self):
@@ -340,7 +344,7 @@ class ProjectPanel(tk.Frame):
     def refresh_plan(self):
         if not self.project:
             return
-        plan = pl.Plan(self.project, self.app.resolve)
+        plan = self._plan = pl.Plan(self.project, self.app.resolve)
         cv = plan.canvas
         self.canvas_note.config(text="%g holes/inch · borders: %d each side, %d top, %d bottom"
                                 % (cv["holes_per_inch"], cv["border_side"], cv["border_top"],
@@ -376,10 +380,34 @@ class ProjectPanel(tk.Frame):
             notes.append("Not counted yet: %d unassigned color%s (%s)." % (
                 len(plan.unassigned), "" if len(plan.unassigned) == 1 else "s",
                 format(plan.unassigned_count, ",")))
-        for l in plan.merged:
-            notes.append("Merged: %s is used for %d image colors (%s)." % (
-                l.name, len(l.colors), ", ".join(l.colors)))
+        if plan.merged:   # one line, however many: details are in the tooltips
+            n = len(plan.merged)
+            notes.append("%d yarn%s used for more than one image color (highlighted; point at "
+                         "it for the colors)." % (n, " is" if n == 1 else "s are"))
         self.notes.config(text="\n".join(notes))
+
+    # ---------- merged-yarn tooltips ----------
+    def _merged_row_tip(self, event):
+        row = self.plan_tree.identify_row(event.y)
+        if not (row and self._plan) or self.plan_tree.identify_region(event.x, event.y) \
+                not in ("tree", "cell"):
+            return None
+        line = self._plan.lines[int(row)]
+        if not line.merged:
+            return None
+        rows = []
+        for hx in line.colors:
+            n = self.project.entry(hx).count
+            rows.append(([hx], "%s  \u00B7  %s knot%s" % (hx, format(n, ","),
+                                                         "" if n == 1 else "s")))
+        return "%s is used for %d image colors" % (line.label, len(line.colors)), rows
+
+    def _merged_summary_tip(self, event):
+        if not (self._plan and self._plan.merged):
+            return None
+        return ("Yarns used for more than one image color",
+                [([l.hex] + l.colors, "%s:  %s" % (l.label, ", ".join(l.colors)))
+                 for l in self._plan.merged])
 
     def edit_canvas(self):
         if not self.project:

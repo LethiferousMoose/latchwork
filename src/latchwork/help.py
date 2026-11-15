@@ -127,7 +127,7 @@ The Plan tab counts assigned colors only; unassigned ones are listed as not coun
 - Pre-cut yarn: packs = knots (plus spare) ÷ pack size, rounded up. Colors sharing a yarn are added up first.
 - Cut from skeins: the number of pieces to cut.
 - Spare: a percentage added to every count.
-- Merged colors (two image colors on one yarn) are highlighted. That's often intended.
+- Merged colors (two image colors on one yarn) are highlighted. That's often intended. Point at a highlighted row to see its image colors, or at the note below the table for all of them.
 
 # Canvas
 Settings are per project (Plan tab → Change…), with "Also use these for new projects".
