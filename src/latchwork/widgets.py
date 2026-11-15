@@ -40,18 +40,46 @@ class Tooltip:
             self.job = self.widget.after(self.DELAY, lambda: self.show(c, x, y))
 
     def show(self, content, x, y):
+        """Open near the pointer, kept inside the app window (which on a maximized window is
+        the monitor it's on, minus the taskbar): below the pointer, else above, and when the
+        list is taller than the window, as many rows as fit plus '...and N more'."""
         self.job = None
         title, rows = content
-        tip = self.tip = tk.Toplevel(self.widget)
+        win = self.widget.winfo_toplevel()
+        bx0, by0 = win.winfo_rootx(), win.winfo_rooty()
+        bx1, by1 = bx0 + win.winfo_width(), by0 + win.winfo_height()
+        tip, h = self._build(title, rows)
+        if h > by1 - by0 - 8 and len(rows) > 1:
+            per_row = (h - self._title_h) / len(rows)
+            fit = max(1, int((by1 - by0 - 8 - self._title_h) / per_row) - 1)
+            tip.destroy()
+            tip, h = self._build(title, rows[:fit] + [
+                ([], "\u2026and %d more" % (len(rows) - fit))])
+        self.tip = tip
+        w = tip.winfo_reqwidth()
+        x = max(bx0, min(x + 14, bx1 - w - 4))
+        if y + 18 + h <= by1:
+            y += 18                      # below the pointer
+        elif y - h - 8 >= by0:
+            y -= h + 8                   # above it
+        else:
+            y = max(by0, by1 - h)        # taller than either side: as low as fits
+        tip.wm_geometry("+%d+%d" % (x, y))
+        tip.deiconify()
+
+    def _build(self, title, rows):
+        tip = tk.Toplevel(self.widget)
         tip.wm_overrideredirect(True)
+        tip.withdraw()                   # measured first, shown once placed
         box = tk.Frame(tip, bg=self.BG, padx=8, pady=6, highlightthickness=1,
                        highlightbackground="#999")
         box.pack()
         box.columnconfigure(1, weight=1)   # a long title widens the text, not the swatches
+        head = None
         if title:
-            tk.Label(box, text=title, font=("Segoe UI", 9, "bold"), bg=self.BG, anchor="w",
-                     justify="left").grid(row=0, column=0, columnspan=2, sticky="w",
-                                          pady=(0, 3))
+            head = tk.Label(box, text=title, font=("Segoe UI", 9, "bold"), bg=self.BG,
+                            anchor="w", justify="left")
+            head.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 3))
         for r, (swatches, text) in enumerate(rows, start=1):
             sw = tk.Frame(box, bg=self.BG)
             sw.grid(row=r, column=0, sticky="w", padx=(0, 6), pady=1)
@@ -61,11 +89,8 @@ class Tooltip:
             tk.Label(box, text=text, font=("Segoe UI", 9), bg=self.BG, anchor="w",
                      justify="left").grid(row=r, column=1, sticky="w")
         tip.update_idletasks()
-        w, h = tip.winfo_reqwidth(), tip.winfo_reqheight()
-        sw_, sh = tip.winfo_screenwidth(), tip.winfo_screenheight()
-        x = min(x + 14, sw_ - w - 4)
-        y = y + 18 if y + 18 + h < sh else max(0, y - h - 8)
-        tip.wm_geometry("+%d+%d" % (x, y))
+        self._title_h = (head.winfo_reqheight() + 3 if head else 0) + 14   # + box padding
+        return tip, tip.winfo_reqheight()
 
     def hide(self):
         if self.job:
