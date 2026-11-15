@@ -21,7 +21,7 @@ tidied so others can use it too. Keep it simple.
   `latchwork.bat` / `.command` / `.sh` wrap it per OS (`.gitattributes` keeps their line endings).
 - `src/latchwork/`: the package, relative imports. `app.py` is the main window; `colormath`,
   `palette`, `project`, `plan`, `pattern`, `pixelart` have no Tk; `palette_window`,
-  `project_panel`, `widgets`, `help` are Tk UI. `pattern_template.html` is the phone pattern.
+  `project_panel`, `carry_window`, `widgets`, `help` are Tk UI. `pattern_template.html` is the phone pattern.
 - `data/`: palettes (`palette.csv` + `palette.brands.csv`, my real yarns).
 - `settings/`: per-user settings (git-ignored).
 - `tests/`: `python -m unittest discover -s tests` (adds `src/` to the path).

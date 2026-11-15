@@ -12,6 +12,7 @@ from . import pattern
 from . import plan as pl
 from .colormath import (DEFAULT_COLOR_WEIGHT, gray_for_lightness, match_order, parse_hex,
                        rgb_to_lab, rgb_to_lch, to_hex)
+from .carry_window import CarryDialog
 from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
@@ -202,6 +203,7 @@ class App:
                               command=self.new_project)
         file_menu.add_command(label="Open project...", accelerator="Ctrl+O",
                               command=self.open_project)
+        file_menu.add_command(label="Carry over assignments...", command=self.carry_over)
         file_menu.add_command(label="Close project", command=self.close_project)
         file_menu.add_separator()
         file_menu.add_command(label="Export pattern (phone / print)...", accelerator="Ctrl+E",
@@ -613,9 +615,33 @@ class App:
             return
         project.path = path
         project.settings.update(read_settings().get("canvas_defaults") or {})
+        # optional: start from an earlier rug's assignments (the open project is offered first)
+        earlier = [self.project.path] if self.project else []
+        self._apply_carry(CarryDialog(self.root, self, project, earlier, skip_text="Skip").result,
+                          project)
         project.suggest(self.yarns, self.palette_name, self.brands, self.weight)
         if self.save_project(project):
             self.show_project(project)
+
+    def carry_over(self):
+        """File menu: carry assignments from earlier projects into the open one."""
+        if not self._need_project("carry over assignments"):
+            return
+        picks = CarryDialog(self.root, self, self.project).result
+        if not picks:
+            return
+        self._apply_carry(picks, self.project)
+        self.save_project()
+        self.sidebar.refresh_rows()
+        self.sidebar.refresh_plan()
+        self.sidebar.render_image()
+        if self.selected_hex:
+            self._goto_entry(self.project.entry(self.selected_hex))
+
+    @staticmethod
+    def _apply_carry(picks, project):
+        for hex_, yarn, source in picks or ():
+            project.carry(hex_, yarn, source)
 
     def open_project(self, path=None):
         if path is None:

@@ -255,7 +255,7 @@ class ProjectPanel(tk.Frame):
             self.row_images[key] = _pair_image(c.hex, yhex)
         name = yarn_label(c.yarn["name"], c.yarn.get("brand")) if c.yarn \
             else "(no yarns in palette)"
-        state = "assigned" if c.confirmed else "suggested"
+        state = ("carried over" if c.carried else "assigned") if c.confirmed else "suggested"
         self.tree.item(hex_, text="  " + c.hex, image=self.row_images[key],
                        values=(format(c.count, ","), name, state),
                        tags=() if c.confirmed else ("suggested",))
@@ -313,7 +313,9 @@ class ProjectPanel(tk.Frame):
         self.info_title.config(text="%s  \u2192  %s" % (c.hex, yarn_label(y["name"],
                                                                           y.get("brand"))))
         if c.confirmed:
-            sub = "Assigned \u00B7 %s \u00B7 from %s" % (y["hex"], y.get("palette") or "?")
+            sub = "%s \u00B7 %s \u00B7 from %s" % (
+                "Carried over from " + c.carried if c.carried else "Assigned", y["hex"],
+                y.get("palette") or "?")
             if not self.app.yarn_in_palette(y):
                 sub += "\nNot in the open palette."
         else:

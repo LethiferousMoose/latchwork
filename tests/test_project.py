@@ -190,6 +190,34 @@ class TestProject(unittest.TestCase):
         self.assertEqual((q.entry("#FFFFFF").yarn["brand"], q.entry("#FFFFFF").yarn["pack"]),
                          ("Hershner's", 320))
 
+    def test_carry_over(self):
+        old1, old2 = self.new(), self.new()
+        old1.assign("#C86432", self.yarns[1], "palette.csv")        # Orange
+        old1.assign("#000000", self.yarns[3], "palette.csv")        # same pick in both
+        old2.assign("#000000", self.yarns[3], "palette.csv")
+        old2.assign("#FFFFFF", self.yarns[0], "palette.csv")
+        old2.assign("#C86432", self.yarns[2], "palette.csv")        # conflict with old1
+        p = self.new()
+        p.assign("#0A141E", self.yarns[2], "palette.csv")           # mine: never offered
+        opts = p.carry_options([("rug2", old2), ("rug1", old1)])    # newest first
+        self.assertEqual(sorted(opts), ["#000000", "#C86432", "#FFFFFF"])
+        self.assertEqual(len(opts["#000000"]), 1)                   # same yarn: no conflict
+        self.assertEqual([(n, y["name"]) for n, y in opts["#C86432"]],
+                         [("rug2", self.yarns[2].sku), ("rug1", "Orange")])
+        name, y = opts["#C86432"][1]
+        p.carry("#C86432", y, name)
+        p.save()
+        q = Project.load(self.path)
+        e = q.entry("#C86432")
+        self.assertEqual((e.yarn["name"], e.confirmed, e.carried), ("Orange", True, "rug1"))
+        self.assertIsNone(q.entry("#0A141E").carried)
+        q.assign("#C86432", self.yarns[2], "palette.csv")           # my own pick now
+        self.assertIsNone(q.entry("#C86432").carried)
+        q.carry("#FFFFFF", opts["#FFFFFF"][0][1], "rug2")
+        q.unassign("#FFFFFF")
+        self.assertIsNone(q.entry("#FFFFFF").carried)
+        self.assertNotIn("carried_from", q.entry("#FFFFFF").to_json())
+
     def test_file_is_readable_json(self):
         p = self.new()
         p.save()

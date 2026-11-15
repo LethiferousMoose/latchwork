@@ -10,7 +10,7 @@ File format (JSON, version 1):
   "colors": [{"hex": "#88A048", "count": 123,
               "yarn": {"name": "Sage", "brand": "Loops & Threads", "pack": null,
                        "hex": "#959A78", "palette": "palette.csv"} | null,
-              "confirmed": true}],
+              "confirmed": true, "carried_from": "mario-1"}],   # carried_from: optional
   "settings": {"spare_percent": 0, "holes_per_inch": 3.75, "border_side": 3, ...}
 }
 """
@@ -21,7 +21,7 @@ import tempfile
 
 from . import pixelart
 from .colormath import lightness, match_order, parse_hex, rgb_to_lab
-from .palette import effective_pack, legacy_assignment
+from .palette import effective_pack, legacy_assignment, yarn_key
 
 FORMAT = "latchwork-project"
 VERSION = 1
@@ -37,10 +37,14 @@ class ColorEntry:
         self.L = lightness(*self.rgb)
         self.yarn = yarn            # {"name", "hex", "palette"} or None
         self.confirmed = confirmed  # True once I press Assign; False = a suggestion
+        self.carried = None         # name of the project this assignment was carried over from
 
     def to_json(self):
-        return {"hex": self.hex, "count": self.count, "yarn": self.yarn,
-                "confirmed": self.confirmed}
+        d = {"hex": self.hex, "count": self.count, "yarn": self.yarn,
+             "confirmed": self.confirmed}
+        if self.carried and self.confirmed:
+            d["carried_from"] = self.carried
+        return d
 
 
 class Project:
@@ -110,6 +114,8 @@ class Project:
                     entry.yarn = {"name": name, "brand": brand, "pack": pack,
                                   "hex": y["hex"].upper(), "palette": y.get("palette", "")}
                     entry.confirmed = bool(s.get("confirmed"))
+                    if entry.confirmed and s.get("carried_from"):
+                        entry.carried = str(s["carried_from"])
         project.settings.update(doc.get("settings") or {})
         return project
 
@@ -163,11 +169,45 @@ class Project:
         c = self.entry(hex_)
         c.yarn = self.snapshot(yarn, palette_name, brands)
         c.confirmed = True
+        c.carried = None
 
     def unassign(self, hex_):
         """Back to a suggestion (filled in by the next suggest())."""
         c = self.entry(hex_)
         c.confirmed = False
+        c.carried = None
+
+    # ---------- carry over from earlier projects ----------
+    def carry_options(self, sources):
+        """What earlier projects could carry over into this one, by exact hex.
+
+        sources: [(name, Project)], newest first. Only colors not assigned here yet are
+        considered. Returns {hex: [(source name, yarn snapshot), ...]}: one option per distinct
+        yarn (name + brand + hex), newest source first; more than one option is a conflict."""
+        out = {}
+        for c in self.colors:
+            if c.confirmed:
+                continue
+            options, seen = [], set()
+            for name, src in sources:
+                e = src.entry(c.hex)
+                if not (e and e.confirmed and e.yarn):
+                    continue
+                y = e.yarn
+                key = (yarn_key(y["name"], y.get("brand") or ""), y["hex"].upper())
+                if key not in seen:
+                    seen.add(key)
+                    options.append((name, dict(y)))
+            if options:
+                out[c.hex] = options
+        return out
+
+    def carry(self, hex_, yarn, source_name):
+        """Assign a yarn snapshot taken from another project."""
+        c = self.entry(hex_)
+        c.yarn = dict(yarn)
+        c.confirmed = True
+        c.carried = source_name
 
     @property
     def assigned_count(self):

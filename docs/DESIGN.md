@@ -126,7 +126,7 @@ A `.latchwork` file is readable JSON:
   "image": {"filename": "landscape.png", "format": "png", "width": 40, "height": 30,
             "data": "<base64 PNG>"},
   "colors": [
-    {"hex": "#AAD2F0", "count": 280, "confirmed": true,
+    {"hex": "#AAD2F0", "count": 280, "confirmed": true, "carried_from": "forest rug",
      "yarn": {"name": "Light Blue", "brand": "Hershner's", "pack": 320,
               "hex": "#ACD5F2", "palette": "palette.csv"}}
   ],
@@ -141,6 +141,18 @@ A `.latchwork` file is readable JSON:
 - The yarn entry is a **snapshot** (name, brand, pack size, hex, source palette). Plans look
   the yarn up in the active palette first, so pack size changes apply, and fall back to the
   snapshot when the yarn is gone.
+- **Carry over** (offered when creating a project, and under File): every color not assigned
+  yet whose hex exactly matches an assigned color in the chosen earlier projects gets that
+  yarn's snapshot as an assignment, with `carried_from` naming the source project (shown as
+  "carried over" in the Colors list; cleared once the color is assigned or un-assigned by
+  hand). Sprites from one game reuse exact hexes, so there is no near-matching: a different
+  hex is a new color and is matched as usual. Rules:
+  - Each project stays one rug; earlier projects are only read, so a hooked rug never changes.
+  - When sources gave the same hex different yarns, the newest project (last saved) is picked
+    and the summary lets you choose another per color.
+  - Carried-over yarns missing from the active palette can be kept (snapshot fallback, as
+    above) or left to be matched from the active palette.
+  - Matching itself is unchanged: yarns used in earlier rugs get no preference.
 - Transparent pixels are not knots and are skipped. Images with more than 64 colors trigger a
   warning (probably not clean pixel art). PNG (all color types and bit depths) and GIF are
   supported; JPEG is refused.
@@ -190,5 +202,6 @@ Not planned, but noted so the reasoning isn't lost:
 - **Yarn inventory:** record which yarns you own, to prefer them in matching or list what to buy.
 - **Skein estimates** for cut-from-skein yarn (pieces → skeins). Left out because yarn per piece
   varies too much by brand and cut length.
+- **Combined shopping list** across several projects, for buying yarn for a batch of rugs.
 - **Brand filter** for matching. Left out because mixing brands is usually needed to have enough
   colors.

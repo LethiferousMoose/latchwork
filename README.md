@@ -47,6 +47,8 @@ first and tells you what's missing.
 1. **File → New project from image** and pick a pixel-art PNG or GIF. The image is stored
    inside the `.latchwork` project file, so moving the original never breaks the project.
    Projects save automatically.
+   Making several rugs from one game? Pick earlier projects when asked, and every color with
+   exactly the same hex starts with the yarn you used before.
 2. **Colors tab:** click a color in the list (or in the image) to make it the target.
 3. The main view shows the target next to its best yarn match. Use **N** / **B** to walk down
    and up the match ranking, **← →** to step through the palette by lightness, **G** to compare
