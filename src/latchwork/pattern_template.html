@@ -66,11 +66,13 @@
   #rowbar .dbl { letter-spacing: -.42em; margin-right: .42em; }   /* two triangles as one icon */
   /* both trackers on: what's in the tracked cell, and how many of it run to the right */
   /* both trackers on: the run jumps sit either side of the cell readout */
-  #readout { display: none; align-items: center; justify-content: center; gap: 10px;
-    font-size: 15px; min-height: 34px; }
+  /* fixed width, buttons pinned to the ends: only the text between them changes, so the
+     buttons never move under your thumb as the yarn name changes */
+  #readout { display: none; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+    gap: 10px; font-size: 15px; min-height: 34px; width: min(100%, 520px); margin: 0 auto; }
   #readout .cell { display: flex; align-items: center; justify-content: center; gap: 10px;
     min-width: 0; }
-  #readout.on { display: flex; }
+  #readout.on { display: grid; }
   #readout canvas { width: 30px; height: 30px; border-radius: 4px; flex: none;
     box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
   #readout .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -111,8 +113,8 @@
     #rowbar button.toggle { min-width: 80px; }
     #rowbar .long { display: none; }
     #rowbar .short { display: inline; }
-    #readout { justify-content: space-between; gap: 5px; }
-    #readout .cell { flex: 1; gap: 8px; }
+    #readout { gap: 5px; width: 100%; }
+    #readout .cell { gap: 8px; }
   }
   @media (min-width: 821px) { #legendBtn { display: none; } #closeLegend { display: none; } }
   #legendInfo { display: none; padding: 8px 12px; color: var(--muted); font-size: 12.5px;
