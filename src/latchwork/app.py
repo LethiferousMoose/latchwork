@@ -300,13 +300,13 @@ class App:
         nav.grid(row=4, column=0, columnspan=2, pady=6)
         for text, cmd in (("◀  Lighter", lambda: self.step(-1)),
                           ("Darker  ▶", lambda: self.step(1)),
-                          ("▲ Better match (B)", lambda: self.cycle_match(-1)),
-                          ("Next match ▼ (N)", lambda: self.cycle_match(1))):
-            ttk.Button(nav, text=text, width=12 if "match" not in text else 19,
-                       command=cmd).pack(side="left", padx=3)
-        self.gray_btn = ttk.Button(nav, text="Grayscale (G)", width=16, command=self.toggle_gray)
+                          ("▲ Better match", lambda: self.cycle_match(-1)),
+                          ("Next match ▼", lambda: self.cycle_match(1))):
+            # keys are in the hint bar below, so the buttons stay short and even
+            ttk.Button(nav, text=text, width=15, command=cmd).pack(side="left", padx=3)
+        self.gray_btn = ttk.Button(nav, text="Grayscale", width=15, command=self.toggle_gray)
         self.gray_btn.pack(side="left", padx=3)
-        self.assign_main = ttk.Button(nav, text="Assign (A)", width=16, command=self.assign)
+        self.assign_main = ttk.Button(nav, text="Assign", width=15, command=self.assign)
         self.assign_main.pack(side="left", padx=3)
 
         self.strip = tk.Canvas(r, height=96, bg=BG, highlightthickness=0)
@@ -861,7 +861,7 @@ class App:
 
     def toggle_gray(self):
         self.gray = not self.gray
-        self.gray_btn.config(text="\u2713 Grayscale on (G)" if self.gray else "Grayscale (G)")
+        self.gray_btn.config(text="\u2713 Grayscale on" if self.gray else "Grayscale")
         self.refresh()
         self.sidebar.render_image()
 
@@ -1034,8 +1034,8 @@ class App:
             self.sidebar.update_footer()
         state = self.assign_state()
         self.assign_main.state(["!disabled"] if state else ["disabled"])
-        self.assign_main.config(text={"this": "\u2713 Assigned (A)",
-                                      "other": "Reassign (A)"}.get(state, "Assign (A)"))
+        self.assign_main.config(text={"this": "\u2713 Assigned",
+                                      "other": "Reassign"}.get(state, "Assign"))
         if not self.yarns:
             self.yarn_title.config(text="No yarns")
             self.yarn_hex_var.set("")
