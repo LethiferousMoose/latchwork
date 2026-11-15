@@ -144,7 +144,7 @@ File → Export pattern (Ctrl+E) writes one self-contained HTML file. Copy it to
 - Pinch to zoom; the grid stays sharp. Rows are numbered from the bottom (row 1 = bottom).
 - Symbols button cycles Auto / Always / Off. Auto shows symbols once cells are big enough (about 7 px; zoom in if they're hidden). Always draws them even when tiny. Off hides them.
 - Tap a yarn in the legend to show only that color.
-- Row tracker (▼ ▲) highlights one row; Column tracker (◀ ▶) one column. With both on, the bar above them reads the cell where they cross: its yarn and symbol, and how many of it run to the right, this cell included ("Green · 6": hook 6).
+- Row tracker: the Row button turns it on, ▼ ▲ move it, and it highlights one row. Column tracker: the Column button, ◀ ▶, one column. With both on, the bar above them reads the cell where they cross: its yarn and symbol, and how many of it run to the right, this cell included ("Green · 6": hook 6).
 - With both on, ◀ ▶ step one cell and wrap to the next row up (or back down) at the ends, since you hook bottom to top, left to right. ◀◀ ▶▶ (either side of the readout, only while both are on) jump a whole color run instead. Tapping the grid never moves the trackers, so a stray touch can't lose your place.
 - Keyboard (computer): ↑ ↓ rows, ← → columns, Shift+← → color runs.
 - Remembered on that device, per pattern: done checkmarks, both trackers (on/off and position) and the Symbols mode. Zoom and the tapped yarn are not.
