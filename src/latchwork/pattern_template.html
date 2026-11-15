@@ -103,7 +103,7 @@
     #rowbar .label { min-width: 0; flex: 1; white-space: nowrap; }
     #rowbar button { padding: 6px 9px; }
     #rowbar button.big { min-width: 42px; padding: 6px 8px; }
-    #rowbar button.toggle { min-width: 62px; }
+    #rowbar button.toggle { min-width: 80px; }
     #rowbar .long { display: none; }
     #rowbar .short { display: inline; }
     #readout { justify-content: flex-start; padding: 0 4px; }
@@ -168,7 +168,7 @@
     <button id="rowUp" class="big" aria-label="Row up">▲</button>
   </div>
   <div class="line">
-    <button id="colTrack" class="toggle" aria-pressed="false" title="Highlight one column at a time; with the row tracker, read one cell"><span class="long">Column tracker</span><span class="short">Col</span></button>
+    <button id="colTrack" class="toggle" aria-pressed="false" title="Highlight one column at a time; with the row tracker, read one cell"><span class="long">Column tracker</span><span class="short">Column</span></button>
     <button id="runBack" class="big" aria-label="Start of this or the previous color run" title="Previous color run"><span class="dbl">◀︎◀︎</span></button>
     <button id="colLeft" class="big" aria-label="Column left">◀︎</button>
     <span class="label" id="colLabel"></span>
@@ -583,16 +583,16 @@ function runAt(row, col) {   // [first, last] column of the same-yarn run contai
   while (b < W && cellAt(row, b + 1) === v) b++;
   return [a, b];
 }
-function counter(name, n, of) {   // "Row 37 of 80" (phones: "Row 37/80")
-  return name + " <b>" + n + "</b><span class='long'> of " + of + "</span><span class='short'>/" + of + "</span>";
+function counter(n, of) {   // "37 of 80" (phones: "37/80"); the toggle beside it says row/column
+  return "<b>" + n + "</b><span class='long'> of " + of + "</span><span class='short'>/" + of + "</span>";
 }
 function syncTrack() {
   state.row = Math.max(1, Math.min(H, state.row));
   state.col = Math.max(1, Math.min(W, state.col));
   rowBtn.setAttribute("aria-pressed", state.rowOn ? "true" : "false");
   colBtn.setAttribute("aria-pressed", state.colOn ? "true" : "false");
-  $("rowLabel").innerHTML = state.rowOn ? counter("Row", state.row, H) : "<span style='color:#888'>off</span>";
-  $("colLabel").innerHTML = state.colOn ? counter("Col", state.col, W) : "<span style='color:#888'>off</span>";
+  $("rowLabel").innerHTML = state.rowOn ? counter(state.row, H) : "<span style='color:#888'>off</span>";
+  $("colLabel").innerHTML = state.colOn ? counter(state.col, W) : "<span style='color:#888'>off</span>";
   $("rowUp").disabled = $("rowDown").disabled = !state.rowOn;
   $("colLeft").disabled = $("colRight").disabled = !state.colOn;
   const both = state.rowOn && state.colOn;
