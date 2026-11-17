@@ -167,8 +167,13 @@ A `.latchwork` file is readable JSON:
     above) or left to be matched from the active palette.
   - Matching itself is unchanged: yarns used in earlier rugs get no preference.
 - Transparent pixels are not knots and are skipped. Images with more than 64 colors trigger a
-  warning (probably not clean pixel art). PNG (all color types and bit depths) and GIF are
-  supported; JPEG is refused.
+  warning (probably not clean pixel art). PNG (all color types and bit depths), GIF and BMP
+  are supported; JPEG is refused (its compression smears pixel art into near-duplicate
+  colors).
+- BMP: uncompressed 1/2/4/8-bit palette, 16/24/32-bit and bitfields, bottom-up or top-down;
+  RLE-compressed BMPs are refused. A 32-bit BMP whose alpha is 0 everywhere is read as opaque
+  (many programs leave that byte empty). The project stores a BMP as PNG: same pixels, smaller
+  file. Headers asking for more than 4 million pixels are treated as damaged.
 
 ## Planning (`plan.py`)
 

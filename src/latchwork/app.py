@@ -608,7 +608,8 @@ class App:
     def new_project(self):
         img_path = filedialog.askopenfilename(
             title="New project: choose the pixel-art image",
-            filetypes=[("Pixel art", "*.png *.gif"), ("PNG", "*.png"), ("GIF", "*.gif"),
+            filetypes=[("Pixel art", "*.png *.gif *.bmp"), ("PNG", "*.png"), ("GIF", "*.gif"),
+                       ("BMP", "*.bmp"),
                        ("All files", "*.*")])
         if not img_path:
             return

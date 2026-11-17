@@ -45,7 +45,7 @@ first and tells you what's missing.
 
 ## How to use it
 
-1. **File → New project from image** and pick a pixel-art PNG or GIF. The image is stored
+1. **File → New project from image** and pick a pixel-art PNG, GIF or BMP. The image is stored
    inside the `.latchwork` project file, so moving the original never breaks the project.
    Projects save automatically.
    Making several rugs from one game? Pick earlier projects when asked, and every color with

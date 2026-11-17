@@ -1,4 +1,4 @@
-"""Pixel-art images: decode PNG exactly (stdlib zlib), GIF via Tk, encode PNG, count colors.
+"""Pixel-art images: decode PNG and BMP exactly (stdlib), GIF via Tk, encode PNG, count colors.
 
 PNG pixel values are used as stored (no gamma or color-profile adjustment), the same values
 GIMP shows for an untagged sRGB image.
@@ -30,6 +30,8 @@ def sniff(data):
         return "gif"
     if data[:3] == b"\xff\xd8\xff":
         return "jpeg"
+    if data[:2] == b"BM":
+        return "bmp"
     return None
 
 
@@ -158,6 +160,113 @@ def decode_png(data):
     return PixelImage(width, height, pixels)
 
 
+# ---------- BMP decode ----------
+BMP_MAX_PIXELS = 4000000   # far beyond any rug; only stops a damaged header asking for gigabytes
+
+
+def _mask_channel(mask):
+    """(shift, max value) for a BMP bitfield mask, e.g. 0x7C00 -> (10, 31)."""
+    if not mask:
+        return None
+    shift = (mask & -mask).bit_length() - 1
+    return shift, mask >> shift
+
+
+def decode_bmp(data):
+    """Windows BMP, uncompressed: 1/2/4/8-bit with a palette, 16/24/32-bit, bitfields (16/32-bit),
+    bottom-up or top-down. RLE-compressed BMPs are refused (rare; save as PNG instead).
+
+    A 32-bit BMP whose alpha is 0 everywhere is read as opaque: many programs leave that byte
+    empty rather than meaning "fully transparent"."""
+    if len(data) < 26 or data[:2] != b"BM":
+        raise ValueError("not a BMP file")
+    offset, hsize = struct.unpack_from("<II", data, 10)
+    if hsize == 12:                                   # old OS/2 header
+        width, height, _planes, bpp = struct.unpack_from("<HHHH", data, 18)
+        comp, ncolors, entry = 0, 0, 3
+    elif hsize >= 40 and len(data) >= 14 + 40:
+        width, height, _planes, bpp, comp = struct.unpack_from("<iiHHI", data, 18)
+        ncolors, entry = struct.unpack_from("<I", data, 46)[0], 4
+    else:
+        raise ValueError("unsupported BMP header (size %d)" % hsize)
+    top_down = height < 0
+    height = abs(height)
+    if width <= 0 or height <= 0 or width * height > BMP_MAX_PIXELS:
+        raise ValueError("BMP size %d \u00d7 %d isn't usable" % (width, height))
+    if comp in (1, 2):
+        raise ValueError("compressed (RLE) BMPs aren't supported; save it again uncompressed "
+                         "or as PNG")
+    if comp not in (0, 3, 6) or bpp not in (1, 2, 4, 8, 16, 24, 32):
+        raise ValueError("unsupported BMP type (%d bits per pixel, compression %d)" % (bpp, comp))
+
+    masks = None                                      # (r, g, b, a) bitfields for 16/32-bit
+    if bpp in (16, 32):
+        if comp in (3, 6):
+            if len(data) < 14 + 40 + 12:
+                raise ValueError("BMP is truncated")
+            r, g, b = struct.unpack_from("<III", data, 54)
+            a = struct.unpack_from("<I", data, 66)[0] if (hsize >= 56 or comp == 6) and \
+                len(data) >= 70 else 0
+            masks = (r, g, b, a)
+        elif bpp == 16:
+            masks = (0x7C00, 0x03E0, 0x001F, 0)       # 5-5-5
+        else:
+            masks = (0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
+    elif comp != 0:
+        raise ValueError("unsupported BMP type (%d bits per pixel, compression %d)" % (bpp, comp))
+
+    palette = None
+    if bpp <= 8:
+        n = ncolors or (1 << bpp)
+        start = 14 + hsize
+        if n > 256 or start + n * entry > len(data):
+            raise ValueError("BMP palette is damaged")
+        palette = [(data[start + i * entry + 2], data[start + i * entry + 1],
+                    data[start + i * entry]) for i in range(n)]
+
+    stride = (width * bpp + 31) // 32 * 4
+    if offset + stride * height > len(data):
+        raise ValueError("BMP image data is truncated")
+    chans = [_mask_channel(m) for m in masks] if masks else None
+
+    def scale(v, ch):                                 # a bitfield value to 0..255
+        if not ch:
+            return 0
+        shift, top = ch
+        return ((v >> shift) & top) * 255 // top if top else 0
+
+    rows = [None] * height
+    alpha_seen = False
+    for y in range(height):
+        line = data[offset + y * stride:offset + (y + 1) * stride]
+        row = []
+        if bpp <= 8:
+            per = 8 // bpp
+            for x in range(width):
+                byte = line[x // per]
+                idx = (byte >> (8 - bpp * (x % per + 1))) & ((1 << bpp) - 1)
+                if idx >= len(palette):
+                    raise ValueError("BMP palette index out of range")
+                row.append(palette[idx] + (255,))
+        elif bpp == 24:
+            for x in range(width):
+                b, g, r = line[3 * x:3 * x + 3]
+                row.append((r, g, b, 255))
+        else:
+            size = bpp // 8
+            for x in range(width):
+                v = int.from_bytes(line[size * x:size * x + size], "little")
+                a = scale(v, chans[3]) if chans[3] else 255
+                if chans[3] and a:
+                    alpha_seen = True
+                row.append((scale(v, chans[0]), scale(v, chans[1]), scale(v, chans[2]), a))
+        rows[y if top_down else height - 1 - y] = row
+    pixels = [p for row in rows for p in row]
+    if chans and chans[3] and not alpha_seen:         # alpha byte left empty: opaque
+        pixels = [p[:3] + (255,) for p in pixels]
+    return PixelImage(width, height, pixels)
+
+
 # ---------- PNG encode ----------
 def _chunk(ctype, body):
     return (struct.pack(">I", len(body)) + ctype + body +
@@ -197,10 +306,12 @@ def decode(data):
         return decode_png(data)
     if kind == "gif":
         return decode_gif_with_tk(data)
+    if kind == "bmp":
+        return decode_bmp(data)
     if kind == "jpeg":
         raise ValueError("JPEG isn't supported: its compression smears pixel art into many "
                          "slightly different colors. Export the image as PNG instead.")
-    raise ValueError("not a PNG or GIF image")
+    raise ValueError("not a PNG, GIF or BMP image")
 
 
 # ---------- colors ----------

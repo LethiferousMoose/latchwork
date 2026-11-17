@@ -81,6 +81,8 @@ class Project:
     def from_image_bytes(cls, data, filename, project_path):
         fmt = pixelart.sniff(data)
         image = pixelart.decode(data)  # raises ValueError with a readable message
+        if fmt == "bmp":   # kept as PNG: the same pixels, a fraction of the size
+            data, fmt = pixelart.encode_png(image), "png"
         counts, transparent = pixelart.color_counts(image)
         if not counts:
             raise ValueError("the image has no opaque pixels")
