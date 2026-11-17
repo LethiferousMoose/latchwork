@@ -133,7 +133,8 @@ A `.latchwork` file is readable JSON:
      "yarn": {"name": "Light Blue", "brand": "Hershner's", "pack": 320,
               "hex": "#ACD5F2", "palette": "palette.csv"}}
   ],
-  "settings": {"spare_percent": 0, "holes_per_inch": 3.75}
+  "settings": {"spare_percent": 0, "holes_per_inch": 3.75,
+               "sort": {"colors": ["count", true]}}
 }
 ```
 
@@ -144,6 +145,15 @@ A `.latchwork` file is readable JSON:
 - The yarn entry is a **snapshot** (name, brand, pack size, hex, source palette). Plans look
   the yarn up in the active palette first, so pack size changes apply, and fall back to the
   snapshot when the yarn is gone.
+- **Table order** (Colors and Plan tabs): colors are stored lightest first (by the image
+  color's L\*), which is the Colors tab's default order; the Plan tab defaults to most knots
+  first, then yarn name. Clicking a heading sorts by it (▲/▼), again flips it, a third time
+  returns to the default. Color sorts by L\* (first click darkest first, since the default is
+  lightest first); Status orders suggested, carried over, assigned; Need sorts by pieces
+  including the spare, so packs and pieces compare. Number columns start largest first, text
+  A–Z. The sort is saved per project in `settings.sort` as `[column, descending]` (absent =
+  default). A row that changes (e.g. on Assign) stays where it is until the table is next
+  refilled, so the selection doesn't jump away.
 - **Carry over** (offered when creating a project, and under File): every color not assigned
   yet whose hex exactly matches an assigned color in the chosen earlier projects gets that
   yarn's snapshot as an assignment, with `carried_from` naming the source project (shown as

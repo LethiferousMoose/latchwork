@@ -218,3 +218,56 @@ class ColorPanel(tk.Frame):
         top = BAR_H + 1
         bar.create_polygon(x, top, x - 5, top + MARK_H - 1, x + 5, top + MARK_H - 1,
                            fill=fill, outline=outline)
+
+
+class TreeSort:
+    """Sortable column headings for a flat Treeview.
+
+    Click a heading to sort by it, click again to flip the direction, a third time to go back to
+    the default order. The heading of the sorted column shows ▲ (ascending) or ▼
+    (descending).
+
+    keys:    {column: (key(iid) -> value, first click descending?)}
+    default: key(iid) -> value giving the default order (ties in a sort keep this order).
+    on_change(state): called after a click; state is [column, descending] or None (default).
+    Call apply() after refilling the tree, since rows are inserted in the default order."""
+
+    ARROW = {False: " \u25b2", True: " \u25bc"}
+
+    def __init__(self, tree, keys, default, on_change=None):
+        self.tree, self.keys, self.default, self.on_change = tree, keys, default, on_change
+        self.state = None
+        self.titles = {c: tree.heading(c, "text") for c in keys}
+        for c in keys:
+            tree.heading(c, command=lambda c=c: self.click(c))
+
+    def set(self, state):
+        """Restore a saved state ([column, descending] or None); unknown columns are ignored."""
+        ok = isinstance(state, (list, tuple)) and len(state) == 2 and state[0] in self.keys
+        self.state = [state[0], bool(state[1])] if ok else None
+        self.apply()
+
+    def click(self, col):
+        first = self.keys[col][1]
+        if not self.state or self.state[0] != col:
+            self.state = [col, first]
+        elif self.state[1] == first:
+            self.state = [col, not first]
+        else:
+            self.state = None
+        self.apply()
+        if self.on_change:
+            self.on_change(self.state)
+
+    def apply(self):
+        for c, title in self.titles.items():
+            on = self.state and self.state[0] == c
+            self.tree.heading(c, text=title + (self.ARROW[self.state[1]] if on else ""))
+        rows = sorted(self.tree.get_children(), key=self.default)
+        if self.state:
+            rows.sort(key=self.keys[self.state[0]][0], reverse=self.state[1])   # stable
+        for i, iid in enumerate(rows):
+            self.tree.move(iid, "", i)
+        sel = self.tree.selection()
+        if sel:
+            self.tree.see(sel[0])

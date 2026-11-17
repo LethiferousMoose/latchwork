@@ -684,7 +684,7 @@ class App:
         self.update_title()
         if self.remember:
             remember_setting("project", os.path.abspath(project.path))
-        first = project.colors[0].hex
+        first = self.sidebar.tree.get_children()[0]   # top row, in the project's saved sort
         self.sidebar.select(first)
         self.select_project_color(first)
 

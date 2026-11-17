@@ -7,7 +7,7 @@ from tkinter import ttk
 from . import plan as pl
 from .palette import label as yarn_label
 from .colormath import gray_for_lightness, lightness, parse_hex, to_hex
-from .widgets import Tooltip
+from .widgets import Tooltip, TreeSort
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
@@ -140,13 +140,22 @@ class ProjectPanel(tk.Frame):
         self.tree = ttk.Treeview(body, columns=("count", "yarn", "state"), selectmode="browse",
                                  height=TABLE_ROWS)
         for col, text, width, anchor in (("#0", "Color", 130, "w"), ("count", "Count", 55, "e"),
-                                         ("yarn", "Yarn", 145, "w"), ("state", "", 70, "w")):
+                                         ("yarn", "Yarn", 145, "w"), ("state", "Status", 70, "w")):
             self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
             self.tree.column(col, width=width, minwidth=40, anchor=anchor, stretch=False)
         self.tree.tag_configure("suggested", foreground="#7A7A7A", font=self._italic)
         _scrolled(body, self.tree)
         self.tree.bind("<Configure>", lambda e: self.size_columns())
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
+        # Clickable headings. Color sorts by lightness (L*); the default order is lightest first,
+        # so the first click shows darkest first. Status: suggested, carried over, assigned.
+        entry = lambda iid: self.project.entry(iid)
+        self.color_sort = TreeSort(self.tree, {
+            "#0": (lambda i: entry(i).L, False),
+            "count": (lambda i: entry(i).count, True),
+            "yarn": (lambda i: self.tree.set(i, "yarn").lower(), False),
+            "state": (lambda i: (entry(i).confirmed, not entry(i).carried), False),
+        }, default=lambda i: self._color_order[i], on_change=lambda st: self._sort_changed("colors", st))
 
     def _build_plan_tab(self):
         tab = tk.Frame(self.tabs, bg=BG, padx=4, pady=6)
@@ -204,6 +213,13 @@ class ProjectPanel(tk.Frame):
             self.plan_tree.column(col, width=width, minwidth=40, anchor=anchor,
                                   stretch=(col == "#0"))
         self.plan_tree.tag_configure("merged", background="#FFF4CC")
+        line = lambda iid: self._plan.lines[int(iid)]
+        self.plan_sort = TreeSort(self.plan_tree, {
+            "#0": (lambda i: line(i).label.lower(), False),
+            "count": (lambda i: line(i).count, True),
+            "need": (lambda i: line(i).need(self._plan.spare)[0], True),   # pieces incl. spare
+            "colors": (lambda i: len(line(i).colors), True),
+        }, default=int, on_change=lambda st: self._sort_changed("plan", st))
         _scrolled(body, self.plan_tree)
         self._plan = None
         Tooltip(self.plan_tree, self._merged_row_tip)
@@ -233,9 +249,31 @@ class ProjectPanel(tk.Frame):
             sub += "  ·  %s transparent (skipped)" % format(project.transparent, ",")
         self.subtitle.config(text=sub)
         self.spare_var.set("%g" % float(project.settings.get("spare_percent", 0) or 0))
+        sort = project.settings.get("sort") or {}
+        self._color_order = {c.hex: i for i, c in enumerate(project.colors)}
+        self.color_sort.state = None
+        self.plan_sort.state = None
         self.refresh_rows()
         self.refresh_plan()
+        self.color_sort.set(sort.get("colors"))
+        self.plan_sort.set(sort.get("plan"))
+        self.size_columns()
         self.on_view()
+
+    def _sort_changed(self, table, state):
+        """A heading was clicked: keep the order with the project (saved like the spare %)."""
+        if not self.project:
+            return
+        sort = dict(self.project.settings.get("sort") or {})
+        if state:
+            sort[table] = state
+        else:
+            sort.pop(table, None)
+        if sort:
+            self.project.settings["sort"] = sort
+        else:
+            self.project.settings.pop("sort", None)
+        self.app.save_project()
 
     def refresh_rows(self):
         keep = self.selected_hex()
@@ -244,6 +282,7 @@ class ProjectPanel(tk.Frame):
         for c in self.project.colors:
             self.tree.insert("", "end", iid=c.hex)
             self.update_row(c.hex, plan=False)
+        self.color_sort.apply()
         self.size_columns()
         if keep and self.tree.exists(keep):
             self.tree.selection_set(keep)
@@ -365,6 +404,7 @@ class ProjectPanel(tk.Frame):
                                   values=(format(l.count, ","), l.need(plan.spare)[2],
                                           len(l.colors)),
                                   tags=("merged",) if l.merged else ())
+        self.plan_sort.apply()
         _fit_columns(self.plan_tree, {"#0": (42, None), "count": (14, None),
                                       "need": (14, None), "colors": (14, None)})
         parts = ["%s assigned" % format(plan.assigned_count, ",")]
@@ -626,5 +666,5 @@ def _fit_columns(tree, spec):
         f = font or base
         texts = [tree.item(i, "text") if col == "#0" else str(tree.set(i, col)) for i in items]
         widest = max([f.measure(t) + pad for t in texts] +
-                     [head.measure(tree.heading(col, "text")) + 14])
+                     [head.measure(tree.heading(col, "text").rstrip(" \u25b2\u25bc") + " \u25bc") + 14])
         tree.column(col, width=widest, minwidth=widest)
