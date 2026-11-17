@@ -178,7 +178,7 @@
 <aside id="legend">
   <header>
     <span class="count" id="legendCount"></span>
-    <button id="showAll">Show all</button>
+    <button id="showAll" disabled title="Click a yarn to show only that yarn; this shows them all again">Show all</button>
     <button id="closeLegend" aria-label="Close">✕</button>
   </header>
   <div id="legendInfo"></div>
@@ -622,6 +622,7 @@ function refreshLegend() {
     li.querySelector(".meta").textContent = y.unassigned ? knots + " · not assigned to a yarn yet"
       : [y.brand, knots, y.need].filter(Boolean).join(" · ");
   });
+  document.getElementById("showAll").disabled = sel < 0;   // nothing highlighted: nothing to undo
   const real = Y.filter(y => !y.unassigned);
   const done = Y.filter((y, i) => !y.unassigned && yarnDone(i)).length;
   document.getElementById("legendCount").textContent =

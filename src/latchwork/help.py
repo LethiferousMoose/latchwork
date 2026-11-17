@@ -144,7 +144,7 @@ File → Export pattern (Ctrl+E) writes one self-contained HTML file. Copy it to
 
 - Pinch to zoom; the grid stays sharp. Rows are numbered from the bottom (row 1 = bottom).
 - Symbols button cycles Auto / Always / Off. Auto shows symbols once cells are big enough (about 7 px; zoom in if they're hidden). Always draws them even when tiny. Off hides them.
-- Tap a yarn in the legend to show only that color.
+- Tap a yarn in the legend to show only that color (its cells keep their symbols, the rest go grey). Tap it again, or Show all (greyed out until a yarn is picked), to bring the rest back.
 - Row tracker: the Row button turns it on, ▼ ▲ move it, and it highlights one row. Column tracker: the Column button, ◀ ▶, one column. With both on, the bar above them reads the cell where they cross: its yarn and symbol (brand underneath), and how many of it run to the right, this cell included ("Green · 6": hook 6).
 - With both on, ◀ ▶ step one cell and wrap to the next row up (or back down) at the ends, since you hook bottom to top, left to right. ◀◀ ▶▶ (either side of the readout, only while both are on) jump a whole color run instead. Tapping the grid never moves the trackers, so a stray touch can't lose your place.
 - Done (the tall button on the right) marks what's tracked as hooked, then moves on: with both trackers on, the rest of the color run (then to the next run); with only Row on, the whole row (then up a row); with only Column on, the whole column (then right a column). Hooked cells fade and lose their symbol, so what's left stands out. On something already marked, the button reads Undo and clears it instead; for a run that's the whole run, wherever you are in it, and you go back to its first cell.
