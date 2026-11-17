@@ -89,6 +89,12 @@
   #readout .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     min-width: 0; }
   #readout .run { white-space: nowrap; color: var(--muted); }
+  /* name · count on top, the brand small underneath: two lines in the height the swatch already takes */
+  #readout .txt { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+  #readout .top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+  #readout .brand { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  #readout .brand:empty { display: none; }
   #readout .run b { color: var(--ink); font-size: 18px; }
 
   #printDlg { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: none;
@@ -183,7 +189,8 @@
   <div id="readout">
     <button id="runBack" class="big" aria-label="Start of this or the previous color run" title="Previous color run"><span class="dbl">◀︎◀︎</span></button>
     <div class="cell"><canvas id="readSw" width="60" height="60"></canvas>
-      <span class="name" id="readName"></span><span class="run" id="readRun"></span></div>
+      <div class="txt"><div class="top"><span class="name" id="readName"></span><span class="run" id="readRun"></span></div>
+        <div class="brand" id="readBrand"></div></div></div>
     <button id="runNext" class="big" aria-label="Next color run" title="Next color run"><span class="dbl">▶︎▶︎</span></button>
   </div>
   <div id="tracks">
@@ -684,6 +691,7 @@ function syncTrack() {
     g.fillStyle = v === NONE ? EMPTY : Y[v].hex; g.fillRect(0, 0, 60, 60);
     if (v !== NONE) drawSymbol(g, v, 30, 30, 60, Y[v].ink);
     $("readName").textContent = v === NONE ? "Empty (no knot)" : Y[v].name;
+    $("readBrand").textContent = v === NONE ? "" : Y[v].unassigned ? "not assigned to a yarn yet" : Y[v].brand || "";
     $("readRun").innerHTML = "· <b>" + n + "</b>";   // what's left of the run, this cell included
   }
   syncDone();
