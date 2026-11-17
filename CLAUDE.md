@@ -28,8 +28,10 @@ tidied so others can use it too. Keep it simple.
 - `tools/export_palette.py`: the GIMP 2.10 script that exported the original palette.
 - `docs/images/`: README screenshots, made from a neutral demo image (not my rug samples).
   When a change visibly alters a screen shown there (main window, Plan tab, palette manager,
-  help, phone pattern), retake that screenshot the same way: same demo image, the real palette,
-  1300×820 main window, phone pattern at 390 px wide.
+  help, carry-over dialog, phone and desktop pattern), retake that screenshot the same way: same
+  demo image, the real palette, 1300×820 main window, phone pattern at 390 px wide, desktop
+  pattern at 1280×800 (rows 1–8 hooked, both trackers on). The carry-over dialog uses two
+  earlier rugs from the demo image and the demo with a small house added (two new colors).
 
 ## My setup (the defaults)
 - Hershner's is pre-cut, 320 pieces per pack; Red Heart and Loops & Threads are cut from skeins.

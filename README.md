@@ -50,6 +50,8 @@ first and tells you what's missing.
    Projects save automatically.
    Making several rugs from one game? Pick earlier projects when asked, and every color with
    exactly the same hex starts with the yarn you used before.
+
+   <img src="docs/images/carry-over.png" alt="Carrying assignments over from earlier rugs" width="60%">
 2. **Colors tab:** click a color in the list (or in the image) to make it the target.
 3. The main view shows the target next to its best yarn match. Use **N** / **B** to walk down
    and up the match ranking, **← →** to step through the palette by lightness, **G** to compare
@@ -57,7 +59,10 @@ first and tells you what's missing.
 4. **Plan tab:** packs or pieces per yarn, finished size and canvas to cut. Canvas settings
    (holes per inch, borders) are per project under *Change…*.
 5. **File → Export pattern** (Ctrl+E) writes the HTML pattern. Copy it to your phone and open
-   it in the browser.
+   it in the browser. Turn on the row and column trackers to read one cell at a time, and press
+   **Done** as you go: hooked cells fade, and the pattern keeps count of what's left.
+
+   ![The exported pattern in a desktop browser, partway through a rug](docs/images/pattern-desktop.png)
 
 Press **F1** for the built-in help, including how matching works and when to change the color
 weight.
