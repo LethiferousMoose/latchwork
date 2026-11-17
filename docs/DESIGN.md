@@ -194,6 +194,12 @@ A `.latchwork` file is readable JSON:
   their yarn, unassigned ones their suggested yarn; "Mark unassigned" stripes those in the sidebar.
   In the sidebar, the selected color shows the yarn currently in the comparison view, updating
   live as you step (preview only; nothing is stored until Assign).
+- The sidebar image is zoomed by whole numbers only (or shrunk by whole steps for big images), so
+  every art pixel is an equal square. That leaves small or oddly shaped art (long, wide) small
+  in the 400 x 250 box, so **View larger** opens the same image in its own resizable,
+  non-modal window at the largest whole-number zoom that fits. It mirrors the sidebar (view,
+  highlight, stripes, selected color, live yarn), redraws once after a burst of changes, and a
+  click there selects a color too; Esc closes it, and it reopens at its last size this session.
 
 ## Pattern export (`pattern.py`, `pattern_template.html`)
 

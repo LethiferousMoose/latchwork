@@ -16,6 +16,14 @@ TRANSPARENT_SHOW = "#F7F7F7"
 TABLE_ROWS = 6     # requested table height; tables shrink on short windows
 
 
+def fit_scale(w, h, box_w, box_h):
+    """(zoom, subsample) showing a w x h image as large as fits in box_w x box_h, keeping every
+    pixel the same size: a whole-number zoom, or a whole-number shrink for big images."""
+    if w <= box_w and h <= box_h:
+        return max(1, min(box_w // w, box_h // h)), 1
+    return 1, math.ceil(max(w / box_w, h / box_h))
+
+
 def _fade(hex_, amount=0.78):
     r, g, b = (int(hex_[i:i + 2], 16) for i in (1, 3, 5))
     return to_hex(*(c + (255 - c) * amount for c in (r, g, b)))
@@ -56,6 +64,8 @@ class ProjectPanel(tk.Frame):
         self.display = None
         self.scale = (1, 1)      # (zoom, subsample) used for the displayed image
         self.offset = (0, 0)
+        self.large = None        # the "View larger" window, while open
+        self._large_geometry = None
         self._quiet = False
         italic = tkfont.nametofont("TkDefaultFont").copy()
         italic.configure(slant="italic")
@@ -66,7 +76,7 @@ class ProjectPanel(tk.Frame):
         tk.Label(self.welcome, text="No project open", font=("Segoe UI", 16, "bold"),
                  bg=BG).pack(anchor="w")
         tk.Label(self.welcome, bg=BG, fg="#555", justify="left", wraplength=IMG_W,
-                 font=UI_FONT, text="Start a rug from a pixel-art image (PNG or GIF), or open a "
+                 font=UI_FONT, text="Start a rug from a pixel-art image (PNG, GIF or BMP), or open a "
                                     "saved .latchwork project. You can also match single colors "
                                     "on the right without a project.").pack(anchor="w", pady=(4, 12))
         start = tk.Frame(self.welcome, bg=BG)
@@ -92,6 +102,10 @@ class ProjectPanel(tk.Frame):
         for value, text in (("original", "Original"), ("preview", "Yarn preview")):
             ttk.Radiobutton(views, text=text, value=value, variable=self.view, style="Toolbutton",
                             command=self.on_view).pack(side="left", ipadx=8)
+        larger = tk.Label(views, text="View larger", font=("Segoe UI", 9, "underline"), bg=BG,
+                          fg="#1565C0", cursor="hand2")
+        larger.pack(side="right", padx=(0, 4))
+        larger.bind("<Button-1>", lambda e: self.open_large())
 
         self.canvas = tk.Canvas(c, width=IMG_W, height=IMG_H, bg="#D8D8D8",
                                 highlightthickness=1, highlightbackground="#AAA",
@@ -228,6 +242,8 @@ class ProjectPanel(tk.Frame):
     # ---------- project ----------
     def show_welcome(self):
         self.project = None
+        if self.large:
+            self.large.destroy()
         self.content.pack_forget()
         self.welcome.pack(fill="both", expand=True)
 
@@ -239,10 +255,7 @@ class ProjectPanel(tk.Frame):
         img = project.image
         self.orig_hex = [to_hex(r, g, b) if a >= 128 else None for r, g, b, a in img.pixels]
         w, h = img.width, img.height
-        if w <= IMG_W and h <= IMG_H:
-            self.scale = (max(1, min(IMG_W // w, IMG_H // h)), 1)
-        else:
-            self.scale = (1, math.ceil(max(w / IMG_W, h / IMG_H)))
+        self.scale = fit_scale(w, h, IMG_W, IMG_H)
         sub = "%d × %d px  ·  %d colors  ·  %s total" % (
             w, h, len(project.colors), format(project.knots, ","))
         if project.transparent:
@@ -484,11 +497,15 @@ class ProjectPanel(tk.Frame):
             self.app.select_project_color(hex_)
 
     def on_image_click(self, event):
+        self.select_at(event.x, event.y, self.scale, self.offset)
+
+    def select_at(self, px, py, scale, offset):
+        """Select the image color under canvas point (px, py) of a view with that scale/offset."""
         if not self.project:
             return
-        zoom, sub = self.scale
-        x = (event.x - self.offset[0]) * sub // zoom
-        y = (event.y - self.offset[1]) * sub // zoom
+        zoom, sub = scale
+        x = (px - offset[0]) * sub // zoom
+        y = (py - offset[1]) * sub // zoom
         img = self.project.image
         if 0 <= x < img.width and 0 <= y < img.height:
             hex_ = self.orig_hex[y * img.width + x]
@@ -512,6 +529,26 @@ class ProjectPanel(tk.Frame):
         c.delete("all")
         if not self.project:
             return
+        self.display = self.build_image(self.scale)
+        dw, dh = self.display.width(), self.display.height()
+        self.offset = ((IMG_W - dw) // 2, (IMG_H - dh) // 2)
+        c.create_image(self.offset[0], self.offset[1], image=self.display, anchor="nw")
+        if self.large:
+            self.large.schedule()
+
+    def open_large(self):
+        if not self.project:
+            return
+        if self.large:
+            self.large.deiconify()
+            self.large.lift()
+            self.large.focus_set()
+            return
+        self.large = LargeView(self)
+
+    def build_image(self, scale):
+        """PhotoImage of the project image at scale (zoom, subsample), as currently shown:
+        original or yarn preview, grayscale, highlight and unassigned stripes."""
         p = self.project
         img = p.image
         w, h = img.width, img.height
@@ -541,7 +578,7 @@ class ProjectPanel(tk.Frame):
                 striped[orig] = _fade(v, 0.55) if orig in unassigned else v
             return v
 
-        zoom, sub = self.scale
+        zoom, sub = scale
         dw = w * zoom if sub == 1 else -(-w // sub)
         dh = h * zoom if sub == 1 else -(-h // sub)
         xs = [min(w - 1, dx * sub // zoom) for dx in range(dw)]
@@ -561,10 +598,71 @@ class ProjectPanel(tk.Frame):
                 else:
                     row.append(shown[orig])
             rows.append("{" + " ".join(row) + "}")
-        self.display = tk.PhotoImage(width=dw, height=dh)
-        self.display.put(" ".join(rows), to=(0, 0))
-        self.offset = ((IMG_W - dw) // 2, (IMG_H - dh) // 2)
-        c.create_image(self.offset[0], self.offset[1], image=self.display, anchor="nw")
+        photo = tk.PhotoImage(width=dw, height=dh)
+        photo.put(" ".join(rows), to=(0, 0))
+        return photo
+
+
+class LargeView(tk.Toplevel):
+    """The project image in its own resizable window, as large as fits (whole-number zoom).
+    Not modal: it follows the sidebar (view, highlight, selected color, live preview) and a
+    click selects a color there too."""
+
+    def __init__(self, panel):
+        super().__init__(panel)
+        self.panel = panel
+        self.configure(bg=BG)
+        self.minsize(240, 180)
+        p = panel.project.image
+        if panel._large_geometry:
+            self.geometry(panel._large_geometry)
+        else:   # start at about 8 screen pixels per art pixel, within most of the screen
+            z = max(1, min(8, (self.winfo_screenwidth() * 3 // 4) // p.width,
+                           (self.winfo_screenheight() * 3 // 4) // p.height))
+            self.geometry("%dx%d" % (max(480, p.width * z + 40), max(320, p.height * z + 40)))
+        self.canvas = tk.Canvas(self, bg="#D8D8D8", highlightthickness=0, cursor="crosshair")
+        self.canvas.pack(fill="both", expand=True)
+        self.photo, self.scale, self.offset, self._job, self._size = None, (1, 1), (0, 0), None, None
+        self.canvas.bind("<Configure>", lambda e: self.schedule())
+        self.canvas.bind("<Button-1>", lambda e: panel.select_at(e.x, e.y, self.scale, self.offset))
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.schedule()
+
+    def schedule(self):
+        """Redraw soon; several changes in a row (a resize drag, stepping yarns) draw once."""
+        if self._job:
+            self.after_cancel(self._job)
+        self._job = self.after(40, self.redraw)
+
+    def redraw(self):
+        self._job = None
+        p = self.panel.project
+        if not p:
+            return
+        self.title("%s \u00b7 larger view" % p.name)
+        cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
+        if cw < 2 or ch < 2:
+            return
+        img = p.image
+        self.scale = fit_scale(img.width, img.height, cw - 16, ch - 16)
+        self.photo = self.panel.build_image(self.scale)
+        dw, dh = self.photo.width(), self.photo.height()
+        self.offset = ((cw - dw) // 2, (ch - dh) // 2)
+        self.canvas.delete("all")
+        self.canvas.create_image(self.offset[0], self.offset[1], image=self.photo, anchor="nw")
+
+    def destroy(self):
+        if self._job:
+            self.after_cancel(self._job)
+            self._job = None
+        if self.panel.large is self:
+            self.panel.large = None
+            try:
+                self.panel._large_geometry = self.geometry()
+            except tk.TclError:
+                pass
+        super().destroy()
 
 
 class CanvasDialog(tk.Toplevel):
