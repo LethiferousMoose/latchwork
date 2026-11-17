@@ -93,6 +93,17 @@ class BmpTest(unittest.TestCase):
                 pixelart.decode(bad)
             self.assertIn(msg, str(cm.exception))
 
+    def test_too_many_colors_is_refused(self):
+        from latchwork.project import MAX_COLORS
+        n = MAX_COLORS + 1   # one row, every pixel a different color
+        row = b"".join(bytes((i & 255, i >> 8, 7)) for i in range(n))
+        with self.assertRaises(ValueError) as cm:
+            Project.from_image_bytes(make_bmp(n, 1, 24, [row]), "photo.bmp", "x.latchwork")
+        self.assertIn("1,001 different colors", str(cm.exception))
+        row = row[:3 * MAX_COLORS]
+        p = Project.from_image_bytes(make_bmp(MAX_COLORS, 1, 24, [row]), "ok.bmp", "x.latchwork")
+        self.assertEqual(len(p.colors), MAX_COLORS)
+
     def test_project_keeps_it_as_png(self):
         data = make_bmp(3, 2, 24, rows24())
         with tempfile.TemporaryDirectory() as tmp:

@@ -167,7 +167,9 @@ A `.latchwork` file is readable JSON:
     above) or left to be matched from the active palette.
   - Matching itself is unchanged: yarns used in earlier rugs get no preference.
 - Transparent pixels are not knots and are skipped. Images with more than 64 colors trigger a
-  warning (probably not clean pixel art). PNG (all color types and bit depths), GIF and BMP
+  warning (probably not clean pixel art); more than 1,000 are refused with advice to reduce the
+  colors first (each color gets a swatch in the Colors list, and Tk on Windows aborts the whole
+  program at around 5,000 of them). PNG (all color types and bit depths), GIF and BMP
   are supported; JPEG is refused (its compression smears pixel art into near-duplicate
   colors).
 - BMP: uncompressed 1/2/4/8-bit palette, 16/24/32-bit and bitfields, bottom-up or top-down;

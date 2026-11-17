@@ -27,6 +27,10 @@ FORMAT = "latchwork-project"
 VERSION = 1
 EXTENSION = ".latchwork"
 MANY_COLORS = 64  # more than this suggests the image isn't clean pixel art
+# More than this is a photo or a smoothed/JPEG'd image, not pixel art, and is refused: every
+# color gets its own swatch in the Colors list, and on Windows Tk aborts the whole program
+# ("Fail to allocate bitmap") at around 5,000 of them.
+MAX_COLORS = 1000
 
 
 class ColorEntry:
@@ -86,6 +90,13 @@ class Project:
         counts, transparent = pixelart.color_counts(image)
         if not counts:
             raise ValueError("the image has no opaque pixels")
+        if len(counts) > MAX_COLORS:
+            raise ValueError(
+                "The image has %s different colors; Latchwork works with up to %s. That many "
+                "usually means a photo, or pixel art that was scaled with smoothing or saved as "
+                "JPEG at some point (even if it's a PNG or BMP now). Reduce it to its real "
+                "colors in an image editor first (e.g. GIMP: Image \u2192 Mode \u2192 Indexed)."
+                % (format(len(counts), ","), format(MAX_COLORS, ",")))
         colors = sorted((ColorEntry(h, n) for h, n in counts.items()), key=lambda c: -c.L)
         return cls(project_path, data, fmt, filename, image, colors, transparent)
 
