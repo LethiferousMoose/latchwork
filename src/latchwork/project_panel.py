@@ -24,9 +24,13 @@ def fit_scale(w, h, box_w, box_h):
     return 1, math.ceil(max(w / box_w, h / box_h))
 
 
-def _fade(hex_, amount=0.78):
+FADE_DARK = 58           # highlight a light color: the rest fades toward this gray, not white
+LIGHT_SELECTION = 65     # L* from which the selected color counts as light
+
+
+def _fade(hex_, amount=0.78, toward=255):
     r, g, b = (int(hex_[i:i + 2], 16) for i in (1, 3, 5))
-    return to_hex(*(c + (255 - c) * amount for c in (r, g, b)))
+    return to_hex(*(c + (toward - c) * amount for c in (r, g, b)))
 
 
 def _gray(hex_):
@@ -563,6 +567,13 @@ class ProjectPanel(tk.Frame):
             if preview and self.mark_unassigned.get() else set()
         sel = self.selected_hex() if self.highlight.get() else None
         gray = self.app.gray
+        fade_to = 255   # the rest fades toward white, or toward dark gray around a light color
+        if sel:
+            sel_shown = swap.get(sel, sel)
+            if gray:
+                sel_shown = _gray(sel_shown)
+            if lightness(*parse_hex(sel_shown)) >= LIGHT_SELECTION:
+                fade_to = FADE_DARK
 
         shown, striped = {}, {}
 
@@ -573,7 +584,7 @@ class ProjectPanel(tk.Frame):
                 if gray:
                     v = _gray(v)
                 if sel and orig != sel:
-                    v = _fade(v)
+                    v = _fade(v, toward=fade_to)
                 shown[orig] = v
                 striped[orig] = _fade(v, 0.55) if orig in unassigned else v
             return v
