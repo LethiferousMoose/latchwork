@@ -1,5 +1,6 @@
 """Shared Tk widgets for Latchwork."""
 import math
+import os
 import tkinter as tk
 from tkinter import ttk
 
@@ -12,6 +13,21 @@ C_MAX = 200.0           # GIMP's LCh chroma slider range
 PANEL_BG = "#F7F7F7"
 UI_FONT = ("Segoe UI", 10)
 VALUE_FONT = ("Consolas", 11)
+
+
+def free_name(folder, filename, also=None):
+    """A file name for a save dialog's suggestion that doesn't exist yet in folder, the way
+    Windows does it: "name.ext", else "name (1).ext", "name (2).ext", ...
+    also(path): other paths that file brings along (a palette's brands file); they must be
+    free too."""
+    stem, ext = os.path.splitext(filename)
+    n = 0
+    while True:
+        name = filename if n == 0 else "%s (%d)%s" % (stem, n, ext)
+        path = os.path.join(folder or ".", name)
+        if not any(os.path.exists(p) for p in [path] + list(also(path) if also else [])):
+            return name
+        n += 1
 
 
 class Tooltip:

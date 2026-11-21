@@ -19,7 +19,7 @@ from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
 from .project_panel import ProjectPanel
-from .widgets import ColorPanel, StatCard, Tooltip, describe_delta_L
+from .widgets import ColorPanel, StatCard, Tooltip, describe_delta_L, free_name
 
 # src/latchwork/app.py -> the repository folder
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -414,7 +414,8 @@ class App:
     def new_palette(self):
         path = filedialog.asksaveasfilename(
             title="New palette (starts empty)", initialdir=DATA_DIR, defaultextension=".csv",
-            initialfile="new-palette.csv", filetypes=[("CSV", "*.csv")])
+            initialfile=free_name(DATA_DIR, "new-palette.csv", lambda p: [pal.brands_path(p)]),
+            filetypes=[("CSV", "*.csv")])
         if not path:
             return
         try:
@@ -652,7 +653,8 @@ class App:
         folder, name = os.path.split(img_path)
         path = filedialog.asksaveasfilename(
             title="Save the new project as", initialdir=folder,
-            initialfile=os.path.splitext(name)[0] + EXTENSION, defaultextension=EXTENSION,
+            initialfile=free_name(folder, os.path.splitext(name)[0] + EXTENSION),
+            defaultextension=EXTENSION,
             filetypes=[("Latchwork project", "*" + EXTENSION)])
         if not path:
             return
@@ -1053,7 +1055,8 @@ class App:
         folder, _ = os.path.split(os.path.abspath(self.project.path))
         path = filedialog.asksaveasfilename(
             title="Export yarn list", initialdir=folder, defaultextension=".csv",
-            initialfile="%s-yarns.csv" % self.project.name, filetypes=[("CSV", "*.csv")])
+            initialfile=free_name(folder, "%s-yarns.csv" % self.project.name),
+            filetypes=[("CSV", "*.csv")])
         if not path:
             return
         try:
@@ -1076,7 +1079,8 @@ class App:
         folder, _ = os.path.split(os.path.abspath(self.project.path))
         path = filedialog.asksaveasfilename(
             title="Export pattern for phone / print", initialdir=folder, defaultextension=".html",
-            initialfile="%s-pattern.html" % self.project.name, filetypes=[("Web page", "*.html")])
+            initialfile=free_name(folder, "%s-pattern.html" % self.project.name),
+            filetypes=[("Web page", "*.html")])
         if not path:
             return
         try:
@@ -1095,7 +1099,8 @@ class App:
         folder, _ = os.path.split(os.path.abspath(self.project.path))
         path = filedialog.asksaveasfilename(
             title="Save yarn-color preview (1 pixel per knot)", initialdir=folder,
-            defaultextension=".png", initialfile="%s-preview.png" % self.project.name,
+            defaultextension=".png",
+            initialfile=free_name(folder, "%s-preview.png" % self.project.name),
             filetypes=[("PNG", "*.png")])
         if not path:
             return

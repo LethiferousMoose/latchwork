@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import palette as pal
 from .colormath import parse_hex
-from .widgets import ColorPanel
+from .widgets import ColorPanel, free_name
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
@@ -320,20 +320,28 @@ class PaletteWindow(tk.Toplevel):
         """The open palette's file name without .csv: exports are named after it."""
         return os.path.splitext(os.path.basename(self.app.palette_path or "palette.csv"))[0]
 
+    def _export_folder(self):
+        """Exports start next to the open palette."""
+        return os.path.dirname(os.path.abspath(self.app.palette_path or "palette.csv"))
+
     def export_csv(self):
-        path = filedialog.asksaveasfilename(parent=self, title="Export yarns as CSV",
-                                            defaultextension=".csv",
-                                            initialfile="%s-yarns.csv" % self._export_stem(),
-                                            filetypes=[("CSV", "*.csv")])
+        folder = self._export_folder()
+        path = filedialog.asksaveasfilename(
+            parent=self, title="Export yarns as CSV", initialdir=folder, defaultextension=".csv",
+            initialfile=free_name(folder, "%s-yarns.csv" % self._export_stem(),
+                                  lambda p: [pal.brands_path(p)]),
+            filetypes=[("CSV", "*.csv")])
         if path:
             self._export(lambda: pal.save_bank(path, self.app.bank, self.app.brands), path,
                          "%d yarns (including retired) and their brands\n(%s)"
                          % (len(self.app.bank), os.path.basename(pal.brands_path(path))))
 
     def export_gpl(self):
-        path = filedialog.asksaveasfilename(parent=self, title="Export yarns as GIMP palette",
-                                            defaultextension=".gpl", initialfile="%s.gpl" % self._export_stem(),
-                                            filetypes=[("GIMP palette", "*.gpl")])
+        folder = self._export_folder()
+        path = filedialog.asksaveasfilename(
+            parent=self, title="Export yarns as GIMP palette", initialdir=folder,
+            defaultextension=".gpl", initialfile=free_name(folder, "%s.gpl" % self._export_stem()),
+            filetypes=[("GIMP palette", "*.gpl")])
         if path:
             self._export(lambda: pal.write_gpl(path, self.app.bank), path,
                          "%d active yarns (retired ones are left out)" % len(pal.active(self.app.bank)))

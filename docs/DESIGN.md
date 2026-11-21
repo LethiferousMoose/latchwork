@@ -11,6 +11,9 @@ and the in-app help (F1).
   more than exact hue. Lightness is exactly GIMP's L\*, so values can be checked in GIMP.
 - **Never lose work.** Projects save on every change, embed their image, and keep a snapshot of
   every assigned yarn, so palette edits, retirements or deletions can't break them.
+  Save dialogs suggest a name that doesn't exist yet (project or palette name first, then
+  "-pattern.html", "-yarns.csv", ...; "name (1).ext", "(2)", ... once taken, as Windows does,
+  with a palette's brands file checked too), so a quick Enter never replaces a file.
 - **A project is not tied to a palette.** It matches against whichever palette is active.
 
 ## Color math (`colormath.py`)
