@@ -102,7 +102,7 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 - Ctrl+1 … Ctrl+9: switch to palette 1–9 of the palette list.
 - F1: this help.
 
-The hollow markers on the bars (R, G, B, L, C and h) show the other side's value, and the small numbers right of the yarn's values are yarn minus target per channel (hue the shorter way around the circle), so the difference between target and yarn is visible at a glance (no hue marker or difference for near-grays, whose hue means little).
+The hollow markers on the bars (R, G, B, L, C and h) show the other side's value, and the small numbers right of the yarn's values are yarn minus target per channel (hue the shorter way around the circle), colored like the lightness card: green within 1, amber within 3, red beyond (for hue, by how far the color actually moves, so a big angle on a dull color can still be green), so the difference between target and yarn is visible at a glance (no hue marker or difference for near-grays, whose hue means little).
 """),
     ("Palettes and brands", """
 # Palettes and brands

@@ -1,4 +1,5 @@
 """Shared Tk widgets for Latchwork."""
+import math
 import tkinter as tk
 from tkinter import ttk
 
@@ -121,18 +122,25 @@ class StatCard(tk.Frame):
         self.note.config(text=note)
 
 
+CLOSE, NEAR, FAR = "#1B5E20", "#8A5A00", "#B71C1C"   # difference within 1, within 3, more
+
+
+def closeness_color(diff):
+    return CLOSE if abs(diff) <= 1 else NEAR if abs(diff) <= 3 else FAR
+
+
 def describe_delta_L(dL):
     """(value text, note, color) for yarn L minus target L."""
     a = abs(dL)
     value = ("%+.1f" % dL).replace("-", "−")
     if a < 0.05:
-        return "0.0", "same lightness", "#1B5E20"
+        return "0.0", "same lightness", CLOSE
     side = "darker" if dL < 0 else "lighter"
     if a <= 1:
-        return value, "very close · yarn is a touch %s" % side, "#1B5E20"
+        return value, "very close · yarn is a touch %s" % side, CLOSE
     if a <= 3:
-        return value, "close · yarn is a bit %s" % side, "#8A5A00"
-    return value, "yarn is noticeably %s" % side, "#B71C1C"
+        return value, "close · yarn is a bit %s" % side, NEAR
+    return value, "yarn is noticeably %s" % side, FAR
 
 
 # Each channel: label, displayed value, position 0..1, gradient sampler t(0..1) -> rgb.
@@ -220,8 +228,14 @@ class ColorPanel(tk.Frame):
             delta = {name: channel_delta(name, value, theirs[name])
                      for name, value, _, _ in _channels(rgb, lch) if name != "h" or hue_ok}
         for name, d in zip("RGBLCh", self.deltas):
-            d.config(text=("%+.1f" % delta[name]).replace("-", "−")
-                     if name in delta else "")
+            if name not in delta:
+                d.config(text="")
+                continue
+            size = delta[name]
+            if name == "h":   # how far the color moves around the hue circle: Lab's delta H
+                size = 2 * math.sqrt(lch[1] * olch[1]) * math.sin(math.radians(size) / 2)
+            d.config(text=("%+.1f" % delta[name]).replace("-", "−"),
+                     fg=closeness_color(size))
         for (name, value, pos, sample), bar, val in zip(_channels(rgb, lch),
                                                         self.bars, self.values):
             bar.delete("all")
