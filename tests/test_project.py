@@ -218,6 +218,26 @@ class TestProject(unittest.TestCase):
         self.assertIsNone(q.entry("#FFFFFF").carried)
         self.assertNotIn("carried_from", q.entry("#FFFFFF").to_json())
 
+    def test_candidates(self):
+        p = self.new()
+        white, orange, navy, black = self.yarns
+        self.assertTrue(p.toggle_candidate("#C86432", orange))
+        self.assertTrue(p.toggle_candidate("#C86432", navy))
+        self.assertTrue(p.toggle_candidate("#000000", navy))         # per color
+        self.assertFalse(p.toggle_candidate("#C86432", orange))      # unmark
+        self.assertTrue(p.is_candidate("#C86432", navy))
+        self.assertFalse(p.is_candidate("#C86432", orange))
+        p.assign("#C86432", black, "palette.csv")                    # assigning keeps them
+        p.save()
+        q = Project.load(self.path)
+        self.assertEqual(q.entry("#C86432").candidates,
+                         [{"name": navy.sku, "brand": "", "hex": navy.hex}])
+        self.assertTrue(q.is_candidate("#000000", navy))
+        self.assertEqual(q.entry("#FFFFFF").candidates, [])
+        self.assertNotIn("candidates", q.entry("#FFFFFF").to_json())
+        # same name, recolored yarn: not the same candidate
+        self.assertFalse(q.is_candidate("#C86432", Yarn(navy.sku, (1, 2, 3))))
+
     def test_read_yarn_image(self):
         # image: #0A141E #C86432 #0A141E / #FFFFFF #000000 #C86432
         p = self.new()

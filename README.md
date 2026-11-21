@@ -57,8 +57,9 @@ first and tells you what's missing.
 2. **Colors tab:** click a color in the list (or in the image) to make it the target.
 3. The main view shows the target next to its best yarn match. Use **N** / **B** to walk down
    and up the match ranking, **← →** (or the mouse wheel over the yarn strip) to step through
-   the palette by lightness, **G** to compare
-   in grayscale. Press **A** to assign the yarn on screen.
+   the palette by lightness, **G** to compare in grayscale. Deciding between a few? **M** marks
+   the yarn on screen as a candidate (or right-click its tile) and **C** (or a middle-click)
+   flips between your candidates. Press **A** to assign the yarn on screen.
 4. **Plan tab:** packs or pieces per yarn, finished size and canvas to cut. Canvas settings
    (holes per inch, borders) are per project under *Change…*.
 5. **File → Export pattern** (Ctrl+E) writes the HTML pattern. Copy it to your phone and open

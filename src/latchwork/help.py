@@ -93,6 +93,8 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 - N: next match down the ranking (after stepping with the arrows, starts again at #1).
 - B: better match, one step up the ranking.
 - Home: best match (#1).
+- M: mark the yarn on screen as a candidate for the selected color (again to unmark); right-click a tile in the strip does the same for that yarn. Candidates are per color, saved in the project, and kept when you assign: a shortlist while you decide. Marked tiles get a star, and the Colors list shows how many (★3).
+- C: next candidate (darker, wrapping around); Shift+C goes the other way. Middle-click (wheel click) over the strip does the same as C. The preview follows, so you can flip between your picks in the whole picture.
 - A: assign the yarn on screen to the selected color; press again to undo.
 - G: grayscale (judge lightness alone).
 - P: sidebar image: original / yarn preview (assigned yarns, and suggested yarns for unassigned colors; Mark unassigned stripes those). The selected color shows the yarn currently on screen, live as you step, so you can judge it in the whole picture; nothing changes until you Assign. Highlight selected color (off by default) fades everything else, to show where that color is: toward white, or toward dark gray when the selected color is light (so white or pale colors still stand out). View larger (above the image) opens it in its own window, as big as fits, for small, long or wide art; it follows the sidebar and you can click colors in it.

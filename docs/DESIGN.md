@@ -137,7 +137,8 @@ A `.latchwork` file is readable JSON:
   "colors": [
     {"hex": "#AAD2F0", "count": 280, "confirmed": true, "carried_from": "forest rug",
      "yarn": {"name": "Light Blue", "brand": "Hershner's", "pack": 320,
-              "hex": "#ACD5F2", "palette": "palette.csv"}}
+              "hex": "#ACD5F2", "palette": "palette.csv"},
+     "candidates": [{"name": "Sky Blue", "brand": "Red Heart", "hex": "#A9C9E4"}]}
   ],
   "settings": {"spare_percent": 0, "holes_per_inch": 3.75,
                "sort": {"colors": ["count", true]}}
@@ -145,6 +146,13 @@ A `.latchwork` file is readable JSON:
 ```
 
 - The **image is embedded**, so the original file can move or disappear.
+- **Candidates** (optional, per color) are yarns I marked while deciding (M, or right-click a
+  strip tile); C and middle-click rotate through them in palette order, wrapping around, and
+  Shift+C goes back. They are bookmarks only: matching and ranking ignore them, and assigning
+  keeps them so the shortlist is there if I change my mind. A candidate is identified by name,
+  brand and hex, so a recolored yarn no longer counts; ones not among the active yarns are
+  kept in the file but skipped. Starred strip tiles, a badge on the yarn swatch ("Candidate 2
+  of 3") and a star count in the Colors list's status show them.
 - Each image color has either a **suggestion** (`confirmed: false`, the current best match from
   the active palette, refreshed when the palette or weight changes) or an **assignment**
   (`confirmed: true`, never changed automatically).

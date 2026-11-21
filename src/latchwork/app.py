@@ -327,13 +327,20 @@ class App:
         self.strip.bind("<MouseWheel>", self._on_strip_wheel)
         self.strip.bind("<Button-4>", lambda e: self.step(-1))     # X11 wheel up
         self.strip.bind("<Button-5>", lambda e: self.step(1))      # X11 wheel down
+        # middle-click: next candidate (macOS numbers the right and middle buttons the other way)
+        aqua = self.root.tk.call("tk", "windowingsystem") == "aqua"
+        self._right_click = "<Button-2>" if aqua else "<Button-3>"
+        self.strip.bind("<Button-3>" if aqua else "<Button-2>",
+                        lambda e: self.cycle_candidate(1))
+        self._note, self._note_job = None, None
 
         hints = tk.Frame(r, bg=BG)
         hints.grid(row=6, column=0, columnspan=2, padx=16, pady=(4, 10))
         self.hint_rows = [tk.Frame(hints, bg=BG), tk.Frame(hints, bg=BG)]
         self.hint_items = []
         for keys, text in (("←→", "lighter / darker"), ("N", "next match"), ("B", "better match"),
-                           ("Home", "best match"), ("G", "grayscale"), ("A", "assign"),
+                           ("Home", "best match"), ("M", "mark candidate"),
+                           ("C", "next candidate"), ("G", "grayscale"), ("A", "assign"),
                            ("P", "original/preview"), ("F1", "help")):
             item = tk.Frame(hints, bg=BG)
             self.hint_items.append(item)
@@ -376,6 +383,10 @@ class App:
             self.root.bind_all(k, lambda e: self._key(e, self.assign))
         for k in ("p", "P"):
             self.root.bind_all(k, lambda e: self._key(e, self.sidebar.toggle_view))
+        for k in ("m", "M"):
+            self.root.bind_all(k, lambda e: self._key(e, self.mark_candidate))
+        self.root.bind_all("c", lambda e: self._key(e, lambda: self.cycle_candidate(1)))
+        self.root.bind_all("C", lambda e: self._key(e, lambda: self.cycle_candidate(-1)))
         for k in ("<Return>", "<Escape>"):
             self.entry.bind(k, lambda e: self.swatch.focus_set())
             self.yarn_entry.bind(k, lambda e: self.swatch.focus_set())   # FocusOut resets it
@@ -960,6 +971,60 @@ class App:
         self.index = i
         self.refresh()
 
+    # ---------- candidates ----------
+    def candidate_indexes(self):
+        """Positions in the palette of the selected color's candidates, lightest first
+        (candidates no longer among the active yarns are skipped)."""
+        if not (self.project and self.selected_hex and self.yarns):
+            return []
+        return [i for i, y in enumerate(self.yarns)
+                if self.project.is_candidate(self.selected_hex, y)]
+
+    def mark_candidate(self, i=None):
+        """M / right-click a tile: mark or unmark a yarn (the one on screen, or tile i) as a
+        candidate for the selected color."""
+        if not (self.project and self.selected_hex and self.yarns):
+            self.root.bell()
+            return
+        if i is not None:
+            self.index = i
+        on = self.project.toggle_candidate(self.selected_hex, self.yarns[self.index])
+        self.save_project()
+        self.sidebar.update_row(self.selected_hex, plan=False)
+        self.sidebar.size_columns()
+        n = len(self.candidate_indexes())
+        self.show_note("Marked as a candidate (%d)" % n if on else
+                       "Unmarked (%d candidate%s left)" % (n, "" if n == 1 else "s"))
+        self.refresh()
+
+    def cycle_candidate(self, delta):
+        """C / middle-click: the next candidate darker than the yarn on screen (Shift+C: the
+        next lighter one), wrapping around."""
+        marks = self.candidate_indexes()
+        if not marks:
+            self.root.bell()
+            self.show_note("No candidates yet: M marks the yarn on screen"
+                           if self.project and self.selected_hex else
+                           "Pick a color of the project first")
+            return
+        if delta > 0:
+            self.index = next((i for i in marks if i > self.index), marks[0])
+        else:
+            self.index = next((i for i in reversed(marks) if i < self.index), marks[-1])
+        self.refresh()
+
+    def show_note(self, text):
+        """A short message at the top right of the yarn swatch, gone after a moment."""
+        self._note = text
+        if self._note_job:
+            self.root.after_cancel(self._note_job)
+        self._note_job = self.root.after(2500, self._clear_note)
+        self.draw_swatch()
+
+    def _clear_note(self):
+        self._note, self._note_job = None, None
+        self.draw_swatch()
+
     def toggle_gray(self):
         self.gray = not self.gray
         self.gray_btn.config(text="\u2713 Grayscale on" if self.gray else "Grayscale")
@@ -1091,6 +1156,22 @@ class App:
             others = self.used_yarns().get((yarn.key, yarn.hex), [])
             if others:
                 self._draw_used_badge(c, mid + 8, h - 8, others, w - mid - 16)
+            marks = self.candidate_indexes()
+            tag = None
+            if self.index in marks:
+                tag = "\u2605 Candidate %d of %d" % (marks.index(self.index) + 1, len(marks))
+            elif marks:
+                tag = "%d candidate%s \u00b7 C to see" % (len(marks), "" if len(marks) == 1
+                                                          else "s")
+            for n, text in enumerate(t for t in (tag, self._note) if t):
+                if not hasattr(self, "_badge_font"):
+                    self._badge_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
+                tw = self._badge_font.measure(text)
+                y0 = 8 + n * 30
+                c.create_rectangle(w - 8 - tw - 20, y0, w - 8, y0 + 24, fill="#2B2B2B",
+                                   outline="")
+                c.create_text(w - 18, y0 + 12, text=text, font=self._badge_font, fill="white",
+                              anchor="e")
 
     def _draw_used_badge(self, c, x, bottom, hexes, room):
         """'Already used for [#87BEEB] [#5A9646] and 2 more' at the bottom-left of the yarn,
@@ -1195,6 +1276,7 @@ class App:
         slots = 2 * NEIGHBORS + 1
         sw = w / slots
         used = self.used_yarns()
+        marks = set(self.candidate_indexes())
         for s in range(slots):
             i = self.index - NEIGHBORS + s
             if not 0 <= i < len(self.yarns):
@@ -1209,9 +1291,14 @@ class App:
             if (y.key, y.hex) in used:   # already assigned to another color of this rug
                 c.create_oval(x1 - 15, 6, x1 - 5, 16, fill="#2B2B2B", outline="white",
                               tags=tag)
+            if i in marks:   # a candidate for the selected color
+                c.create_rectangle(x0 + 4, 5, x0 + 22, 21, fill="#2B2B2B", outline="", tags=tag)
+                c.create_text(x0 + 13, 13, text="\u2605", fill="#FFD54F",
+                              font=("Segoe UI", 9, "bold"), tags=tag)
             c.create_text((x0 + x1) / 2, 58, text=y.sku, width=sw - 6, anchor="n",
                           font=("Segoe UI", 8, "bold" if current else "normal"), tags=tag)
             c.tag_bind(tag, "<Button-1>", lambda e, i=i: self.jump_to(i))
+            c.tag_bind(tag, self._right_click, lambda e, i=i: self.mark_candidate(i))
 
 
 def main():

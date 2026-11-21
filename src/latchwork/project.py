@@ -10,7 +10,9 @@ File format (JSON, version 1):
   "colors": [{"hex": "#88A048", "count": 123,
               "yarn": {"name": "Sage", "brand": "Loops & Threads", "pack": null,
                        "hex": "#959A78", "palette": "palette.csv"} | null,
-              "confirmed": true, "carried_from": "mario-1"}],   # carried_from: optional
+              "confirmed": true, "carried_from": "mario-1",     # carried_from: optional
+              "candidates": [{"name": "Brass", "brand": "Hershner's", "hex": "#755940"}]}],
+                                                       # candidates: optional, yarns I marked
   "settings": {"spare_percent": 0, "holes_per_inch": 3.75, "border_side": 3, ...}
 }
 """
@@ -42,12 +44,15 @@ class ColorEntry:
         self.yarn = yarn            # {"name", "hex", "palette"} or None
         self.confirmed = confirmed  # True once I press Assign; False = a suggestion
         self.carried = None         # name of the project this assignment was carried over from
+        self.candidates = []        # yarns I marked to compare: [{"name", "brand", "hex"}]
 
     def to_json(self):
         d = {"hex": self.hex, "count": self.count, "yarn": self.yarn,
              "confirmed": self.confirmed}
         if self.carried and self.confirmed:
             d["carried_from"] = self.carried
+        if self.candidates:
+            d["candidates"] = [dict(y) for y in self.candidates]
         return d
 
 
@@ -129,6 +134,10 @@ class Project:
                     entry.confirmed = bool(s.get("confirmed"))
                     if entry.confirmed and s.get("carried_from"):
                         entry.carried = str(s["carried_from"])
+            for y in (s or {}).get("candidates") or []:
+                if isinstance(y, dict) and y.get("name") and parse_hex(y.get("hex", "")):
+                    entry.candidates.append({"name": y["name"], "brand": y.get("brand") or "",
+                                             "hex": y["hex"].upper()})
         project.settings.update(doc.get("settings") or {})
         return project
 
@@ -189,6 +198,24 @@ class Project:
         c = self.entry(hex_)
         c.confirmed = False
         c.carried = None
+
+    # ---------- candidates: yarns I'm deciding between, per color ----------
+    @staticmethod
+    def _cand_match(y, yarn):
+        return yarn_key(y["name"], y["brand"]) == yarn.key and y["hex"] == yarn.hex.upper()
+
+    def is_candidate(self, hex_, yarn):
+        return any(self._cand_match(y, yarn) for y in self.entry(hex_).candidates)
+
+    def toggle_candidate(self, hex_, yarn):
+        """Mark or unmark a yarn as a candidate for a color; True if it is marked now."""
+        c = self.entry(hex_)
+        kept = [y for y in c.candidates if not self._cand_match(y, yarn)]
+        if len(kept) < len(c.candidates):
+            c.candidates = kept
+            return False
+        c.candidates.append({"name": yarn.sku, "brand": yarn.brand, "hex": yarn.hex.upper()})
+        return True
 
     # ---------- carry over from earlier projects ----------
     def carry_options(self, sources):

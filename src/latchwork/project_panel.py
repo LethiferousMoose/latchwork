@@ -316,6 +316,8 @@ class ProjectPanel(tk.Frame):
         name = yarn_label(c.yarn["name"], c.yarn.get("brand")) if c.yarn \
             else "(no yarns in palette)"
         state = ("carried over" if c.carried else "assigned") if c.confirmed else "suggested"
+        if c.candidates:
+            state += " \u2605%d" % len(c.candidates)
         self.tree.item(hex_, text="  " + c.hex, image=self.row_images[key],
                        values=(format(c.count, ","), name, state),
                        tags=() if c.confirmed else ("suggested",))
