@@ -20,7 +20,7 @@ import os
 import tempfile
 
 from . import pixelart
-from .colormath import lightness, match_order, parse_hex, rgb_to_lab
+from .colormath import lightness, match_order, parse_hex, rgb_to_lab, to_hex
 from .palette import effective_pack, legacy_assignment, yarn_key
 
 FORMAT = "latchwork-project"
@@ -221,6 +221,46 @@ class Project:
         c.yarn = dict(yarn)
         c.confirmed = True
         c.carried = source_name
+
+    # ---------- assign from a yarn image ----------
+    def read_yarn_image(self, image, yarns):
+        """Read assignments from a yarn image: this rug's image, same size, recolored so every
+        pixel is a yarn's exact color (how patterns were made by hand before Latchwork).
+
+        yarns: every yarn of the palette; for a color shared by two, an active yarn wins.
+        Returns {hex: result} for every color of this rug, where result is one of
+          ("yarn", Yarn)                 all its pixels are that yarn's color
+          ("split", [(hex, count), ...]) its pixels hold several colors, most first
+          ("unknown", hex)               one color, but no yarn has it
+          ("empty", None)                transparent in the yarn image
+        Raises ValueError if the sizes differ."""
+        if (image.width, image.height) != (self.image.width, self.image.height):
+            raise ValueError(
+                "The yarn image is %d × %d but this rug's image is %d × %d. It has to "
+                "be the same size, one pixel per knot (not enlarged, no grid lines)."
+                % (image.width, image.height, self.image.width, self.image.height))
+        by_hex = {}
+        for y in sorted(yarns, key=lambda y: y.retired):
+            by_hex.setdefault(y.hex.upper(), y)
+        seen = {}
+        cut = pixelart.TRANSPARENT_BELOW
+        for (r, g, b, a), (yr, yg, yb, ya) in zip(self.image.pixels, image.pixels):
+            if a < cut:
+                continue
+            under = to_hex(yr, yg, yb) if ya >= cut else None
+            counts = seen.setdefault(to_hex(r, g, b), {})
+            counts[under] = counts.get(under, 0) + 1
+        out = {}
+        for c in self.colors:
+            counts = seen.get(c.hex, {})
+            if len(counts) > 1:
+                out[c.hex] = ("split", sorted(counts.items(), key=lambda kv: -kv[1]))
+            elif None in counts:
+                out[c.hex] = ("empty", None)
+            else:
+                (h,) = counts
+                out[c.hex] = ("yarn", by_hex[h]) if h in by_hex else ("unknown", h)
+        return out
 
     @property
     def assigned_count(self):

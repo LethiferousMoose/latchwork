@@ -166,6 +166,15 @@ A `.latchwork` file is readable JSON:
   - Carried-over yarns missing from the active palette can be kept (snapshot fallback, as
     above) or left to be matched from the active palette.
   - Matching itself is unchanged: yarns used in earlier rugs get no preference.
+- **Assign from yarn image** (File): brings in a rug patterned by hand before Latchwork. The
+  yarn image is the rug's image recolored so every pixel is a yarn's exact color, at the same
+  size (one pixel per knot; enlarged or gridded copies are refused). For each color of the rug,
+  the pixels at the same places in the yarn image decide: all one yarn's color assigns that
+  yarn (an ordinary assignment, replacing any earlier one; the summary lists replacements).
+  Anything else is left as it is and listed: several colors there (e.g. pixels touched up
+  later), a color no yarn has (renamed or edited), or transparent. Exact colors only, no
+  near-matching. Retired yarns count (an old rug may use one); a color shared with an active
+  yarn goes to the active one.
 - Transparent pixels are not knots and are skipped. Images with more than 64 colors trigger a
   warning (probably not clean pixel art); more than 1,000 are refused with advice to reduce the
   colors first (each color gets a swatch in the Colors list, and Tk on Windows aborts the whole

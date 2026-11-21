@@ -50,6 +50,8 @@ first and tells you what's missing.
    Projects save automatically.
    Making several rugs from one game? Pick earlier projects when asked, and every color with
    exactly the same hex starts with the yarn you used before.
+   Already patterned a rug by hand? **File → Assign from yarn image** reads your yarn-colored
+   copy of the art (same size) and assigns every color that matches a yarn exactly.
 
    <img src="docs/images/carry-over.png" alt="Carrying assignments over from earlier rugs" width="60%">
 2. **Colors tab:** click a color in the list (or in the image) to make it the target.

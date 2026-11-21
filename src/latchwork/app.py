@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from . import palette as pal
 from . import pattern
+from . import pixelart
 from . import plan as pl
 from .colormath import (DEFAULT_COLOR_WEIGHT, gray_for_lightness, match_order, parse_hex,
                        rgb_to_lab, rgb_to_lch, to_hex)
@@ -205,6 +206,7 @@ class App:
         file_menu.add_command(label="Open project...", accelerator="Ctrl+O",
                               command=self.open_project)
         file_menu.add_command(label="Carry over assignments...", command=self.carry_over)
+        file_menu.add_command(label="Assign from yarn image...", command=self.assign_from_image)
         file_menu.add_command(label="Close project", command=self.close_project)
         file_menu.add_separator()
         file_menu.add_command(label="Export pattern (phone / print)...", accelerator="Ctrl+E",
@@ -650,12 +652,86 @@ class App:
         if not picks:
             return
         self._apply_carry(picks, self.project)
+        self._after_bulk_assign()
+
+    def _after_bulk_assign(self):
         self.save_project()
         self.sidebar.refresh_rows()
         self.sidebar.refresh_plan()
         self.sidebar.render_image()
         if self.selected_hex:
             self._goto_entry(self.project.entry(self.selected_hex))
+
+    def assign_from_image(self):
+        """File menu: assign yarns from a hand-made yarn image (the rug's image recolored with
+        exact yarn colors, same size)."""
+        if not self._need_project("assign from a yarn image"):
+            return
+        title = "Assign from yarn image"
+        path = filedialog.askopenfilename(
+            title="Choose the yarn image (this rug's image in yarn colors, same size)",
+            initialdir=os.path.dirname(os.path.abspath(self.project.path)),
+            filetypes=[("Pixel art", "*.png *.gif *.bmp"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "rb") as fh:
+                image = pixelart.decode(fh.read())
+            results = self.project.read_yarn_image(image, self.bank)
+        except (OSError, ValueError) as e:
+            messagebox.showerror(title, "Could not use %s\n\n%s" % (path, e))
+            return
+        by_hex = {y.hex.upper(): y for y in self.bank}
+
+        def name(h):
+            if h is None:
+                return "transparent"
+            y = by_hex.get(h)
+            return "%s %s" % (h, y.label) if y else h
+
+        picks, same, replaced, problems = [], 0, [], []
+        for c in self.project.colors:
+            kind, value = results[c.hex]
+            if kind == "yarn":
+                old = c.yarn if c.confirmed else None
+                if old and self.assignment_key(old) == value.key \
+                        and old["hex"].upper() == value.hex:
+                    same += 1
+                    continue
+                picks.append((c.hex, value))
+                if old:
+                    replaced.append("%s: %s \u2192 %s" % (
+                        c.hex, pal.label(old["name"], old.get("brand") or ""), value.label))
+            elif kind == "split":
+                problems.append("%s: several colors there (%s)" % (c.hex, ", ".join(
+                    "%s \u00d7%d" % (name(h), n) for h, n in value)))
+            elif kind == "unknown":
+                problems.append("%s: %s is not a yarn color in %s" % (
+                    c.hex, value, self.palette_name))
+            else:
+                problems.append("%s: transparent in the yarn image" % c.hex)
+
+        def listing(head, lines, most=12):
+            if not lines:
+                return ""
+            more = len(lines) - most
+            return "\n\n%s\n%s%s" % (head, "\n".join(lines[:most]),
+                                       "\n\u2026and %d more" % more if more > 0 else "")
+
+        n = len(self.project.colors)
+        text = "%d of %d colors match a yarn exactly%s." % (
+            len(picks) + same, n, " (%d already assigned to it)" % same if same else "")
+        text += listing("Replaces these assignments:", replaced)
+        text += listing("Left as they are:", problems)
+        if not picks:
+            messagebox.showinfo(title, text + "\n\nNothing to assign.")
+            return
+        if not messagebox.askyesno(title, text + "\n\nAssign %d color%s?" % (
+                len(picks), "" if len(picks) == 1 else "s")):
+            return
+        for hex_, yarn in picks:
+            self.project.assign(hex_, yarn, self.palette_name, self.brands)
+        self._after_bulk_assign()
 
     @staticmethod
     def _apply_carry(picks, project):

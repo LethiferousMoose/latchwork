@@ -15,6 +15,7 @@ Latchwork takes a pixel-art image to a finished latch-hook pattern:
 
 - File → New project from image (PNG, GIF or BMP; not JPEG, which blurs pixel art into extra colors). The image is stored inside the .latchwork file, so moving or deleting the original never breaks a project.
 - Carry over: a new project can start from earlier rugs' assignments (the open project is offered first). Colors with exactly the same hex get the same yarn, marked "carried over"; every other color is matched as usual. Also under File → Carry over assignments, which only fills colors not assigned yet.
+- Assign from yarn image (File): for a rug you patterned before Latchwork. Start a project from the original art, then pick your old yarn image: the same picture, same size, recolored with exact yarn colors. Every color whose pixels all show one yarn's color gets that yarn; a summary first lists what it will assign or replace and the colors it leaves alone (mixed colors there, a color that isn't a yarn, or transparent).
 - Colors tab: every image color with its knot count, lightest first. Click a row (or a pixel in the image) to make it the target.
 - The main view shows the target next to a yarn. Step through yarns, then press Assign (A).
 - Plan tab: packs or pieces per yarn (most knots first), finished size and canvas to cut.

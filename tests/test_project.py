@@ -218,6 +218,33 @@ class TestProject(unittest.TestCase):
         self.assertIsNone(q.entry("#FFFFFF").carried)
         self.assertNotIn("carried_from", q.entry("#FFFFFF").to_json())
 
+    def test_read_yarn_image(self):
+        # image: #0A141E #C86432 #0A141E / #FFFFFF #000000 #C86432
+        p = self.new()
+        white, orange, navy, black = self.yarns
+        retired_navy = Yarn("Old Navy", navy.rgb, retired=True)
+        ok = lambda y: y.rgb + (255,)                                 # noqa: E731
+        odd = (1, 2, 3, 255)
+        pixels = [ok(navy), ok(orange), ok(black),                    # navy split: navy/black
+                  (0, 0, 0, 0), odd, ok(orange)]                      # white clear, black odd
+        img = pixelart.PixelImage(3, 2, pixels)
+        res = p.read_yarn_image(img, [retired_navy] + self.yarns)
+        self.assertEqual(res["#C86432"], ("yarn", orange))
+        self.assertEqual(res["#0A141E"][0], "split")
+        self.assertEqual(sorted(res["#0A141E"][1]), sorted([(navy.hex, 1), (black.hex, 1)]))
+        self.assertEqual(res["#FFFFFF"], ("empty", None))
+        self.assertEqual(res["#000000"], ("unknown", "#010203"))
+        # a shared color picks the active yarn, even when the retired one comes first
+        pixels[2] = ok(navy)
+        res = p.read_yarn_image(pixelart.PixelImage(3, 2, pixels), [retired_navy] + self.yarns)
+        self.assertIs(res["#0A141E"][1], navy)
+        # transparent rug pixels are ignored; a split with transparent lists None
+        pixels[2] = (0, 0, 0, 0)
+        res = p.read_yarn_image(pixelart.PixelImage(3, 2, pixels), self.yarns)
+        self.assertIn((None, 1), res["#0A141E"][1])
+        with self.assertRaises(ValueError):
+            p.read_yarn_image(pixelart.PixelImage(2, 3, pixels), self.yarns)
+
     def test_file_is_readable_json(self):
         p = self.new()
         p.save()
