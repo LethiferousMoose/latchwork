@@ -183,8 +183,8 @@ class ColorPanel(tk.Frame):
         self.status.pack(side="left", padx=4)
 
     def show(self, rgb, other=None):
-        """Draw the channels for rgb (or blank if None). `other` (an rgb) adds faint markers on
-        L, C and h for comparison; no hue marker when either color is near gray."""
+        """Draw the channels for rgb (or blank if None). `other` (an rgb) adds hollow markers on
+        every bar for comparison; no hue marker when either color is near gray."""
         self.images = []
         if rgb is None:
             for bar, val in zip(self.bars, self.values):
@@ -197,7 +197,7 @@ class ColorPanel(tk.Frame):
         if other is not None:
             olch = rgb_to_lch(*other)
             ghost = {name: pos for name, _, pos, _ in _channels(other, olch)
-                     if name in "LC" or (name == "h" and min(lch[1], olch[1]) >= HUE_MIN_C)}
+                     if name != "h" or min(lch[1], olch[1]) >= HUE_MIN_C}
         for (name, value, pos, sample), bar, val in zip(_channels(rgb, lch),
                                                         self.bars, self.values):
             bar.delete("all")
