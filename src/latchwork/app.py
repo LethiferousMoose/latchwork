@@ -322,6 +322,11 @@ class App:
         self.strip = tk.Canvas(r, height=96, bg=BG, highlightthickness=0)
         self.strip.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(6, 0))
         self.strip.bind("<Configure>", lambda e: self.draw_strip())
+        # mouse wheel on the strip: up = lighter, down = darker, one yarn per notch
+        self._wheel = 0
+        self.strip.bind("<MouseWheel>", self._on_strip_wheel)
+        self.strip.bind("<Button-4>", lambda e: self.step(-1))     # X11 wheel up
+        self.strip.bind("<Button-5>", lambda e: self.step(1))      # X11 wheel down
 
         hints = tk.Frame(r, bg=BG)
         hints.grid(row=6, column=0, columnspan=2, padx=16, pady=(4, 10))
@@ -939,6 +944,17 @@ class App:
         if self.yarns:
             self.index = max(0, min(len(self.yarns) - 1, self.index + delta))
             self.refresh()
+
+    def _on_strip_wheel(self, event):
+        if self.root.tk.call("tk", "windowingsystem") == "aqua":   # macOS: small deltas
+            self.step(-1 if event.delta > 0 else 1)
+            return
+        # Windows: 120 per notch; touchpads send smaller pieces, so add them up
+        self._wheel += event.delta
+        notches = int(self._wheel / 120)
+        if notches:
+            self._wheel -= notches * 120
+            self.step(-notches)
 
     def jump_to(self, i):
         self.index = i

@@ -89,7 +89,7 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 """),
     ("Keyboard shortcuts", """
 # Keyboard shortcuts
-- ← →: step one yarn lighter / darker (palette order, lightest to darkest).
+- ← →: step one yarn lighter / darker (palette order, lightest to darkest). The mouse wheel over the strip of yarns does the same: up for lighter, down for darker.
 - N: next match down the ranking (after stepping with the arrows, starts again at #1).
 - B: better match, one step up the ranking.
 - Home: best match (#1).
