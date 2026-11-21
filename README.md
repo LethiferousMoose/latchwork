@@ -60,6 +60,11 @@ first and tells you what's missing.
    the palette by lightness, **G** to compare in grayscale. Deciding between a few? **M** marks
    the yarn on screen as a candidate (or right-click its tile) and **C** (or a middle-click)
    flips between your candidates. Press **A** to assign the yarn on screen.
+   For small, long or wide art, **View larger** (above the sidebar image) opens the picture in
+   its own window. With *Highlight selected color* on, everything but the selected color fades,
+   toward dark gray around a light color like this sun.
+
+   <img src="docs/images/larger-view.png" alt="View larger, highlighting the sun" width="48%">
 4. **Plan tab:** packs or pieces per yarn, finished size and canvas to cut. Canvas settings
    (holes per inch, borders) are per project under *Change…*.
 5. **File → Export pattern** (Ctrl+E) writes the HTML pattern. Copy it to your phone and open
