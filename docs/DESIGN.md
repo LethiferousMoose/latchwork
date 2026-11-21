@@ -84,10 +84,11 @@ and a dot on its strip tile (assignments only, not suggestions; the ranking is u
 since a shared yarn merges two colors on the rug, which is sometimes wanted and sometimes
 not). Hollow markers on every bar (R, G, B, L, C, h) show the other side's value, and a
 column right of the yarn's values gives yarn − target per channel, in the same scale as the
-values (R, G, B 0–100); hue goes the shorter way around, so 350° vs 10° is −20. Each is
-colored like the lightness card, green within 1, amber within 3, red beyond; hue is judged by
-ΔH = 2√(C₁C₂)·sin(Δh/2), how far the color moves in Lab units, since the same angle is a
-big change on a vivid color and almost none on a dull one (the number shown stays in degrees).
+values (R, G, B 0–100); hue goes the shorter way around, so 350° vs 10° is −20. Each
+sits on a pale chip colored like the lightness card: green within 1, amber within 3, red
+beyond. Hue is judged by ΔH = 2√(C₁C₂)·sin(Δh/2), how far the color moves in Lab units,
+since the same angle is a big change on a vivid color and almost none on a dull one (the
+number shown stays in degrees).
 No hue marker or difference below chroma 5, where hue means little.
 
 ## Palettes (`palette.py`, `palette_window.py`)

@@ -123,6 +123,7 @@ class StatCard(tk.Frame):
 
 
 CLOSE, NEAR, FAR = "#1B5E20", "#8A5A00", "#B71C1C"   # difference within 1, within 3, more
+TINT = {CLOSE: "#DCEFDD", NEAR: "#F6E7C8", FAR: "#F9DEDE"}  # pale chip behind that text color
 
 
 def closeness_color(diff):
@@ -187,9 +188,9 @@ class ColorPanel(tk.Frame):
                            relief="sunken", bd=1, padx=4)
             val.grid(row=row, column=2, sticky="e")
             if deltas:
-                d = tk.Label(self, font=("Consolas", 10), bg=PANEL_BG, fg="#666", width=6,
-                             anchor="e")
-                d.grid(row=row, column=3, sticky="e", padx=(2, 0))
+                d = tk.Label(self, font=("Consolas", 10), bg=PANEL_BG, width=6, anchor="e",
+                             padx=3)
+                d.grid(row=row, column=3, sticky="e", padx=(6, 0))
                 self.deltas.append(d)
             self.bars.append(bar)
             self.values.append(val)
@@ -211,7 +212,7 @@ class ColorPanel(tk.Frame):
         self.images = []
         if rgb is None:
             for d in self.deltas:
-                d.config(text="")
+                d.config(text="", bg=PANEL_BG)
             for bar, val in zip(self.bars, self.values):
                 bar.delete("all")
                 bar.create_rectangle(0, 0, self.bar_w - 1, BAR_H - 1, fill="#DDD", outline="#BBB")
@@ -229,13 +230,13 @@ class ColorPanel(tk.Frame):
                      for name, value, _, _ in _channels(rgb, lch) if name != "h" or hue_ok}
         for name, d in zip("RGBLCh", self.deltas):
             if name not in delta:
-                d.config(text="")
+                d.config(text="", bg=PANEL_BG)
                 continue
             size = delta[name]
             if name == "h":   # how far the color moves around the hue circle: Lab's delta H
                 size = 2 * math.sqrt(lch[1] * olch[1]) * math.sin(math.radians(size) / 2)
-            d.config(text=("%+.1f" % delta[name]).replace("-", "−"),
-                     fg=closeness_color(size))
+            fg = closeness_color(size)
+            d.config(text=("%+.1f" % delta[name]).replace("-", "−"), fg=fg, bg=TINT[fg])
         for (name, value, pos, sample), bar, val in zip(_channels(rgb, lch),
                                                         self.bars, self.values):
             bar.delete("all")

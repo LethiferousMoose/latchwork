@@ -25,7 +25,7 @@ from .widgets import ColorPanel, StatCard, Tooltip, describe_delta_L
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(ROOT, "data")
 DEFAULT_PALETTE = os.path.join(DATA_DIR, "palette.csv")
-COMPARE_BAR_W = 210   # channel bars in the comparison: room for the yarn's difference column
+COMPARE_BAR_W = 200   # channel bars in the comparison: room for the yarn's difference column
 SETTINGS = os.path.join(ROOT, "settings", "latchwork_settings.json")  # per-user, not in git
 OLD_SETTINGS = os.path.join(ROOT, "latchwork_settings.json")          # before the data/ move
 
