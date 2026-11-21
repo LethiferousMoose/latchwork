@@ -25,6 +25,7 @@ from .widgets import ColorPanel, StatCard, Tooltip, describe_delta_L
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(ROOT, "data")
 DEFAULT_PALETTE = os.path.join(DATA_DIR, "palette.csv")
+COMPARE_BAR_W = 210   # channel bars in the comparison: room for the yarn's difference column
 SETTINGS = os.path.join(ROOT, "settings", "latchwork_settings.json")  # per-user, not in git
 OLD_SETTINGS = os.path.join(ROOT, "latchwork_settings.json")          # before the data/ move
 
@@ -274,9 +275,10 @@ class App:
 
         self.hex_var = tk.StringVar()
         self.yarn_hex_var = tk.StringVar()
-        self.target_panel = ColorPanel(r, self.hex_var, editable=True)
+        self.target_panel = ColorPanel(r, self.hex_var, editable=True, bar_w=COMPARE_BAR_W)
         self.target_panel.grid(row=2, column=0, sticky="n", padx=16, pady=4)
-        self.yarn_panel = ColorPanel(r, self.yarn_hex_var, editable=True, on_copy=self.copy_hex)
+        self.yarn_panel = ColorPanel(r, self.yarn_hex_var, editable=True, on_copy=self.copy_hex,
+                                     deltas=True, bar_w=COMPARE_BAR_W)
         self.yarn_entry = self.yarn_panel.entry
         self.yarn_hex_var.trace_add("write", lambda *_: self.on_yarn_hex_changed())
         self.yarn_entry.bind("<FocusOut>", lambda e: self.reset_yarn_hex())

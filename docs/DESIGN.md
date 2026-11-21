@@ -82,8 +82,10 @@ starts at #1 again. The Match rank card shows the current yarn's rank. A yarn al
 assigned to another color of the rug gets an "Already used for" badge listing those colors
 and a dot on its strip tile (assignments only, not suggestions; the ranking is unchanged,
 since a shared yarn merges two colors on the rug, which is sometimes wanted and sometimes
-not). Hollow markers on every bar (R, G, B, L, C, h) show the other side's value (no hue marker
-below chroma 5, where hue means little).
+not). Hollow markers on every bar (R, G, B, L, C, h) show the other side's value, and a
+column right of the yarn's values gives yarn − target per channel, in the same scale as the
+values (R, G, B 0–100); hue goes the shorter way around, so 350° vs 10° is −20. No hue
+marker or difference below chroma 5, where hue means little.
 
 ## Palettes (`palette.py`, `palette_window.py`)
 

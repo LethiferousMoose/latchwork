@@ -152,27 +152,42 @@ def _channels(rgb, lch):
     ]
 
 
+def channel_delta(name, value, other):
+    """value - other for a channel; for hue the shorter way around (350 vs 10 is -20)."""
+    d = value - other
+    if name == "h":
+        d = (d + 180) % 360 - 180
+    return d
+
+
 class ColorPanel(tk.Frame):
     """GIMP-style channel readout: label, gradient bar with marker, boxed value, per channel,
-    plus an HTML notation box (editable or read-only)."""
+    plus an HTML notation box (editable or read-only). With deltas=True, a column after the
+    values shows this color minus the `other` one passed to show()."""
 
-    def __init__(self, parent, hex_var, editable, on_copy=None):
+    def __init__(self, parent, hex_var, editable, on_copy=None, deltas=False, bar_w=BAR_W):
         super().__init__(parent, bg=PANEL_BG, bd=1, relief="solid", padx=12, pady=10)
-        self.bars, self.values, self.images = [], [], []
+        self.bar_w = bar_w
+        self.bars, self.values, self.images, self.deltas = [], [], [], []
         for row, name in enumerate("RGBLCh"):
             tk.Label(self, text=name, font=("Segoe UI", 10, "bold"), bg=PANEL_BG, width=2,
                      anchor="w").grid(row=row, column=0, sticky="w")
-            bar = tk.Canvas(self, width=BAR_W, height=BAR_H + MARK_H, bg=PANEL_BG,
+            bar = tk.Canvas(self, width=bar_w, height=BAR_H + MARK_H, bg=PANEL_BG,
                             highlightthickness=0)
             bar.grid(row=row, column=1, padx=(4, 8), pady=2)
             val = tk.Label(self, font=VALUE_FONT, bg="white", width=6, anchor="e",
                            relief="sunken", bd=1, padx=4)
             val.grid(row=row, column=2, sticky="e")
+            if deltas:
+                d = tk.Label(self, font=("Consolas", 10), bg=PANEL_BG, fg="#666", width=6,
+                             anchor="e")
+                d.grid(row=row, column=3, sticky="e", padx=(2, 0))
+                self.deltas.append(d)
             self.bars.append(bar)
             self.values.append(val)
 
         html = tk.Frame(self, bg=PANEL_BG)
-        html.grid(row=6, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        html.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         tk.Label(html, text="HTML notation", font=UI_FONT, bg=PANEL_BG).pack(side="left")
         self.entry = ttk.Entry(html, textvariable=hex_var, font=("Consolas", 12), width=9,
                                state="normal" if editable else "readonly")
@@ -187,34 +202,43 @@ class ColorPanel(tk.Frame):
         every bar for comparison; no hue marker when either color is near gray."""
         self.images = []
         if rgb is None:
+            for d in self.deltas:
+                d.config(text="")
             for bar, val in zip(self.bars, self.values):
                 bar.delete("all")
-                bar.create_rectangle(0, 0, BAR_W - 1, BAR_H - 1, fill="#DDD", outline="#BBB")
+                bar.create_rectangle(0, 0, self.bar_w - 1, BAR_H - 1, fill="#DDD", outline="#BBB")
                 val.config(text="")
             return
         lch = rgb_to_lch(*rgb)
-        ghost = {}
+        ghost, delta = {}, {}
         if other is not None:
             olch = rgb_to_lch(*other)
+            hue_ok = min(lch[1], olch[1]) >= HUE_MIN_C
             ghost = {name: pos for name, _, pos, _ in _channels(other, olch)
-                     if name != "h" or min(lch[1], olch[1]) >= HUE_MIN_C}
+                     if name != "h" or hue_ok}
+            theirs = {name: v for name, v, _, _ in _channels(other, olch)}
+            delta = {name: channel_delta(name, value, theirs[name])
+                     for name, value, _, _ in _channels(rgb, lch) if name != "h" or hue_ok}
+        for name, d in zip("RGBLCh", self.deltas):
+            d.config(text=("%+.1f" % delta[name]).replace("-", "−")
+                     if name in delta else "")
         for (name, value, pos, sample), bar, val in zip(_channels(rgb, lch),
                                                         self.bars, self.values):
             bar.delete("all")
-            img = tk.PhotoImage(width=BAR_W, height=BAR_H)
-            row = "{" + " ".join(to_hex(*sample(x / (BAR_W - 1))) for x in range(BAR_W)) + "}"
-            img.put(row, to=(0, 0, BAR_W, BAR_H))
+            w = self.bar_w
+            img = tk.PhotoImage(width=w, height=BAR_H)
+            row = "{" + " ".join(to_hex(*sample(x / (w - 1))) for x in range(w)) + "}"
+            img.put(row, to=(0, 0, w, BAR_H))
             self.images.append(img)  # keep a reference or Tk drops the image
             bar.create_image(0, 0, image=img, anchor="nw")
-            bar.create_rectangle(0, 0, BAR_W - 1, BAR_H - 1, outline="#999")
+            bar.create_rectangle(0, 0, w - 1, BAR_H - 1, outline="#999")
             if name in ghost:
                 self._marker(bar, ghost[name], fill="", outline="#888")
             self._marker(bar, pos, fill="#111", outline="#111")
             val.config(text="%.1f" % value)
 
-    @staticmethod
-    def _marker(bar, pos, fill, outline):
-        x = 1 + pos * (BAR_W - 3)
+    def _marker(self, bar, pos, fill, outline):
+        x = 1 + pos * (self.bar_w - 3)
         top = BAR_H + 1
         bar.create_polygon(x, top, x - 5, top + MARK_H - 1, x + 5, top + MARK_H - 1,
                            fill=fill, outline=outline)
