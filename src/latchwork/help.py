@@ -100,7 +100,7 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 - P: sidebar image: original / yarn preview (assigned yarns, and suggested yarns for unassigned colors; Mark unassigned stripes those). The selected color shows the yarn currently on screen, live as you step, so you can judge it in the whole picture; nothing changes until you Assign. Highlight selected color (off by default) fades everything else, to show where that color is: toward white, or toward dark gray when the selected color is light (so white or pale colors still stand out). View larger (above the image) opens it in its own window, as big as fits, for small, long or wide art; it follows the sidebar, you can click colors in it, and P works there too.
 - Enter or Esc: leave the hex field.
 - Typing a hex into the yarn's HTML notation box jumps to the yarn with that color; if no yarn matches, the box resets when you leave it.
-- Ctrl+N new project, Ctrl+O open project, Ctrl+E export pattern, Ctrl+P manage yarns.
+- Ctrl+N new project, Ctrl+O open project (File > Open recent lists the last 8), Ctrl+E export pattern, Ctrl+P manage yarns.
 - Ctrl+1 … Ctrl+9: switch to palette 1–9 of the palette list.
 - F1: this help.
 

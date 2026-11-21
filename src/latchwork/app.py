@@ -87,6 +87,27 @@ def remember_setting(key, value):
     write_settings(settings)
 
 
+RECENT_MAX = 8   # File > Open recent
+
+
+def recent_projects():
+    """Projects I opened, most recent first (paths, as saved; missing files included)."""
+    settings = read_settings()
+    paths = settings.get("recent_projects")
+    if not isinstance(paths, list):
+        paths = [settings.get("project")]   # before the list existed: the last one
+    return [q for q in paths if isinstance(q, str)][:RECENT_MAX]
+
+
+def remember_recent(path, add=True):
+    """Move a project to the top of the recent list (add=False: take it off the list)."""
+    key = os.path.normcase(os.path.abspath(path))
+    paths = [q for q in recent_projects() if os.path.normcase(os.path.abspath(q)) != key]
+    if add:
+        paths.insert(0, os.path.abspath(path))
+    remember_setting("recent_projects", paths[:RECENT_MAX])
+
+
 def remembered_palettes():
     """The palette list from settings (existing files only)."""
     paths = read_settings().get("palettes")
@@ -206,6 +227,8 @@ class App:
                               command=self.new_project)
         file_menu.add_command(label="Open project...", accelerator="Ctrl+O",
                               command=self.open_project)
+        self.recent_menu = tk.Menu(file_menu, tearoff=False, postcommand=self._fill_recent)
+        file_menu.add_cascade(label="Open recent", menu=self.recent_menu)
         file_menu.add_command(label="Carry over assignments...", command=self.carry_over)
         file_menu.add_command(label="Assign from yarn image...", command=self.assign_from_image)
         file_menu.add_command(label="Close project", command=self.close_project)
@@ -780,12 +803,40 @@ class App:
         self.show_project(project)
         return True
 
+    def _fill_recent(self):
+        """File > Open recent, filled each time it opens: name and the folder it's in."""
+        m = self.recent_menu
+        m.delete(0, "end")
+        paths = recent_projects() if self.remember else []
+        for n, path in enumerate(paths, 1):
+            folder = os.path.dirname(path)
+            where = os.path.join(os.path.basename(os.path.dirname(folder)),
+                                 os.path.basename(folder))
+            name = os.path.splitext(os.path.basename(path))[0]
+            m.add_command(label="%d  %s   (%s)" % (n, name, where), underline=0,
+                          command=lambda p=path: self.open_recent(p))
+        if not paths:
+            m.add_command(label="No recent projects", state="disabled")
+            return
+        m.add_separator()
+        m.add_command(label="Clear list", command=lambda: remember_setting("recent_projects", []))
+
+    def open_recent(self, path):
+        if not os.path.isfile(path):
+            if messagebox.askyesno("Open recent", "%s\n\nisn't there any more (moved, renamed, "
+                                   "or on a drive that isn't connected).\n\nTake it off the "
+                                   "list?" % path):
+                remember_recent(path, add=False)
+            return
+        self.open_project(path)
+
     def show_project(self, project):
         self.project = project
         self.sidebar.set_project(project)
         self.update_title()
         if self.remember:
             remember_setting("project", os.path.abspath(project.path))
+            remember_recent(project.path)
         first = self.sidebar.tree.get_children()[0]   # top row, in the project's saved sort
         self.sidebar.select(first)
         self.select_project_color(first)

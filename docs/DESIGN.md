@@ -270,7 +270,10 @@ JSON, one cell per knot, safely escaped.
 ## Settings
 
 `settings/latchwork_settings.json` (per user, not in git): the active palette, the palette
-list, the last project, the color weight and canvas defaults for new projects.
+list, the last project (reopened at start), the recent projects (File > Open recent: the last
+8 opened or created, most recent first; a missing one offers to come off the list instead of
+being dropped silently, since it may be on a drive that isn't connected), the color weight and
+canvas defaults for new projects.
 
 ## Future possibilities
 
