@@ -410,7 +410,7 @@ class App:
     def new_palette(self):
         path = filedialog.asksaveasfilename(
             title="New palette (starts empty)", initialdir=DATA_DIR, defaultextension=".csv",
-            initialfile="new_palette.csv", filetypes=[("CSV", "*.csv")])
+            initialfile="new-palette.csv", filetypes=[("CSV", "*.csv")])
         if not path:
             return
         try:
@@ -1049,7 +1049,7 @@ class App:
         folder, _ = os.path.split(os.path.abspath(self.project.path))
         path = filedialog.asksaveasfilename(
             title="Export yarn list", initialdir=folder, defaultextension=".csv",
-            initialfile="%s yarn list.csv" % self.project.name, filetypes=[("CSV", "*.csv")])
+            initialfile="%s-yarns.csv" % self.project.name, filetypes=[("CSV", "*.csv")])
         if not path:
             return
         try:
@@ -1072,7 +1072,7 @@ class App:
         folder, _ = os.path.split(os.path.abspath(self.project.path))
         path = filedialog.asksaveasfilename(
             title="Export pattern for phone / print", initialdir=folder, defaultextension=".html",
-            initialfile="%s pattern.html" % self.project.name, filetypes=[("Web page", "*.html")])
+            initialfile="%s-pattern.html" % self.project.name, filetypes=[("Web page", "*.html")])
         if not path:
             return
         try:
@@ -1091,7 +1091,7 @@ class App:
         folder, _ = os.path.split(os.path.abspath(self.project.path))
         path = filedialog.asksaveasfilename(
             title="Save yarn-color preview (1 pixel per knot)", initialdir=folder,
-            defaultextension=".png", initialfile="%s preview.png" % self.project.name,
+            defaultextension=".png", initialfile="%s-preview.png" % self.project.name,
             filetypes=[("PNG", "*.png")])
         if not path:
             return

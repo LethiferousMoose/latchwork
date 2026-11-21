@@ -316,9 +316,14 @@ class PaletteWindow(tk.Toplevel):
         self.commit(new, select=[iid(y) for y in new if y.key not in before],
                     brands=pal.merge_brands(self.app.brands, in_brands))
 
+    def _export_stem(self):
+        """The open palette's file name without .csv: exports are named after it."""
+        return os.path.splitext(os.path.basename(self.app.palette_path or "palette.csv"))[0]
+
     def export_csv(self):
         path = filedialog.asksaveasfilename(parent=self, title="Export yarns as CSV",
-                                            defaultextension=".csv", initialfile="yarns.csv",
+                                            defaultextension=".csv",
+                                            initialfile="%s-yarns.csv" % self._export_stem(),
                                             filetypes=[("CSV", "*.csv")])
         if path:
             self._export(lambda: pal.save_bank(path, self.app.bank, self.app.brands), path,
@@ -327,7 +332,7 @@ class PaletteWindow(tk.Toplevel):
 
     def export_gpl(self):
         path = filedialog.asksaveasfilename(parent=self, title="Export yarns as GIMP palette",
-                                            defaultextension=".gpl", initialfile="Latchwork.gpl",
+                                            defaultextension=".gpl", initialfile="%s.gpl" % self._export_stem(),
                                             filetypes=[("GIMP palette", "*.gpl")])
         if path:
             self._export(lambda: pal.write_gpl(path, self.app.bank), path,
