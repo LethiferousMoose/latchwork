@@ -214,6 +214,7 @@ class App:
                               command=self.export_pattern)
         file_menu.add_command(label="Export yarn list...", command=self.export_yarn_list)
         file_menu.add_command(label="Save preview image...", command=self.save_preview)
+        file_menu.add_command(label="Export before/after...", command=self.save_before_after)
         file_menu.add_separator()
         file_menu.add_command(label="New palette...", command=self.new_palette)
         file_menu.add_command(label="Open palette...", command=self.open_palette)
@@ -1108,6 +1109,23 @@ class App:
             pl.write_preview_png(self.project, path)
         except OSError as e:
             messagebox.showerror("Save preview", "Could not write %s\n\n%s" % (path, e))
+
+    def save_before_after(self):
+        """File menu: the original next to the yarn preview, as one PNG to share."""
+        if not self._need_project("export its before/after"):
+            return
+        folder, _ = os.path.split(os.path.abspath(self.project.path))
+        path = filedialog.asksaveasfilename(
+            title="Export before/after (original next to the yarn preview)", initialdir=folder,
+            defaultextension=".png",
+            initialfile=free_name(folder, "%s-before-after.png" % self.project.name),
+            filetypes=[("PNG", "*.png")])
+        if not path:
+            return
+        try:
+            pl.write_before_after_png(self.project, path)
+        except OSError as e:
+            messagebox.showerror("Export before/after", "Could not write %s\n\n%s" % (path, e))
 
     def copy_hex(self):
         if self.yarns:

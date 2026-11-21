@@ -140,6 +140,8 @@ Settings are per project (Plan tab → Change…), with "Also use these for new 
 - Canvas to cut = image + borders: a fold on each side, a fold at the top (hanging loop) and at the bottom including one empty row.
 
 File menu: export the yarn list (CSV) and the yarn-color preview (PNG, one pixel per knot).
+
+Export before/after: the original next to the yarn preview, as one PNG to share. Each picture is zoomed by a whole number to about 500 pixels (so pixel art stays crisp), in a light gray frame; art wider than tall is stacked, original on top. Unassigned colors show their suggested yarn, as in the preview.
 """),
     ("Pattern on the phone", """
 # Pattern on the phone

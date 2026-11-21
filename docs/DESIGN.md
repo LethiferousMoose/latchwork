@@ -216,6 +216,11 @@ A `.latchwork` file is readable JSON:
   - Canvas to cut = (width + 2 × side) × (height + top + bottom) holes. The defaults come from
     folding 3 holes on each side, 8 at the top for the hanging loop, and 3 at the bottom plus
     one empty row, because the cut edge isn't stable enough to hook into.
+- **Before/after export** (`before_after_image`): original and yarn preview, each at the largest
+  whole-number zoom that fits 500 px (at least 1x, so pixel art stays crisp on social sites), in a
+  10 px gray frame (#D8D8D8, the larger view's; transparent knots show it too) with a 20 px white
+  gap. Side by side, or stacked with the original on top when the art is wider than tall, to
+  stay close to square. It reproduces the screenshot pair I liked, without screenshots.
 - Yarn preview (sidebar, and the preview PNG export, one pixel per knot): assigned colors show
   their yarn, unassigned ones their suggested yarn; "Mark unassigned" stripes those in the sidebar.
   In the sidebar, the selected color shows the yarn currently in the comparison view, updating

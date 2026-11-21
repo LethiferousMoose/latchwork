@@ -184,3 +184,50 @@ def write_preview_png(project, path):
     data = pixelart.encode_png(img)
     with open(path, "wb") as fh:
         fh.write(data)
+
+
+BA_BOX = 500                 # each picture fits in this many pixels (whole-number zoom)
+BA_FRAME = 10                # gray border around each picture
+BA_GAP = 20                  # white gap between the two
+BA_GRAY = (216, 216, 216)    # the larger view's background; transparent knots show it too
+BA_WHITE = (255, 255, 255)
+
+
+def before_after_image(project):
+    """The original and the yarn preview next to each other, for sharing: each zoomed by the
+    largest whole number that fits BA_BOX (at least 1), in a gray frame, a white gap between.
+    Side by side, or one above the other (original on top) when the art is wider than tall."""
+    src = project.image
+    w, h = src.width, src.height
+    z = max(1, min(BA_BOX // w, BA_BOX // h))
+    pw, ph = w * z + 2 * BA_FRAME, h * z + 2 * BA_FRAME        # one framed picture
+    stacked = w > h
+    W, H = (pw, 2 * ph + BA_GAP) if stacked else (2 * pw + BA_GAP, ph)
+    cut = pixelart.TRANSPARENT_BELOW
+
+    def rows(pixels):
+        """The framed picture's rows, each a list of pw RGB tuples."""
+        edge = [BA_GRAY] * pw
+        out = [edge] * BA_FRAME
+        for y in range(h):
+            row = [BA_GRAY] * BA_FRAME
+            for p in pixels[y * w:(y + 1) * w]:
+                row.extend([p[:3] if p[3] >= cut else BA_GRAY] * z)
+            row.extend([BA_GRAY] * BA_FRAME)
+            out.extend([row] * z)
+        return out + [edge] * BA_FRAME
+
+    a, b = rows(src.pixels), rows(preview_pixels(project))
+    if stacked:
+        lines = a + [[BA_WHITE] * W] * BA_GAP + b
+    else:
+        gap = [BA_WHITE] * BA_GAP
+        lines = [ra + gap + rb for ra, rb in zip(a, b)]
+    pixels = [p + (255,) for line in lines for p in line]
+    return pixelart.PixelImage(W, H, pixels)
+
+
+def write_before_after_png(project, path):
+    data = pixelart.encode_png(before_after_image(project))
+    with open(path, "wb") as fh:
+        fh.write(data)

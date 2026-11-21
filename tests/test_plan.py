@@ -123,6 +123,21 @@ class TestPlan(unittest.TestCase):
         with open(path, "rb") as fh:
             self.assertEqual(pixelart.decode_png(fh.read()).pixels, px)
 
+    def test_before_after(self):
+        # 3 x 2 art, wider than tall: stacked; zoom 166 fits 500 px
+        img = pl.before_after_image(self.p)
+        z, f, g = 166, pl.BA_FRAME, pl.BA_GAP
+        pw, ph = 3 * z + 2 * f, 2 * z + 2 * f
+        self.assertEqual((img.width, img.height), (pw, 2 * ph + g))
+        self.assertEqual(img.pixel(0, 0), pl.BA_GRAY + (255,))
+        self.assertEqual(img.pixel(f, f), (10, 20, 30, 255))                   # original #0A141E
+        self.assertEqual(img.pixel(f, ph + g + f), (20, 25, 60, 255))          # yarn: Navy
+        self.assertEqual(img.pixel(pw // 2, ph + g // 2), (255, 255, 255, 255))  # the gap
+        path = os.path.join(self.dir, "ba.png")
+        pl.write_before_after_png(self.p, path)
+        with open(path, "rb") as fh:
+            self.assertEqual(pixelart.decode_png(fh.read()).pixels, img.pixels)
+
 
 if __name__ == "__main__":
     unittest.main()
