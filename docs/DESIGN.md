@@ -225,7 +225,8 @@ A `.latchwork` file is readable JSON:
   in the 400 x 250 box, so **View larger** opens the same image in its own resizable,
   non-modal window at the largest whole-number zoom that fits. It mirrors the sidebar (view,
   highlight, stripes, selected color, live yarn), redraws once after a burst of changes, and a
-  click there selects a color too; Esc closes it, and it reopens at its last size this session.
+  click there selects a color too; P switches original/preview there too (other keys stay
+  with the main window); Esc closes it, and it reopens at its last size this session.
 
 ## Pattern export (`pattern.py`, `pattern_template.html`)
 

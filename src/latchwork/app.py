@@ -382,7 +382,7 @@ class App:
         for k in ("a", "A"):
             self.root.bind_all(k, lambda e: self._key(e, self.assign))
         for k in ("p", "P"):
-            self.root.bind_all(k, lambda e: self._key(e, self.sidebar.toggle_view))
+            self.root.bind_all(k, lambda e: self._key(e, self.sidebar.toggle_view, large=True))
         for k in ("m", "M"):
             self.root.bind_all(k, lambda e: self._key(e, self.mark_candidate))
         self.root.bind_all("c", lambda e: self._key(e, lambda: self.cycle_candidate(1)))
@@ -391,9 +391,13 @@ class App:
             self.entry.bind(k, lambda e: self.swatch.focus_set())
             self.yarn_entry.bind(k, lambda e: self.swatch.focus_set())   # FocusOut resets it
 
-    def _key(self, event, action, always=False):
+    def _key(self, event, action, always=False, large=False):
+        """large: the key also works while the larger view has the focus."""
         widget = event.widget
-        if not isinstance(widget, tk.Misc) or widget.winfo_toplevel() is not self.root:
+        if not isinstance(widget, tk.Misc):
+            return None
+        top = widget.winfo_toplevel()
+        if top is not self.root and not (large and top is self.sidebar.large):
             return None  # keys in other windows (palette manager, dialogs) behave normally
         if not always and isinstance(widget, (tk.Entry, ttk.Entry)):
             return None  # let the letter be typed
