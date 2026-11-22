@@ -136,9 +136,9 @@ PNG and GIF, because that's what Tk reads without extra packages. The folders ar
 Photos are chosen in the Add/Edit yarn dialog and only copied in when it's saved (Cancel
 leaves nothing behind); a replaced photo takes the old file's name once the old one is deleted.
 
-**A color from a photo** is a suggestion only; a yarn's color never changes unless I press
-"Use suggested color" (which fills the color field) and save (or keep the suggestion when
-adding a yarn from a photo). It is the photo's average in
+**A color from a photo** is a suggestion only, shown as a copyable hex code next to the photo;
+a yarn's color never changes unless I paste it into HTML notation and save (or keep the
+suggestion when adding a yarn from a photo, which starts with it filled in). It is the photo's average in
 linear light, with its lightness raised: `L = 0.957 × photo L + 6.44`, chroma and hue kept.
 That fit is my 57 Red Heart yarns that have both a picked color and a shop swatch photo (mean
 error 2.9 L); a photo's average reads 3–5 L darker than a picked pixel of the same yarn,

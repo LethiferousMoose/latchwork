@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 from . import palette as pal
 from . import photos
 from .colormath import SWATCH_L_OFFSET, SWATCH_L_SCALE, lightness, parse_hex, to_hex
-from .widgets import ColorPanel, free_name
+from .widgets import ColorPanel, Tooltip, free_name
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
@@ -680,13 +680,21 @@ class BrandEditDialog(tk.Toplevel):
             self.destroy()
 
 
+def tip(widget, text, title=None):
+    """Hover help for a widget; text may be a function returning the text (or None)."""
+    def content(_event):
+        t = text() if callable(text) else text
+        return (title, [([], t)]) if t else None
+    return Tooltip(widget, content)
+
+
 class YarnDialog(tk.Toplevel):
     """Add or edit one yarn, including its photo. Nothing is saved or copied until Add/Save.
     result = {"name", "rgb", "brand", "pack", "photo_src", "photo_removed"} or None, where
     photo_src is a newly chosen photo to copy in and photo_removed means drop the yarn's photo.
     With photo_src given when adding, the name and color start from that photo."""
 
-    PHOTO_SIDE = 150
+    PHOTO_SIDE = 136
 
     def __init__(self, parent, bank, brands, palette_path, yarn=None, photo_src=None):
         super().__init__(parent)
@@ -694,32 +702,73 @@ class YarnDialog(tk.Toplevel):
         self.palette_path = palette_path
         self.photo_src, self.photo_removed = None, False
         self.thumb = self.avg = self.suggested = None
+        self.problem = None
         self.title("Edit yarn" if yarn else "Add yarn")
         self.configure(bg=BG, padx=16, pady=14)
         self.resizable(False, False)
         self.transient(parent)
 
-        form = tk.Frame(self, bg=BG)
-        form.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
+        # Header, like a profile: the photo on the left, the yarn's details beside it.
+        top = tk.Frame(self, bg=BG)
+        top.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        self._build_photo(top)
+        form = tk.Frame(top, bg=BG)
+        form.grid(row=0, column=1, sticky="nw", padx=(14, 0))
         tk.Label(form, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
         self.name_var = tk.StringVar(value=yarn.sku if yarn else "")
-        self.name_entry = name_entry = ttk.Entry(form, textvariable=self.name_var, width=34,
+        self.name_entry = name_entry = ttk.Entry(form, textvariable=self.name_var, width=21,
                                                  font=("Segoe UI", 11))
-        name_entry.grid(row=0, column=1, columnspan=3, sticky="w", padx=8)
+        name_entry.grid(row=0, column=1, columnspan=3, sticky="w", padx=(8, 0))
         tk.Label(form, text="Brand", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w",
                                                                pady=(6, 0))
         last = yarn.brand if yarn else (brands[0].name if len(brands) == 1 else "")
         self.brand_var = tk.StringVar(value=last)
-        ttk.Combobox(form, textvariable=self.brand_var, width=24,
-                     values=[b.name for b in brands]).grid(row=1, column=1, sticky="w", padx=8,
-                                                           pady=(6, 0))
-        tk.Label(form, text="Pack size", font=UI_FONT, bg=BG).grid(row=1, column=2, sticky="w",
-                                                                   padx=(8, 0), pady=(6, 0))
+        ttk.Combobox(form, textvariable=self.brand_var, width=22,
+                     values=[b.name for b in brands]).grid(row=1, column=1, columnspan=3,
+                                                           sticky="w", padx=(8, 0), pady=(6, 0))
+        pack_label = tk.Label(form, text="Pack size", font=UI_FONT, bg=BG)
+        pack_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
         self.pack_var = tk.StringVar(value=str(yarn.pack) if yarn and yarn.pack else "")
-        ttk.Entry(form, textvariable=self.pack_var, width=7).grid(row=1, column=3, sticky="w",
-                                                                  padx=8, pady=(6, 0))
+        pack_entry = ttk.Entry(form, textvariable=self.pack_var, width=7)
+        pack_entry.grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(6, 0))
         self.pack_hint = tk.Label(form, font=HINT_FONT, bg=BG, fg="#666", anchor="w")
-        self.pack_hint.grid(row=2, column=1, columnspan=3, sticky="w", padx=8)
+        self.pack_hint.grid(row=2, column=2, columnspan=2, sticky="w", padx=(6, 0), pady=(6, 0))
+        pack_help = ("Pieces per pre-cut pack. Leave it blank to use the brand's\n"
+                     "pack size (set under Brands...); blank for a brand without\n"
+                     "one means the yarn is cut from skeins.")
+        for w in (pack_label, pack_entry, self.pack_hint):
+            tip(w, pack_help)
+
+        # What the photo suggests, as copyable hex codes (like HTML notation below).
+        self.photo_rows = []
+        self.avg_var, self.sug_var = tk.StringVar(), tk.StringVar()
+        helps = ("The average of every pixel in the photo (in linear light,\n"
+                 "as mixing light does).",
+                 "The average, lightened: L x %.3f + %.2f. An average counts\n"
+                 "the shadows between strands, so it reads darker than the\n"
+                 "yarn looks; this is how picked yarn colors compare to\n"
+                 "their photos. Copy it into HTML notation to use it."
+                 % (SWATCH_L_SCALE, SWATCH_L_OFFSET))
+        for r, (label, var, help_) in enumerate((("Average", self.avg_var, helps[0]),
+                                                 ("Suggested", self.sug_var, helps[1])), 3):
+            lab = tk.Label(form, text=label, font=UI_FONT, bg=BG)
+            line = tk.Frame(form, bg=BG)
+            chip = tk.Frame(line, width=18, height=18, highlightthickness=1,
+                            highlightbackground="#888")
+            chip.pack(side="left")
+            entry = ttk.Entry(line, textvariable=var, font=("Consolas", 10), width=8,
+                              state="readonly")
+            entry.pack(side="left", padx=(6, 0))
+            entry.bind("<FocusIn>", lambda e: e.widget.after_idle(
+                lambda w=e.widget: w.select_range(0, "end")))
+            Lval = tk.Label(line, font=UI_FONT, bg=BG, fg="#444")
+            Lval.pack(side="left", padx=(8, 0))
+            lab.grid(row=r, column=0, sticky="w", pady=(8 if r == 3 else 3, 0))
+            line.grid(row=r, column=1, columnspan=3, sticky="w", padx=(8, 0),
+                      pady=(8 if r == 3 else 3, 0))
+            for w in (lab, chip, entry, Lval):
+                tip(w, help_)
+            self.photo_rows.append((chip, Lval, [lab, line]))
 
         # Neighbor preview: lighter neighbor | this yarn | darker neighbor, names underneath.
         self.swatch = tk.Canvas(self, width=self.SW_W, height=self.SW_H, bg=BG,
@@ -735,7 +784,6 @@ class YarnDialog(tk.Toplevel):
         self.info.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
         self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020", anchor="w")
         self.error.grid(row=4, column=0, columnspan=2, sticky="w", pady=(2, 0))
-        self._build_photo_area()
 
         btns = tk.Frame(self, bg=BG)
         btns.grid(row=6, column=0, columnspan=2, sticky="e", pady=(12, 0))
@@ -761,30 +809,41 @@ class YarnDialog(tk.Toplevel):
     SW_W, SW_H, SIDE_W, BLOCK_H = 420, 96, 100, 70
 
     # ---------- photo ----------
-    def _build_photo_area(self):
+    def _build_photo(self, top):
         side = self.PHOTO_SIDE
-        area = tk.Frame(self, bg=BG)
-        area.grid(row=5, column=0, columnspan=2, sticky="ew", pady=(10, 0))
-        holder = tk.Frame(area, bg="#DDD", width=side, height=side)
-        holder.pack(side="left", anchor="n")
+        left = tk.Frame(top, bg=BG)
+        left.grid(row=0, column=0, sticky="nw")
+        holder = tk.Frame(left, bg="#DDD", width=side, height=side, highlightthickness=1,
+                          highlightbackground="#BBB")
+        holder.pack()
         holder.pack_propagate(False)
         self.picture = tk.Label(holder, bg="#DDD", font=HINT_FONT, fg="#777", justify="center",
-                                wraplength=side - 16)
+                                wraplength=side - 16, cursor="hand2")
         self.picture.pack(fill="both", expand=True)
-        right = tk.Frame(area, bg=BG)
-        right.pack(side="left", fill="both", expand=True, padx=(12, 0))
-        tk.Label(right, text="Photo", font=("Segoe UI", 10, "bold"), bg=BG).pack(anchor="w")
-        self.chips = tk.Canvas(right, width=self.SW_W - side - 12, height=60, bg=BG,
-                               highlightthickness=0)
-        self.use_btn = ttk.Button(right, text="Use suggested color", command=self.use_suggested)
-        self.photo_hint = tk.Label(right, font=HINT_FONT, bg=BG, fg="#666", justify="left",
-                                   anchor="w", wraplength=self.SW_W - side - 12)
-        self.photo_hint.pack(anchor="w", pady=(2, 0))
-        row = tk.Frame(right, bg=BG)
-        row.pack(side="bottom", anchor="w")
-        ttk.Button(row, text="Choose photo...", command=self.choose_photo).pack(side="left")
-        self.remove_btn = ttk.Button(row, text="Remove photo", command=self.remove_photo)
-        self.remove_btn.pack(side="left", padx=(6, 0))
+        self.picture.bind("<Button-1>", lambda e: self.choose_photo())
+        tip(self.picture, self._photo_tip)
+        row = tk.Frame(left, bg=BG)
+        row.pack(fill="x", pady=(4, 0))
+        row.columnconfigure((0, 1), weight=1, uniform="photo")
+        ttk.Button(row, text="Choose...", command=self.choose_photo).grid(
+            row=0, column=0, sticky="ew")
+        self.remove_btn = ttk.Button(row, text="Remove", command=self.remove_photo)
+        self.remove_btn.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        tip(self.remove_btn, "Take the photo off this yarn. Its copy in the photo folder is\n"
+                             "deleted when you press Save; the photo you chose it from\n"
+                             "is never touched.")
+
+    def _photo_tip(self):
+        folder = os.path.basename(pal.swatch_dir(self.palette_path or "palette.csv"))
+        if self.problem:
+            return "%s\nChoose the photo again, or remove it from this yarn." % self.problem
+        if self.thumb:
+            return ("Click to choose a different photo (PNG or GIF).\n"
+                    "It's copied into %s when you press %s." % (
+                        folder, "Save" if self.yarn else "Add"))
+        return ("Click to choose a photo of this yarn (PNG or GIF), optional.\n"
+                "It's copied into %s when you press %s." % (
+                    folder, "Save" if self.yarn else "Add"))
 
     def photo_path(self):
         """The photo shown: a newly chosen one, else the yarn's own (None when there's none)."""
@@ -795,54 +854,37 @@ class YarnDialog(tk.Toplevel):
         return None
 
     def show_photo(self):
-        self.thumb = self.avg = self.suggested = None
+        self.thumb = self.avg = self.suggested = self.problem = None
         path = self.photo_path()
-        problem = None
         if path and os.path.isfile(path):
             try:
                 img = photos.load(path, master=self)
                 self.thumb = photos.thumbnail(img, self.PHOTO_SIDE)
                 self.avg, self.suggested = photos.colors(img)
             except ValueError as e:
-                problem = "Can't read the photo: %s" % e
+                self.problem = "Can't read the photo: %s" % e
         elif path:
-            problem = "Photo missing:\n%s" % self.yarn.photo
+            self.problem = "Photo missing: %s" % self.yarn.photo
         if self.thumb:
             self.picture.config(image=self.thumb, text="")
+        elif self.problem:
+            self.picture.config(image="", text="Photo missing" if path and not os.path.isfile(
+                path) else "Can't read the photo")
         else:
-            self.picture.config(image="", text=problem or "No photo")
-        c = self.chips
-        c.delete("all")
-        if self.avg:
-            for i, (label, rgb) in enumerate((("Average", self.avg),
-                                              ("Suggested", self.suggested))):
-                top = i * 30
-                c.create_rectangle(1, top + 2, 37, top + 26, fill=to_hex(*rgb), outline="#999")
-                c.create_text(46, top + 14, anchor="w", font=UI_FONT,
-                              text="%s  %s  L %.1f" % (label, to_hex(*rgb), lightness(*rgb)))
-            self.chips.pack(anchor="w", pady=(4, 0), before=self.photo_hint)
-            self.use_btn.pack(anchor="w", pady=(2, 0), before=self.photo_hint)
-            self.photo_hint.config(text="Suggested = the average, lightened (L x %.3f + %.2f): "
-                                        "an average counts the shadows between strands."
-                                   % (SWATCH_L_SCALE, SWATCH_L_OFFSET))
-        elif problem:
-            self.chips.pack_forget()
-            self.use_btn.pack_forget()
-            self.photo_hint.config(text="Choose the photo again, or remove it from this yarn.")
-        else:
-            self.chips.pack_forget()
-            self.use_btn.pack_forget()
-            self.photo_hint.config(text="Optional: a PNG or GIF photo of this yarn. It is "
-                                        "copied into the palette's photo folder when you "
-                                        "press %s." % ("Save" if self.yarn else "Add"))
+            self.picture.config(image="", text="No photo\n\nclick to choose one")
+        for (chip, Lval, cells), rgb, var in zip(self.photo_rows, (self.avg, self.suggested),
+                                                 (self.avg_var, self.sug_var)):
+            if rgb:
+                var.set(to_hex(*rgb))
+                chip.config(bg=to_hex(*rgb))
+                Lval.config(text="L %.1f" % lightness(*rgb))
+                for w in cells:
+                    w.grid()
+            else:
+                for w in cells:
+                    w.grid_remove()
         has = bool(self.photo_src or (self.yarn and self.yarn.photo and not self.photo_removed))
         self.remove_btn.state(["!disabled"] if has else ["disabled"])
-        self._update_use_btn()
-
-    def _update_use_btn(self):
-        if self.suggested:
-            same = parse_hex(self.hex_var.get()) == tuple(self.suggested)
-            self.use_btn.state(["disabled"] if same else ["!disabled"])
 
     def set_photo(self, path):
         self.photo_src, self.photo_removed = path, False
@@ -870,10 +912,6 @@ class YarnDialog(tk.Toplevel):
         self.photo_removed = bool(self.yarn and self.yarn.photo)
         self.show_photo()
 
-    def use_suggested(self):
-        if self.suggested:
-            self.hex_var.set(to_hex(*self.suggested))
-
     # ---------- form ----------
     def problems(self):
         rgb = parse_hex(self.hex_var.get())
@@ -898,12 +936,14 @@ class YarnDialog(tk.Toplevel):
         r, err = self.problems()
         rgb = parse_hex(self.hex_var.get())
         b = pal.brand_by_key(self.brands, self.brand_var.get())
-        if b:
-            self.pack_hint.config(text="blank = brand's pack size (%s)" % pack_text(b.pack))
+        if self.pack_var.get().strip():
+            self.pack_hint.config(text="this yarn's own")
+        elif b:
+            self.pack_hint.config(text="brand: %s" % pack_text(b.pack))
         elif pal.clean_name(self.brand_var.get()):
-            self.pack_hint.config(text="new brand (set its pack size under Brands...)")
+            self.pack_hint.config(text="new brand")
         else:
-            self.pack_hint.config(text="blank = cut from skein")
+            self.pack_hint.config(text="cut from skein")
         c = self.swatch
         c.delete("all")
         self.panel.show(rgb)
@@ -935,7 +975,6 @@ class YarnDialog(tk.Toplevel):
             self.info.config(text="")
         self.error.config(text=err or "")
         self.ok.state(["disabled"] if err else ["!disabled"])
-        self._update_use_btn()
 
     def accept(self):
         r, err = self.problems()
