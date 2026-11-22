@@ -115,8 +115,7 @@ class PaletteWindow(tk.Toplevel):
         buttons.pack(side="left", fill="y", padx=(10, 0))
         self.retire_btn = None
         self.needs_selection = []
-        for text, cmd in (("Add...", self.add), ("Add from photo...", self.add_from_photo),
-                          ("Edit...", self.edit),
+        for text, cmd in (("Add...", self.add), ("Edit...", self.edit),
                           ("Set brand...", self.set_brand), ("Retire", self.retire),
                           ("Delete...", self.delete), (None, None), ("Brands...", self.brands),
                           (None, None), ("Import...", self.import_),
@@ -124,7 +123,7 @@ class PaletteWindow(tk.Toplevel):
             if text is None:
                 tk.Frame(buttons, height=14, bg=BG).pack()
                 continue
-            b = ttk.Button(buttons, text=text, width=16, command=cmd)
+            b = ttk.Button(buttons, text=text, width=14, command=cmd)
             b.pack(pady=2)
             if text == "Retire":
                 self.retire_btn = b
@@ -208,21 +207,6 @@ class PaletteWindow(tk.Toplevel):
     # ---------- yarn actions ----------
     def add(self):
         r = YarnDialog(self, self.app.bank, self.app.brands, self.app.palette_path).result
-        if r:
-            self._add(r)
-
-    def add_from_photo(self):
-        path = filedialog.askopenfilename(parent=self, title="Add a yarn from a photo",
-                                          filetypes=photos.FILETYPES)
-        if not path:
-            return
-        try:
-            photos.load(path, master=self)
-        except ValueError as e:
-            messagebox.showerror("Add from photo", str(e), parent=self)
-            return
-        r = YarnDialog(self, self.app.bank, self.app.brands, self.app.palette_path,
-                       photo_src=path).result
         if r:
             self._add(r)
 
@@ -692,11 +676,11 @@ class YarnDialog(tk.Toplevel):
     """Add or edit one yarn, including its photo. Nothing is saved or copied until Add/Save.
     result = {"name", "rgb", "brand", "pack", "photo_src", "photo_removed"} or None, where
     photo_src is a newly chosen photo to copy in and photo_removed means drop the yarn's photo.
-    With photo_src given when adding, the name and color start from that photo."""
+    Choosing a photo for a new yarn fills in its name and color when those are still empty."""
 
     PHOTO_SIDE = 150
 
-    def __init__(self, parent, bank, brands, palette_path, yarn=None, photo_src=None):
+    def __init__(self, parent, bank, brands, palette_path, yarn=None):
         super().__init__(parent)
         self.bank, self.brands, self.yarn, self.result = bank, brands, yarn, None
         self.palette_path = palette_path
@@ -796,13 +780,9 @@ class YarnDialog(tk.Toplevel):
         for v in (self.name_var, self.hex_var, self.brand_var, self.pack_var):
             v.trace_add("write", lambda *_: self.update_view())
         self.show_photo()
-        if photo_src:
-            self.set_photo(photo_src)
         self.update_view()
         center_on(self, parent)
         (self.panel.entry if yarn else name_entry).focus_set()
-        if photo_src and not yarn:
-            name_entry.select_range(0, "end")
         self.grab_set()
         self.wait_window()
 
@@ -862,7 +842,7 @@ class YarnDialog(tk.Toplevel):
         if path and os.path.isfile(path):
             try:
                 img = photos.load(path, master=self)
-                self.thumb = photos.cover(img, self.PHOTO_SIDE)
+                self.thumb = photos.thumbnail(img, self.PHOTO_SIDE)
                 self.avg, self.suggested = photos.colors(img)
             except ValueError as e:
                 self.problem = "Can't read the photo: %s" % e

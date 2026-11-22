@@ -120,7 +120,7 @@ Palette → Manage yarns (Ctrl+P) edits the active palette. Changes save immedia
 - Import (CSV or GIMP .gpl) always merges: nothing is removed, and a summary is shown before anything changes.
 - Selecting a yarn in the manager shows it in the main view.
 - A yarn can have a photo (PNG or GIF): click the photo spot in the Add or Edit window (or Choose…). Next to it are the photo's average and the color it suggests; copy a hex code into HTML notation to use it. Nothing is saved until you press Save.
-- Add from photo… starts a new yarn from a photo, with its name and suggested color filled in.
+- Choosing a photo while adding a yarn fills in its name (from the file name) and the suggested color, if those are still empty.
 
 The suggested color is the photo's average, lightened (L × 0.957 + 6.44): an average counts the shadows between strands, so it reads darker than the yarn looks.
 
