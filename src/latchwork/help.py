@@ -119,8 +119,8 @@ Palette → Manage yarns (Ctrl+P) edits the active palette. Changes save immedia
 - Retire hides a yarn from matching but keeps it (e.g. discontinued). Delete is for mistakes.
 - Import (CSV or GIMP .gpl) always merges: nothing is removed, and a summary is shown before anything changes.
 - Selecting a yarn in the manager shows it in the main view.
-- Photo… gives a yarn a photo (PNG or GIF). The window also shows the color the photo suggests; the yarn's own color only changes if you press Use this color.
-- Add from photo… starts a new yarn from a photo, with the suggested color filled in.
+- A yarn can have a photo (PNG or GIF): Choose photo… in the Add or Edit window. It shows the photo's average and the color it suggests; Use suggested color puts that in the color field, and nothing is saved until you press Save.
+- Add from photo… starts a new yarn from a photo, with its name and suggested color filled in.
 
 The suggested color is the photo's average, lightened (L × 0.957 + 6.44): an average counts the shadows between strands, so it reads darker than the yarn looks.
 

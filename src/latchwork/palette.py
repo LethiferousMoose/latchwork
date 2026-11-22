@@ -395,6 +395,21 @@ def new_photo_name(palette_path, yarn, ext=".png"):
     return folder + "/" + name
 
 
+def tidy_photo_name(palette_path, yarn):
+    """A replaced photo is copied in as 'Name (2).png' while the old one still exists; once the
+    old one is gone, rename it back to 'Name.png'. Returns the new name, or None if unchanged."""
+    if not yarn.photo or "/" not in yarn.photo:
+        return None
+    folder, current = yarn.photo.rsplit("/", 1)
+    want = folder + "/" + safe_file_name(yarn.sku) + os.path.splitext(current)[1]
+    src, dst = photo_file(palette_path, yarn), os.path.join(swatch_dir(palette_path),
+                                                            *want.split("/"))
+    if want == yarn.photo or os.path.exists(dst) or not os.path.isfile(src):
+        return None
+    os.replace(src, dst)
+    return want
+
+
 def copy_photos(src_palette, dst_palette, yarns):
     """Copy the yarns' photos to another palette's swatch folder (for an export). Photos that
     are missing are dropped from the copies. Returns the yarns to save with the new palette."""

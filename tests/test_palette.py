@@ -311,6 +311,20 @@ class TestPhotos(TempDir):
         self.assertEqual(pal.new_photo_name(p, y), "L&T/Odd- Name- (2).png")
         self.assertEqual(pal.new_photo_name(p, Yarn("Gray", (1, 2, 3))), "No brand/Gray.png")
 
+    def test_tidy_photo_name_after_a_replace(self):
+        p = self.path("p.csv")
+        folder = os.path.join(pal.swatch_dir(p), "Red Heart")
+        os.makedirs(folder)
+        open(os.path.join(folder, "Gold (2).png"), "w").close()
+        y = Yarn("Gold", (1, 2, 3), brand=RH, photo="Red Heart/Gold (2).png")
+        open(os.path.join(folder, "Gold.png"), "w").close()       # old copy still there
+        self.assertIsNone(pal.tidy_photo_name(p, y))
+        os.remove(os.path.join(folder, "Gold.png"))
+        self.assertEqual(pal.tidy_photo_name(p, y), "Red Heart/Gold.png")
+        self.assertEqual(os.listdir(folder), ["Gold.png"])
+        y.photo = "Red Heart/Gold.png"
+        self.assertIsNone(pal.tidy_photo_name(p, y))
+
     def test_export_copies_photos_and_drops_missing_ones(self):
         src, dst = self.path("a.csv"), self.path("b.csv")
         yarns = bank()
