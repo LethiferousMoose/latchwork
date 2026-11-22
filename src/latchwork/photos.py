@@ -52,17 +52,19 @@ def thumbnail(img, max_side):
 
 
 def cover_texture(img, w, h):
-    """(image, x offset, y offset): the photo scaled to cover a w x h picture (whole-number
-    zoom, or the largest whole-number shrink that still covers), centered. Like a photo
-    layer behind the whole picture: every color's knots show their own yarn's photo."""
+    """(image, x offset, y offset) covering a w x h picture, like a photo layer behind it:
+    every color's knots show their own yarn's photo. Never enlarged (that only blurs it):
+    a photo that covers the picture is shrunk by the largest whole step that still covers
+    and centered; a smaller one is repeated at its own size."""
     pw, ph = img.width(), img.height()
     if pw >= w and ph >= h:
         f = min(pw // w, ph // h)
         if f > 1:
             img = img.subsample(f)
-    else:
-        img = img.zoom(max(-(-w // pw), -(-h // ph)))
-    return img, (img.width() - w) // 2, (img.height() - h) // 2
+        return img, (img.width() - w) // 2, (img.height() - h) // 2
+    tiled = tk.PhotoImage(master=img.tk, width=w, height=h)
+    tiled.tk.call(tiled.name, "copy", img.name, "-to", 0, 0, w, h)   # Tk repeats the source
+    return tiled, 0, 0
 
 
 def copy_in(src, palette_path, yarn, img=None):

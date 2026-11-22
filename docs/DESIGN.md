@@ -249,9 +249,11 @@ A `.latchwork` file is readable JSON:
   live as you step (preview only; nothing is stored until Assign).
 - **Texture** (T, or the box above the image; preview only) replaces flat colors with yarn
   photos, the way I used to test-fit in GIMP: each yarn's photo is a layer behind the whole
-  picture, seen through that color's knots. The photo is scaled to cover the image (whole-number
-  zoom, or the largest whole-number shrink that still covers) and centered, then copied in one
-  rectangle per run of same-colored knots, so it costs little more than the flat preview.
+  picture, seen through that color's knots. Photos are never enlarged (Tk zooms by whole
+  numbers without smoothing, so small photos like Herrschners' turned blocky): one that covers
+  the picture is shrunk by the largest whole step that still covers and centered; a smaller
+  one is repeated (tiled) at its own size. It's copied in one rectangle per run of
+  same-colored knots, so it costs little more than the flat preview.
   Scaled photos are cached per size. The yarn is the assigned or suggested one (the live yarn
   for the selected color); no photo, grayscale, a faded (Highlight) or striped (Mark unassigned)
   color stays flat. From the original, T switches to the textured preview.
