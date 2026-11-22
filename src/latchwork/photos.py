@@ -51,6 +51,20 @@ def thumbnail(img, max_side):
     return img.subsample(f) if f > 1 else img
 
 
+def cover_texture(img, w, h):
+    """(image, x offset, y offset): the photo scaled to cover a w x h picture (whole-number
+    zoom, or the largest whole-number shrink that still covers), centered. Like a photo
+    layer behind the whole picture: every color's knots show their own yarn's photo."""
+    pw, ph = img.width(), img.height()
+    if pw >= w and ph >= h:
+        f = min(pw // w, ph // h)
+        if f > 1:
+            img = img.subsample(f)
+    else:
+        img = img.zoom(max(-(-w // pw), -(-h // ph)))
+    return img, (img.width() - w) // 2, (img.height() - h) // 2
+
+
 def copy_in(src, palette_path, yarn, img=None):
     """Copy a photo into the palette's swatch folder as 'Brand/Name.png' (shrunk when it's
     larger than MAX_SIDE). Returns the relative name to store in yarn.photo."""

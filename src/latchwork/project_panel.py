@@ -1,9 +1,13 @@
-"""Project sidebar: the image (original or yarn preview), its colors and assignments, and the plan."""
+"""Project sidebar: the image (original or yarn preview, flat or textured with yarn photos), its
+colors and assignments, and the plan."""
 import math
+import os
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import ttk
 
+from . import palette as pal
+from . import photos
 from . import plan as pl
 from .palette import label as yarn_label
 from .colormath import gray_for_lightness, lightness, parse_hex, to_hex
@@ -71,6 +75,8 @@ class ProjectPanel(tk.Frame):
         self.large = None        # the "View larger" window, while open
         self._large_geometry = None
         self._quiet = False
+        self._photos = {}        # yarn photo path -> (mtime, PhotoImage)
+        self._textures = {}      # (path, mtime, w, h) -> (image, x offset, y offset)
         italic = tkfont.nametofont("TkDefaultFont").copy()
         italic.configure(slant="italic")
         self._italic = italic
@@ -106,6 +112,15 @@ class ProjectPanel(tk.Frame):
         for value, text in (("original", "Original"), ("preview", "Yarn preview")):
             ttk.Radiobutton(views, text=text, value=value, variable=self.view, style="Toolbutton",
                             command=self.on_view).pack(side="left", ipadx=8)
+        self.texture = tk.BooleanVar(value=False)
+        self.texture_cb = ttk.Checkbutton(views, text="Texture", variable=self.texture,
+                                          command=self.render_image)
+        self.texture_cb.pack(side="left", padx=(12, 0))
+        Tooltip(self.texture_cb, lambda e: (None, [([], (
+            "Yarn preview with each yarn's photo instead of its flat color (T),\n"
+            "like a photo layer behind the picture. Yarns without a photo stay\n"
+            "flat; so does everything in grayscale, and the colors that\n"
+            "Highlight fades or Mark unassigned stripes."))]))
         larger = tk.Label(views, text="View larger", font=("Segoe UI", 9, "underline"), bg=BG,
                           fg="#1565C0", cursor="hand2")
         larger.pack(side="right", padx=(0, 4))
@@ -522,8 +537,22 @@ class ProjectPanel(tk.Frame):
 
     # ---------- image ----------
     def on_view(self):
-        self.mark_cb.state(["!disabled"] if self.view.get() == "preview" else ["disabled"])
+        state = ["!disabled"] if self.view.get() == "preview" else ["disabled"]
+        self.mark_cb.state(state)
+        self.texture_cb.state(state)
         self.render_image()
+
+    def toggle_texture(self):
+        """T: yarn texture on or off. From the original it goes to the textured preview."""
+        if not self.project:
+            return
+        if self.view.get() != "preview":
+            self.view.set("preview")
+            self.texture.set(True)
+            self.on_view()
+        else:
+            self.texture.set(not self.texture.get())
+            self.render_image()
 
     def toggle_view(self):
         if self.project:
@@ -594,6 +623,8 @@ class ProjectPanel(tk.Frame):
         zoom, sub = scale
         dw = w * zoom if sub == 1 else -(-w // sub)
         dh = h * zoom if sub == 1 else -(-h // sub)
+        textured = self._textures_for(dw, dh, live, sel, unassigned) \
+            if preview and self.texture.get() and not gray else {}
         xs = [min(w - 1, dx * sub // zoom) for dx in range(dw)]
         rows = []
         for dy in range(dh):
@@ -613,7 +644,73 @@ class ProjectPanel(tk.Frame):
             rows.append("{" + " ".join(row) + "}")
         photo = tk.PhotoImage(width=dw, height=dh)
         photo.put(" ".join(rows), to=(0, 0))
+        if textured:
+            self._paint_textures(photo, textured, xs, w, h, scale, dw, dh)
         return photo
+
+    # ---------- yarn texture ----------
+    def _textures_for(self, dw, dh, live, sel, unassigned):
+        """{image color: (texture, x offset, y offset)} for the colors whose yarn has a photo."""
+        bank = {y.key: y for y in self.app.bank}
+        out = {}
+        for e in self.project.colors:
+            if (sel and e.hex != sel) or e.hex in unassigned:
+                continue
+            if live and live[0] == e.hex:
+                y = self.app.yarns[self.app.index]
+            elif e.yarn:
+                y = bank.get(pal.yarn_key(e.yarn["name"], e.yarn.get("brand", "")))
+            else:
+                y = None
+            path = pal.photo_file(self.app.palette_path, y) if y else None
+            tex = self._texture(path, dw, dh) if path else None
+            if tex:
+                out[e.hex] = tex
+        return out
+
+    def _texture(self, path, w, h):
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return None
+        key = (path, mtime, w, h)
+        tex = self._textures.get(key)
+        if tex is None:
+            cached = self._photos.get(path)
+            if not cached or cached[0] != mtime:
+                try:
+                    cached = self._photos[path] = (mtime, photos.load(path, master=self))
+                except ValueError:
+                    return None
+            tex = self._textures[key] = photos.cover_texture(cached[1], w, h)
+            while len(self._textures) > 60:          # keep the most recent sizes only
+                del self._textures[next(iter(self._textures))]
+        return tex
+
+    def _paint_textures(self, photo, textured, xs, w, h, scale, dw, dh):
+        """Copy each textured color's photo into its knots: one rectangle per run of the same
+        color along a row of art pixels."""
+        zoom, sub = scale
+        call, name = photo.tk.call, photo.name
+        y0 = 0
+        while y0 < dh:
+            iy = min(h - 1, y0 * sub // zoom)
+            y1 = y0 + 1
+            while y1 < dh and min(h - 1, y1 * sub // zoom) == iy:
+                y1 += 1
+            base, x0 = iy * w, 0
+            while x0 < dw:
+                orig = self.orig_hex[base + xs[x0]]
+                x1 = x0 + 1
+                while x1 < dw and self.orig_hex[base + xs[x1]] == orig:
+                    x1 += 1
+                tex = textured.get(orig)
+                if tex:
+                    img, ox, oy = tex
+                    call(name, "copy", img.name, "-from", x0 + ox, y0 + oy, x1 + ox, y1 + oy,
+                         "-to", x0, y0)
+                x0 = x1
+            y0 = y1
 
 
 class LargeView(tk.Toplevel):

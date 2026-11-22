@@ -365,7 +365,7 @@ class App:
         for keys, text in (("←→", "lighter / darker"), ("N", "next match"), ("B", "better match"),
                            ("Home", "best match"), ("M", "mark candidate"),
                            ("C", "next candidate"), ("G", "grayscale"), ("A", "assign"),
-                           ("P", "original/preview"), ("F1", "help")):
+                           ("P", "original/preview"), ("T", "texture"), ("F1", "help")):
             item = tk.Frame(hints, bg=BG)
             self.hint_items.append(item)
             for k in ([keys] if len(keys) > 2 or keys == "F1" else list(keys)):
@@ -407,6 +407,9 @@ class App:
             self.root.bind_all(k, lambda e: self._key(e, self.assign))
         for k in ("p", "P"):
             self.root.bind_all(k, lambda e: self._key(e, self.sidebar.toggle_view, large=True))
+        for k in ("t", "T"):
+            self.root.bind_all(k, lambda e: self._key(e, self.sidebar.toggle_texture,
+                                                      large=True))
         for k in ("m", "M"):
             self.root.bind_all(k, lambda e: self._key(e, self.mark_candidate))
         self.root.bind_all("c", lambda e: self._key(e, lambda: self.cycle_candidate(1)))

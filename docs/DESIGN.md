@@ -247,6 +247,14 @@ A `.latchwork` file is readable JSON:
   their yarn, unassigned ones their suggested yarn; "Mark unassigned" stripes those in the sidebar.
   In the sidebar, the selected color shows the yarn currently in the comparison view, updating
   live as you step (preview only; nothing is stored until Assign).
+- **Texture** (T, or the box above the image; preview only) replaces flat colors with yarn
+  photos, the way I used to test-fit in GIMP: each yarn's photo is a layer behind the whole
+  picture, seen through that color's knots. The photo is scaled to cover the image (whole-number
+  zoom, or the largest whole-number shrink that still covers) and centered, then copied in one
+  rectangle per run of same-colored knots, so it costs little more than the flat preview.
+  Scaled photos are cached per size. The yarn is the assigned or suggested one (the live yarn
+  for the selected color); no photo, grayscale, a faded (Highlight) or striped (Mark unassigned)
+  color stays flat. From the original, T switches to the textured preview.
 - Highlight selected color fades the other colors 78% toward white, or toward dark gray (#3A3A3A)
   when the selected color as shown has L\* of 65 or more, since pale colors vanish against a
   white fade.
@@ -255,7 +263,7 @@ A `.latchwork` file is readable JSON:
   in the 400 x 250 box, so **View larger** opens the same image in its own resizable,
   non-modal window at the largest whole-number zoom that fits. It mirrors the sidebar (view,
   highlight, stripes, selected color, live yarn), redraws once after a burst of changes, and a
-  click there selects a color too; P switches original/preview there too (other keys stay
+  click there selects a color too; P and T work there too (other keys stay
   with the main window); Esc closes it, and it reopens at its last size this session.
 
 ## Pattern export (`pattern.py`, `pattern_template.html`)

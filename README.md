@@ -60,6 +60,8 @@ first and tells you what's missing.
    the palette by lightness, **G** to compare in grayscale. Deciding between a few? **M** marks
    the yarn on screen as a candidate (or right-click its tile) and **C** (or a middle-click)
    flips between your candidates. Press **A** to assign the yarn on screen.
+   For a final check, **T** (or *Texture*) shows the preview with each yarn's photo instead of
+   its flat color, for yarns that have a photo in the palette.
    For small, long or wide art, **View larger** (above the sidebar image) opens the picture in
    its own window. With *Highlight selected color* on, everything but the selected color fades,
    toward dark gray around a light color like this sun.
