@@ -6,8 +6,9 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "src"))
 
-from latchwork.colormath import (gray_for_lightness, lch_to_rgb, lightness, match_order,  # noqa: E402
-                       nearest_index, parse_hex, rgb_to_lab, rgb_to_lch, to_hex)
+from latchwork.colormath import (average_rgb, gray_for_lightness, lch_to_rgb, lightness,  # noqa: E402
+                                 match_order, nearest_index, parse_hex, rgb_to_lab, rgb_to_lch,
+                                 suggest_from_photo, to_hex)
 from latchwork.palette import load_palette  # noqa: E402
 
 PALETTE = os.path.join(ROOT, "data", "palette.csv")
@@ -119,6 +120,29 @@ class TestWeightedMatch(unittest.TestCase):
     def test_order_is_complete_and_ties_keep_list_order(self):
         labs = [(50, 0, 0), (50, 0, 0), (60, 0, 0)]
         self.assertEqual(match_order((50, 0, 0), labs, 0.5), [0, 1, 2])
+
+
+class TestPhotoColor(unittest.TestCase):
+    def test_average_is_in_linear_light(self):
+        self.assertEqual(to_hex(*average_rgb([(255, 255, 255)] * 3)), "#FFFFFF")
+        # black + white averages to linear 0.5, which is sRGB 188, not 128
+        self.assertEqual(to_hex(*average_rgb([(0, 0, 0), (255, 255, 255)])), "#BCBCBC")
+        with self.assertRaises(ValueError):
+            average_rgb([])
+
+    def test_suggestion_matches_the_red_heart_additions(self):
+        # photo averages -> the colors added to the palette for these yarns
+        for avg, palette in (("#6A5147", "#765D52"), ("#DA9D63", "#E4A66C"),
+                             ("#F9BA9A", "#FFC2A2"), ("#313455", "#3E4062"),
+                             ("#52575B", "#5E6367")):
+            self.assertEqual(to_hex(*suggest_from_photo(parse_hex(avg))), palette, avg)
+
+    def test_suggestion_keeps_hue_and_never_passes_white(self):
+        L, C, h = rgb_to_lch(*parse_hex("#46719B"))
+        L2, C2, h2 = rgb_to_lch(*suggest_from_photo(parse_hex("#46719B")))
+        self.assertGreater(L2, L)
+        self.assertAlmostEqual(h2, h, delta=1.5)
+        self.assertEqual(suggest_from_photo((255, 255, 255)), (255, 255, 255))
 
 
 class TestHex(unittest.TestCase):

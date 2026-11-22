@@ -2,6 +2,8 @@
 
 Files: a palette CSV (one row per yarn) and its companion brand list next to it, named after it
 (palette.csv -> palette.brands.csv). A yarn is identified by name + brand (case-insensitive).
+Yarn photos (optional) live in a folder next to it (palette.csv -> palette.swatches/), with
+photos.csv there linking each photo to its yarn; the palette CSV itself never mentions them.
 Pack size: a brand's default (blank = cut from skeins), optionally overridden per yarn.
 
 No Tk in here, so everything is unit-testable.
@@ -9,12 +11,16 @@ No Tk in here, so everything is unit-testable.
 import csv
 import os
 import re
+import shutil
 import tempfile
 
 from .colormath import lightness, parse_hex, rgb_to_lab, rgb_to_lch, to_hex
 
 FIELDS = ["order", "sku", "brand", "r", "g", "b", "hex", "L_gimp", "pack_size", "retired"]
 BRAND_FIELDS = ["brand", "pack_size"]
+PHOTO_FIELDS = ["sku", "brand", "file"]
+PHOTOS_FILE = "photos.csv"
+PHOTO_TYPES = (".png", ".gif")     # what Tk can read without extra packages
 _PLACEHOLDER = re.compile(r"^(|index\s*\d*|untitled.*|unnamed.*|color\s*\d*|colour\s*\d*)$", re.I)
 
 # How palettes made before brands existed were read (from the name suffix). Used only when a
@@ -96,11 +102,12 @@ class Brand:
 
 
 class Yarn:
-    def __init__(self, sku, rgb, retired=False, brand="", pack=None):
+    def __init__(self, sku, rgb, retired=False, brand="", pack=None, photo=None):
         self.sku = clean_name(sku)
         self.brand = clean_name(brand)
         self.pack = pack          # per-yarn override; None = use the brand's pack size
         self.retired = bool(retired)
+        self.photo = photo        # file in the palette's swatch folder ('Red Heart/Gold.png')
         self.set_rgb(rgb)
 
     def set_rgb(self, rgb):
@@ -119,7 +126,7 @@ class Yarn:
         return label(self.sku, self.brand)
 
     def copy(self):
-        return Yarn(self.sku, self.rgb, self.retired, self.brand, self.pack)
+        return Yarn(self.sku, self.rgb, self.retired, self.brand, self.pack, self.photo)
 
     def __repr__(self):
         return "Yarn(%r, %s%s)" % (self.label, self.hex, ", retired" if self.retired else "")
@@ -260,6 +267,7 @@ def load_bank(path):
         brands = [Brand(n, p) for n, p in LEGACY_PACKS.items()]
     else:
         brands = []
+    attach_photos(path, yarns)
     return sort_yarns(yarns), ensure_brands(brands, yarns)
 
 
@@ -301,9 +309,108 @@ def write_brands(path, brands):
 
 
 def save_bank(path, yarns, brands):
-    """Palette CSV plus its brand file."""
+    """Palette CSV plus its brand file (and the photo list, when there are photos)."""
     save_palette(path, yarns)
     write_brands(brands_path(path), ensure_brands(brands, yarns))
+    write_photos(path, yarns)
+
+
+# ---------- yarn photos ----------
+def swatch_dir(palette_path):
+    """palette.csv -> palette.swatches (the folder holding that palette's yarn photos)."""
+    root, _ = os.path.splitext(os.path.abspath(palette_path))
+    return root + ".swatches"
+
+
+def photos_path(palette_path):
+    return os.path.join(swatch_dir(palette_path), PHOTOS_FILE)
+
+
+def read_photos(palette_path):
+    """{yarn key: file} from the palette's photo list ({} when there is none)."""
+    path = photos_path(palette_path)
+    if not os.path.exists(path):
+        return {}
+    out = {}
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        for row in csv.DictReader(fh):
+            f = (row.get("file") or "").strip().replace("\\", "/")
+            if f:
+                out[yarn_key(row.get("sku"), row.get("brand"))] = f
+    return out
+
+
+def attach_photos(palette_path, yarns):
+    photos = read_photos(palette_path)
+    for y in yarns:
+        y.photo = photos.get(y.key)
+
+
+def write_photos(palette_path, yarns):
+    """Rewrite photos.csv from the yarns. Nothing is created for a palette without photos."""
+    rows = sorted(((y.sku, y.brand, y.photo) for y in yarns if y.photo),
+                  key=lambda r: (r[1].lower(), r[0].lower()))
+    path = photos_path(palette_path)
+    if not rows and not os.path.exists(path):
+        return
+
+    def write(fh):
+        w = csv.writer(fh)
+        w.writerow(PHOTO_FIELDS)
+        w.writerows(rows)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    _atomic_write(path, write)
+
+
+def photo_file(palette_path, yarn):
+    """Full path of the yarn's photo, or None when it has none. It may be missing on disk."""
+    if not yarn.photo or not palette_path:
+        return None
+    return os.path.join(swatch_dir(palette_path), *yarn.photo.split("/"))
+
+
+def has_photo(palette_path, yarn):
+    f = photo_file(palette_path, yarn)
+    return bool(f and os.path.isfile(f))
+
+
+_UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def safe_file_name(name):
+    """A yarn or brand name as a file/folder name (characters Windows forbids become '-')."""
+    s = _UNSAFE.sub("-", clean_name(name)).strip(" .")
+    return s or "yarn"
+
+
+def new_photo_name(palette_path, yarn, ext=".png"):
+    """Where a new photo for this yarn goes, relative to the swatch folder: 'Brand/Name.png',
+    'Brand/Name (2).png' when that's taken."""
+    folder = safe_file_name(yarn.brand) if yarn.brand else "No brand"
+    base = safe_file_name(yarn.sku)
+    root = swatch_dir(palette_path)
+    name, n = base + ext, 2
+    while os.path.exists(os.path.join(root, folder, name)):
+        name, n = "%s (%d)%s" % (base, n, ext), n + 1
+    return folder + "/" + name
+
+
+def copy_photos(src_palette, dst_palette, yarns):
+    """Copy the yarns' photos to another palette's swatch folder (for an export). Photos that
+    are missing are dropped from the copies. Returns the yarns to save with the new palette."""
+    out = []
+    for y in yarns:
+        c = y.copy()
+        src = photo_file(src_palette, y)
+        if src and os.path.isfile(src):
+            dst = os.path.join(swatch_dir(dst_palette), *y.photo.split("/"))
+            if os.path.normcase(os.path.abspath(src)) != os.path.normcase(os.path.abspath(dst)):
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                shutil.copyfile(src, dst)
+        else:
+            c.photo = None
+        out.append(c)
+    return out
 
 
 # ---------- GIMP .gpl ----------

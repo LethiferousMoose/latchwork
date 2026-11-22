@@ -1,11 +1,13 @@
-"""Palette manager window: yarns (add, edit, brand, retire, delete), brands, import and export."""
+"""Palette manager window: yarns (add, edit, brand, retire, delete, photo), brands, import and
+export."""
 import os
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
 from . import palette as pal
-from .colormath import parse_hex
+from . import photos
+from .colormath import SWATCH_L_OFFSET, SWATCH_L_SCALE, lightness, parse_hex, to_hex
 from .widgets import ColorPanel, free_name
 
 BG = "#ECECEC"
@@ -88,11 +90,12 @@ class PaletteWindow(tk.Toplevel):
 
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True, padx=12)
-        self.tree = ttk.Treeview(body, columns=("hex", "L", "brand", "pack", "status"),
+        self.tree = ttk.Treeview(body, columns=("hex", "L", "brand", "pack", "photo", "status"),
                                  selectmode="extended")
         for col, text, width, anchor in (("#0", "Yarn", 190, "w"), ("hex", "Hex", 75, "w"),
                                          ("L", "L", 50, "e"), ("brand", "Brand", 125, "w"),
-                                         ("pack", "Pack", 95, "w"), ("status", "Status", 65, "w")):
+                                         ("pack", "Pack", 95, "w"), ("photo", "Photo", 60, "w"),
+                                         ("status", "Status", 65, "w")):
             self.tree.heading(col, text=text, anchor=anchor if col != "#0" else "w")
             # Only the last column stretches; Yarn is sized to the longest name in refresh().
             self.tree.column(col, width=width, minwidth=40, anchor=anchor,
@@ -112,7 +115,8 @@ class PaletteWindow(tk.Toplevel):
         buttons.pack(side="left", fill="y", padx=(10, 0))
         self.retire_btn = None
         self.needs_selection = []
-        for text, cmd in (("Add...", self.add), ("Edit...", self.edit),
+        for text, cmd in (("Add...", self.add), ("Add from photo...", self.add_from_photo),
+                          ("Edit...", self.edit), ("Photo...", self.photo),
                           ("Set brand...", self.set_brand), ("Retire", self.retire),
                           ("Delete...", self.delete), (None, None), ("Brands...", self.brands),
                           (None, None), ("Import...", self.import_),
@@ -120,11 +124,11 @@ class PaletteWindow(tk.Toplevel):
             if text is None:
                 tk.Frame(buttons, height=14, bg=BG).pack()
                 continue
-            b = ttk.Button(buttons, text=text, width=14, command=cmd)
+            b = ttk.Button(buttons, text=text, width=16, command=cmd)
             b.pack(pady=2)
             if text == "Retire":
                 self.retire_btn = b
-            if text in ("Edit...", "Set brand...", "Retire", "Delete..."):
+            if text in ("Edit...", "Photo...", "Set brand...", "Retire", "Delete..."):
                 self.needs_selection.append(b)
 
         tk.Label(self, font=HINT_FONT, bg=BG, fg="#666", anchor="w", justify="left",
@@ -146,6 +150,11 @@ class PaletteWindow(tk.Toplevel):
         p = pal.effective_pack(y, self.app.brands)
         return str(p) if p else "cut"
 
+    def photo_cell(self, y):
+        if not y.photo:
+            return ""
+        return "yes" if pal.has_photo(self.app.palette_path, y) else "missing"
+
     def refresh(self, select=None):
         keep = set(select) if select is not None else set(self.tree.selection())
         self.tree.delete(*self.tree.get_children())
@@ -161,7 +170,7 @@ class PaletteWindow(tk.Toplevel):
                 img = self.images[y.hex] = swatch_image([y.hex])
             self.tree.insert("", "end", iid=iid(y), text="  " + y.sku, image=img,
                              values=(y.hex, "%.1f" % y.L, y.brand or "–", self.pack_cell(y),
-                                     "retired" if y.retired else ""),
+                                     self.photo_cell(y), "retired" if y.retired else ""),
                              tags=("retired",) if y.retired else ())
             shown += 1
         sel = [s for s in keep if self.tree.exists(s)]
@@ -202,6 +211,48 @@ class PaletteWindow(tk.Toplevel):
         if r:
             y = pal.Yarn(r["name"], r["rgb"], brand=r["brand"], pack=r["pack"])
             self.commit(self.app.bank + [y], select=[iid(y)])
+
+    def add_from_photo(self):
+        path = filedialog.askopenfilename(parent=self, title="Add a yarn from a photo",
+                                          filetypes=photos.FILETYPES)
+        if not path:
+            return
+        try:
+            img = photos.load(path, master=self)
+            avg, suggested = photos.colors(img)
+        except ValueError as e:
+            messagebox.showerror("Add from photo", str(e), parent=self)
+            return
+        note = ("Color suggested from the photo: its average %s (L %.1f), lightened to %s "
+                "(L %.1f). Change it if you like." % (
+                    to_hex(*avg), lightness(*avg), to_hex(*suggested), lightness(*suggested)))
+        thumb = photos.thumbnail(img, YarnDialog.PHOTO_SIDE)
+        r = YarnDialog(self, self.app.bank, self.app.brands, name=photo_title(path),
+                       hex=to_hex(*suggested), note=note, photo=thumb).result
+        if not r:
+            return
+        y = pal.Yarn(r["name"], r["rgb"], brand=r["brand"], pack=r["pack"])
+        try:
+            y.photo = photos.copy_in(path, self.app.palette_path, y, img)
+        except (OSError, tk.TclError) as e:
+            messagebox.showerror("Add from photo", "Could not copy the photo\n\n%s" % e,
+                                 parent=self)
+            return
+        self.commit(self.app.bank + [y], select=[iid(y)])
+
+    def photo(self):
+        sel = self.selected()
+        if len(sel) != 1:
+            messagebox.showinfo("Photo", "Select one yarn.", parent=self)
+            return
+        PhotoDialog(self, sel[0])
+
+    def replace_yarn(self, yarn, change):
+        """Save the bank with change(copy of yarn) applied; returns the new copy or None."""
+        new = [x.copy() for x in self.app.bank]
+        target = new[self.app.bank.index(yarn)]
+        change(target)
+        return target if self.commit(new, select=[iid(target)]) else None
 
     def edit(self):
         sel = self.selected()
@@ -271,7 +322,9 @@ class PaletteWindow(tk.Toplevel):
                 icon="warning", parent=self):
             return
         gone = {id(y) for y in sel}
-        self.commit([x.copy() for x in self.app.bank if id(x) not in gone])
+        if self.commit([x.copy() for x in self.app.bank if id(x) not in gone]):
+            for y in sel:
+                discard_photo(self.app.palette_path, y)
 
     def brands(self):
         BrandsDialog(self)
@@ -331,10 +384,17 @@ class PaletteWindow(tk.Toplevel):
             initialfile=free_name(folder, "%s-yarns.csv" % self._export_stem(),
                                   lambda p: [pal.brands_path(p)]),
             filetypes=[("CSV", "*.csv")])
-        if path:
-            self._export(lambda: pal.save_bank(path, self.app.bank, self.app.brands), path,
-                         "%d yarns (including retired) and their brands\n(%s)"
-                         % (len(self.app.bank), os.path.basename(pal.brands_path(path))))
+        if not path:
+            return
+        n = sum(1 for y in self.app.bank if pal.has_photo(self.app.palette_path, y))
+
+        def write():
+            yarns = pal.copy_photos(self.app.palette_path, path, self.app.bank)
+            pal.save_bank(path, yarns, self.app.brands)
+        self._export(write, path, "%d yarns (including retired) and their brands\n(%s)%s"
+                     % (len(self.app.bank), os.path.basename(pal.brands_path(path)),
+                        "\nand %d photos (in %s)" % (n, os.path.basename(pal.swatch_dir(path)))
+                        if n else ""))
 
     def export_gpl(self):
         folder = self._export_folder()
@@ -357,6 +417,150 @@ class PaletteWindow(tk.Toplevel):
     def close(self):
         self.app.palette_window = None
         self.destroy()
+
+
+def photo_title(path):
+    """A starting name for a yarn added from a photo: the file name without its extension."""
+    return pal.clean_name(os.path.splitext(os.path.basename(path))[0].replace("_", " "))
+
+
+def discard_photo(palette_path, yarn):
+    """Delete the yarn's copy in the photo folder (the photo it was chosen from is untouched)."""
+    f = pal.photo_file(palette_path, yarn)
+    if f and os.path.isfile(f):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+
+
+class PhotoDialog(tk.Toplevel):
+    """One yarn's photo: show it, choose or remove it, and offer the color the photo suggests.
+    The yarn's color only changes when I press Use this color."""
+
+    SIDE = 280
+
+    def __init__(self, win, yarn):
+        super().__init__(win)
+        self.win, self.app, self.yarn = win, win.app, yarn
+        self.img = self.thumb = None
+        self.configure(bg=BG, padx=16, pady=14)
+        self.resizable(False, False)
+        self.transient(win)
+        holder = tk.Frame(self, bg="#DDD", width=self.SIDE, height=self.SIDE)
+        holder.grid(row=0, column=0, sticky="n")
+        holder.pack_propagate(False)
+        self.picture = tk.Label(holder, bg="#DDD", bd=0, font=UI_FONT, fg="#777",
+                                justify="center", wraplength=self.SIDE - 20)
+        self.picture.pack(fill="both", expand=True)
+        side = tk.Frame(self, bg=BG)
+        side.grid(row=0, column=1, sticky="nw", padx=(14, 0))
+        self.heading = tk.Label(side, font=("Segoe UI", 12, "bold"), bg=BG, anchor="w")
+        self.heading.pack(anchor="w")
+        self.blocks = tk.Canvas(side, width=300, height=170, bg=BG, highlightthickness=0)
+        self.blocks.pack(anchor="w", pady=(8, 0))
+        self.use_btn = ttk.Button(side, text="Use this color", command=self.use_color)
+        self.use_btn.pack(anchor="w")
+        self.info = tk.Label(side, font=HINT_FONT, bg=BG, fg="#555", justify="left",
+                             wraplength=300, anchor="w")
+        self.info.pack(anchor="w", pady=(8, 0))
+        btns = tk.Frame(self, bg=BG)
+        btns.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        ttk.Button(btns, text="Choose photo...", command=self.choose).pack(side="left")
+        self.remove_btn = ttk.Button(btns, text="Remove photo", command=self.remove)
+        self.remove_btn.pack(side="left", padx=6)
+        ttk.Button(btns, text="Close", command=self.destroy).pack(side="right")
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.show()
+        center_on(self, win)
+        self.grab_set()
+
+    def show(self):
+        y = self.yarn
+        self.title("Photo - %s" % y.label)
+        self.heading.config(text=y.label)
+        self.img = self.thumb = self.avg = self.suggested = None
+        f = pal.photo_file(self.app.palette_path, y)
+        problem = None
+        if f and os.path.isfile(f):
+            try:
+                self.img = photos.load(f, master=self)
+                self.thumb = photos.thumbnail(self.img, self.SIDE)
+                self.avg, self.suggested = photos.colors(self.img)
+            except ValueError as e:
+                problem = "Can't read the photo\n\n%s" % e
+        elif f:
+            problem = "Photo missing:\n%s" % y.photo
+        if self.thumb:
+            self.picture.config(image=self.thumb, text="")
+        else:
+            self.picture.config(image="", text=problem or "No photo yet")
+        c = self.blocks
+        c.delete("all")
+        rows = [("This yarn", y.rgb)]
+        if self.avg:
+            rows += [("Photo average", self.avg), ("Suggested from the photo", self.suggested)]
+        for i, (label, rgb) in enumerate(rows):
+            top = i * 56
+            c.create_rectangle(1, top + 1, 80, top + 47, fill=to_hex(*rgb), outline="#999")
+            c.create_text(92, top + 14, text=label, anchor="w", font=("Segoe UI", 10, "bold"))
+            c.create_text(92, top + 34, text="%s   L %.1f" % (to_hex(*rgb), lightness(*rgb)),
+                          anchor="w", font=UI_FONT, fill="#444")
+        c.configure(height=len(rows) * 56)
+        same = self.suggested is not None and tuple(self.suggested) == tuple(y.rgb)
+        if self.suggested:
+            self.use_btn.pack(anchor="w", before=self.info)
+            self.use_btn.state(["disabled"] if same else ["!disabled"])
+        else:
+            self.use_btn.pack_forget()
+        self.remove_btn.state(["!disabled"] if y.photo else ["disabled"])
+        if not self.avg:
+            self.info.config(text="Choose a PNG or GIF photo of this yarn. A copy goes into the "
+                                  "palette's photo folder (%s)." % os.path.basename(
+                                      pal.swatch_dir(self.app.palette_path or "palette.csv")))
+        else:
+            self.info.config(text="Suggested = the photo's average with its lightness raised "
+                                  "the way picked yarn colors compare to yarn photos (L x %.3f + %.2f). "
+                                  "This yarn's color only changes if you press Use this color."
+                                  % (SWATCH_L_SCALE, SWATCH_L_OFFSET))
+
+    def _save(self, change):
+        y = self.win.replace_yarn(self.yarn, change)
+        if y:
+            self.yarn = y
+            self.show()
+        return y
+
+    def choose(self):
+        path = filedialog.askopenfilename(parent=self, title="Photo for %s" % self.yarn.label,
+                                          filetypes=photos.FILETYPES)
+        if not path:
+            return
+        try:
+            img = photos.load(path, master=self)
+            rel = photos.copy_in(path, self.app.palette_path, self.yarn, img)
+        except ValueError as e:
+            messagebox.showerror("Photo", str(e), parent=self)
+            return
+        except (OSError, tk.TclError) as e:
+            messagebox.showerror("Photo", "Could not copy the photo\n\n%s" % e, parent=self)
+            return
+        old = self.yarn
+        if self._save(lambda t: setattr(t, "photo", rel)) and old.photo and old.photo != rel:
+            discard_photo(self.app.palette_path, old)
+
+    def use_color(self):
+        if self.suggested:
+            self._save(lambda t: t.set_rgb(self.suggested))
+
+    def remove(self):
+        if not messagebox.askyesno("Remove photo", "Remove the photo from %s?\n\nIts copy in "
+                                   "the photo folder is deleted; the photo you chose it from "
+                                   "is not touched." % self.yarn.label, parent=self):
+            return
+        old = self.yarn
+        if self._save(lambda t: setattr(t, "photo", None)):
+            discard_photo(self.app.palette_path, old)
 
 
 class BrandChoiceDialog(tk.Toplevel):
@@ -602,9 +806,12 @@ class BrandEditDialog(tk.Toplevel):
 class YarnDialog(tk.Toplevel):
     """Add or edit one yarn. result = {"name", "rgb", "brand", "pack"} or None."""
 
-    def __init__(self, parent, bank, brands, yarn=None):
+    PHOTO_SIDE = 150
+
+    def __init__(self, parent, bank, brands, yarn=None, name="", hex="", note="", photo=None):
         super().__init__(parent)
         self.bank, self.brands, self.yarn, self.result = bank, brands, yarn, None
+        self.photo = photo
         self.title("Edit yarn" if yarn else "Add yarn")
         self.configure(bg=BG, padx=16, pady=14)
         self.resizable(False, False)
@@ -613,7 +820,7 @@ class YarnDialog(tk.Toplevel):
         form = tk.Frame(self, bg=BG)
         form.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
         tk.Label(form, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
-        self.name_var = tk.StringVar(value=yarn.sku if yarn else "")
+        self.name_var = tk.StringVar(value=yarn.sku if yarn else name)
         name_entry = ttk.Entry(form, textvariable=self.name_var, width=34, font=("Segoe UI", 11))
         name_entry.grid(row=0, column=1, columnspan=3, sticky="w", padx=8)
         tk.Label(form, text="Brand", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w",
@@ -636,7 +843,7 @@ class YarnDialog(tk.Toplevel):
                                 highlightthickness=0)
         self.swatch.grid(row=1, column=0, columnspan=2, pady=(0, 8))
 
-        self.hex_var = tk.StringVar(value=yarn.hex if yarn else "")
+        self.hex_var = tk.StringVar(value=yarn.hex if yarn else hex)
         self.panel = ColorPanel(self, self.hex_var, editable=True)
         self.panel.grid(row=2, column=0, columnspan=2, sticky="ew")
 
@@ -645,9 +852,17 @@ class YarnDialog(tk.Toplevel):
         self.info.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
         self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020", anchor="w")
         self.error.grid(row=4, column=0, columnspan=2, sticky="w", pady=(2, 0))
+        if photo is not None or note:
+            extra = tk.Frame(self, bg=BG)
+            extra.grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
+            if photo is not None:
+                tk.Label(extra, image=photo, bd=1, relief="solid").pack(side="left")
+            tk.Label(extra, text=note, font=HINT_FONT, bg=BG, fg="#555", justify="left",
+                     wraplength=self.SW_W - (self.PHOTO_SIDE + 12 if photo else 0),
+                     anchor="nw").pack(side="left", anchor="n", padx=(12 if photo else 0, 0))
 
         btns = tk.Frame(self, bg=BG)
-        btns.grid(row=5, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        btns.grid(row=6, column=0, columnspan=2, sticky="e", pady=(12, 0))
         self.ok = ttk.Button(btns, text="Save" if yarn else "Add", command=self.accept)
         self.ok.pack(side="left", padx=4)
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left")
@@ -659,6 +874,8 @@ class YarnDialog(tk.Toplevel):
         self.update_view()
         center_on(self, parent)
         (self.panel.entry if yarn else name_entry).focus_set()
+        if name and not yarn:
+            name_entry.select_range(0, "end")
         self.grab_set()
         self.wait_window()
 

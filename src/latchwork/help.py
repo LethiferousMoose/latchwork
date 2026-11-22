@@ -119,8 +119,12 @@ Palette → Manage yarns (Ctrl+P) edits the active palette. Changes save immedia
 - Retire hides a yarn from matching but keeps it (e.g. discontinued). Delete is for mistakes.
 - Import (CSV or GIMP .gpl) always merges: nothing is removed, and a summary is shown before anything changes.
 - Selecting a yarn in the manager shows it in the main view.
+- Photo… gives a yarn a photo (PNG or GIF). The window also shows the color the photo suggests; the yarn's own color only changes if you press Use this color.
+- Add from photo… starts a new yarn from a photo, with the suggested color filled in.
 
-The palette is two files: palette.csv (yarns) and palette.brands.csv (brands and pack sizes). Export CSV writes both.
+The suggested color is the photo's average, lightened (L × 0.957 + 6.44): an average counts the shadows between strands, so it reads darker than the yarn looks.
+
+The palette is two files: palette.csv (yarns) and palette.brands.csv (brands and pack sizes). Photos are copied into a folder next to them (palette.swatches). Export CSV writes all of it.
 
 Projects aren't tied to a palette: each assignment keeps the yarn's name, brand, pack size and hex, so it survives palette edits or switching palettes.
 """),

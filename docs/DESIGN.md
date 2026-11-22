@@ -120,8 +120,25 @@ anything. A summary is shown first and nothing changes until confirmed:
 - Same hex under another name (maybe a rename): add, skip, or rename the existing yarn.
 - Placeholder names ("Index 3", "Untitled") or duplicates within the file: name or skip.
 
-**Export:** CSV (everything, including retired, plus the brands file) and `.gpl` (active
-yarns only, `R G B<tab>Name (Brand)`).
+**Export:** CSV (everything, including retired, plus the brands file and the photos) and
+`.gpl` (active yarns only, `R G B<tab>Name (Brand)`).
+
+**Yarn photos** (optional, one per yarn) live in a folder named after the palette
+(`palette.csv` → `palette.swatches/`), copied in as `Brand/Name.png` and shrunk to 400 px on
+the long side when larger. `photos.csv` in that folder (`sku, brand, file`) links them to
+yarns, so `palette.csv` never mentions photos: a palette without its folder simply has no
+photos, and a link whose file is gone shows as "missing". The file name is fixed when the
+photo is copied in; renaming a yarn or brand in the app updates the link, not the file.
+Removing a photo (or deleting its yarn) deletes the copy, never the photo it came from. Only
+PNG and GIF, because that's what Tk reads without extra packages. The folders are git-ignored
+(`*.swatches/`): downloaded swatch photos belong to the shops that took them.
+
+**A color from a photo** is a suggestion only; a yarn's color never changes unless I press
+"Use this color" (or accept it when adding a yarn from a photo). It is the photo's average in
+linear light, with its lightness raised: `L = 0.957 × photo L + 6.44`, chroma and hue kept.
+That fit is my 57 Red Heart yarns that have both a picked color and a shop swatch photo (mean
+error 2.9 L); a photo's average reads 3–5 L darker than a picked pixel of the same yarn,
+because shadows between the strands count too.
 
 **Palette list:** one palette is active at a time; every palette opened stays on a list in the
 Palette dropdown and menu (Ctrl+1…9). Palettes are kept in memory and re-read only when the

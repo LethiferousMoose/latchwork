@@ -87,6 +87,11 @@ To use your own yarns, open **Palette → Manage yarns** (Ctrl+P) to add or edit
 an empty palette with **File → New palette**. Palettes are plain CSV files you can also edit in
 a spreadsheet.
 
+Yarns can have a photo (PNG or GIF): **Photo...** in the palette manager, or **Add from photo...**
+to start a new yarn from one with its color suggested from the photo. Photos are copied into a
+folder next to the palette (`data/palette.swatches/`), which isn't in git, so the shipped palette
+has none.
+
 ![Palette manager](docs/images/palette-manager.png)
 
 ## How matching works

@@ -85,6 +85,38 @@ def gray_for_lightness(L):
     return srgb_encode(y)
 
 
+_DECODE = [srgb_decode(c) for c in range(256)]
+
+
+def average_rgb(pixels):
+    """Mean of (r, g, b) 0..255 pixels, averaged in linear light (as mixing light does), as
+    sRGB floats. A photo's average reads darker than a single picked pixel of the yarn."""
+    n, sr, sg, sb = 0, 0.0, 0.0, 0.0
+    dec = _DECODE
+    for r, g, b in pixels:
+        sr += dec[r]
+        sg += dec[g]
+        sb += dec[b]
+        n += 1
+    if not n:
+        raise ValueError("no pixels")
+    return srgb_encode(sr / n), srgb_encode(sg / n), srgb_encode(sb / n)
+
+
+# A yarn photo's average vs the color I picked for the same yarn: fitted on 57 of my yarns with
+# both (Red Heart swatches): picked L = 0.957 * photo L + 6.44 (mean error 2.9 L); chroma and
+# hue barely differ, so they are kept.
+SWATCH_L_SCALE, SWATCH_L_OFFSET = 0.957, 6.44
+
+
+def suggest_from_photo(rgb):
+    """The palette color a photo's average suggests: lightness raised by the fit above, chroma
+    and hue kept. Returns sRGB 0..255 ints."""
+    L, C, h = rgb_to_lch(*rgb)
+    L2 = min(100.0, SWATCH_L_SCALE * L + SWATCH_L_OFFSET)
+    return tuple(int(round(c)) for c in lch_to_rgb(L2, C, h))
+
+
 def parse_hex(text):
     """'#88A048', '88a048', ' #88A048 ' -> (136, 160, 72); anything else -> None."""
     s = text.strip()

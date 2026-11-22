@@ -265,5 +265,66 @@ class TestImport(unittest.TestCase):
         self.assertEqual(pal.suggest_name("Light Teal", RH, taken), "Light Teal 2")
 
 
+class TestPhotos(TempDir):
+    def test_links_live_in_the_swatch_folder_not_the_palette(self):
+        p = self.path("p.csv")
+        yarns = bank()
+        yarns[0].photo = "Herrschners/Sunny Yellow.png"
+        pal.save_bank(p, yarns, brands())
+        with open(p, encoding="utf-8") as fh:
+            self.assertNotIn("photo", fh.read())
+        self.assertTrue(os.path.exists(os.path.join(self.dir, "p.swatches", "photos.csv")))
+        back, _ = pal.load_bank(p)
+        self.assertEqual({y.sku: y.photo for y in back if y.photo},
+                         {"Sunny Yellow": "Herrschners/Sunny Yellow.png"})
+        self.assertFalse(pal.has_photo(p, back[0]))     # linked, but the file isn't there
+
+    def test_no_photos_no_folder(self):
+        p = self.path("p.csv")
+        pal.save_bank(p, bank(), brands())
+        self.assertFalse(os.path.exists(pal.swatch_dir(p)))
+        self.assertTrue(all(y.photo is None for y in pal.load_bank(p)[0]))
+
+    def test_rename_keeps_the_photo_and_removing_clears_it(self):
+        p = self.path("p.csv")
+        yarns = bank()
+        yarns[0].photo = "Herrschners/Sunny Yellow.png"
+        pal.save_bank(p, yarns, brands())
+        back, br = pal.load_bank(p)
+        renamed = [y.copy() for y in back]
+        renamed[0].sku, renamed[0].brand = "Lemon", RH
+        pal.save_bank(p, renamed, br)
+        again, _ = pal.load_bank(p)
+        self.assertEqual([(y.label, y.photo) for y in again if y.photo],
+                         [("Lemon (Red Heart)", "Herrschners/Sunny Yellow.png")])
+        cleared = [y.copy() for y in again]
+        cleared[0].photo = None
+        pal.save_bank(p, cleared, br)
+        self.assertTrue(all(y.photo is None for y in pal.load_bank(p)[0]))
+
+    def test_new_photo_names(self):
+        p = self.path("p.csv")
+        y = Yarn('Odd: Name?', (1, 2, 3), brand="L&T")
+        self.assertEqual(pal.new_photo_name(p, y), "L&T/Odd- Name-.png")
+        os.makedirs(os.path.join(pal.swatch_dir(p), "L&T"))
+        open(os.path.join(pal.swatch_dir(p), "L&T", "Odd- Name-.png"), "w").close()
+        self.assertEqual(pal.new_photo_name(p, y), "L&T/Odd- Name- (2).png")
+        self.assertEqual(pal.new_photo_name(p, Yarn("Gray", (1, 2, 3))), "No brand/Gray.png")
+
+    def test_export_copies_photos_and_drops_missing_ones(self):
+        src, dst = self.path("a.csv"), self.path("b.csv")
+        yarns = bank()
+        yarns[0].photo, yarns[1].photo = "H/one.png", "H/gone.png"
+        os.makedirs(os.path.join(pal.swatch_dir(src), "H"))
+        with open(os.path.join(pal.swatch_dir(src), "H", "one.png"), "wb") as fh:
+            fh.write(b"png")
+        pal.save_bank(src, yarns, brands())
+        out = pal.copy_photos(src, dst, pal.load_bank(src)[0])
+        pal.save_bank(dst, out, brands())
+        back, _ = pal.load_bank(dst)
+        self.assertEqual([y.photo for y in back if y.photo], ["H/one.png"])
+        self.assertTrue(pal.has_photo(dst, next(y for y in back if y.photo)))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,9 +20,10 @@ tidied so others can use it too. Keep it simple.
 - `latchwork.py`: launcher (checks Python/Tkinter, adds `src/` to the path).
   `latchwork.bat` / `.command` / `.sh` wrap it per OS (`.gitattributes` keeps their line endings).
 - `src/latchwork/`: the package, relative imports. `app.py` is the main window; `colormath`,
-  `palette`, `project`, `plan`, `pattern`, `pixelart` have no Tk; `palette_window`,
+  `palette`, `project`, `plan`, `pattern`, `pixelart` have no Tk (`photos` is the Tk image side); `palette_window`,
   `project_panel`, `carry_window`, `widgets`, `help` are Tk UI. `pattern_template.html` is the phone pattern.
-- `data/`: palettes (`palette.csv` + `palette.brands.csv`, my real yarns).
+- `data/`: palettes (`palette.csv` + `palette.brands.csv`, my real yarns). Yarn photos go in
+  `palette.swatches/` next to a palette (git-ignored: shop swatch photos aren't ours to share).
 - `settings/`: per-user settings (git-ignored).
 - `tests/`: `python -m unittest discover -s tests` (adds `src/` to the path).
 - `tools/export_palette.py`: the GIMP 2.10 script that exported the original palette.
