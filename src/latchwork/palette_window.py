@@ -694,7 +694,7 @@ class YarnDialog(tk.Toplevel):
     photo_src is a newly chosen photo to copy in and photo_removed means drop the yarn's photo.
     With photo_src given when adding, the name and color start from that photo."""
 
-    PHOTO_SIDE = 136
+    PHOTO_SIDE = 150
 
     def __init__(self, parent, bank, brands, palette_path, yarn=None, photo_src=None):
         super().__init__(parent)
@@ -825,9 +825,10 @@ class YarnDialog(tk.Toplevel):
         row = tk.Frame(left, bg=BG)
         row.pack(fill="x", pady=(4, 0))
         row.columnconfigure((0, 1), weight=1, uniform="photo")
-        ttk.Button(row, text="Choose...", command=self.choose_photo).grid(
+        # width=1: the buttons take the photo's width between them, not their own
+        ttk.Button(row, text="Choose...", width=1, command=self.choose_photo).grid(
             row=0, column=0, sticky="ew")
-        self.remove_btn = ttk.Button(row, text="Remove", command=self.remove_photo)
+        self.remove_btn = ttk.Button(row, text="Remove", width=1, command=self.remove_photo)
         self.remove_btn.grid(row=0, column=1, sticky="ew", padx=(4, 0))
         tip(self.remove_btn, "Take the photo off this yarn. Its copy in the photo folder is\n"
                              "deleted when you press Save; the photo you chose it from\n"
@@ -874,15 +875,10 @@ class YarnDialog(tk.Toplevel):
             self.picture.config(image="", text="No photo\n\nclick to choose one")
         for (chip, Lval, cells), rgb, var in zip(self.photo_rows, (self.avg, self.suggested),
                                                  (self.avg_var, self.sug_var)):
-            if rgb:
-                var.set(to_hex(*rgb))
-                chip.config(bg=to_hex(*rgb))
-                Lval.config(text="L %.1f" % lightness(*rgb))
-                for w in cells:
-                    w.grid()
-            else:
-                for w in cells:
-                    w.grid_remove()
+            # always shown (empty without a photo) so the dialog keeps its size
+            var.set(to_hex(*rgb) if rgb else "")
+            chip.config(bg=to_hex(*rgb) if rgb else "#DDD")
+            Lval.config(text="L %.1f" % lightness(*rgb) if rgb else "L  –")
         has = bool(self.photo_src or (self.yarn and self.yarn.photo and not self.photo_removed))
         self.remove_btn.state(["!disabled"] if has else ["disabled"])
 
