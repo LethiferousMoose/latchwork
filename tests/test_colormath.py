@@ -21,7 +21,7 @@ def palette_rows():
 class TestLightness(unittest.TestCase):
     def test_every_palette_row_matches_L_gimp(self):
         rows = palette_rows()
-        self.assertEqual(len(rows), 198)
+        self.assertEqual(len(rows), 208)
         for row in rows:
             with self.subTest(sku=row["sku"]):
                 L = lightness(int(row["r"]), int(row["g"]), int(row["b"]))
