@@ -6,6 +6,7 @@ is in palette.py (photos.csv in the palette's swatch folder).
 import os
 import shutil
 import tkinter as tk
+from fractions import Fraction
 
 from . import palette as pal
 from .colormath import average_rgb, suggest_from_photo
@@ -46,9 +47,30 @@ def colors(img):
     return tuple(int(round(c)) for c in avg), suggest_from_photo(avg)
 
 
-def thumbnail(img, max_side):
-    f = shrink_factor(img, max_side)
-    return img.subsample(f) if f > 1 else img
+def cover(img, side):
+    """A side x side square filling the frame with the photo, centered and cropped, like a
+    profile picture. Tk only scales by whole numbers, so it zooms by p and shrinks by q with
+    p/q just above the needed scale."""
+    w, h = img.width(), img.height()
+    short = min(w, h)
+    pre = max(1, short // (side * 2))           # big photos: shrink most of the way first
+    if pre > 1:
+        img = img.subsample(pre)
+        w, h = img.width(), img.height()
+        short = min(w, h)
+    f = Fraction(side, short).limit_denominator(8)
+    if f * short < side:                        # rounded below: step up to cover the frame
+        f = Fraction(-(-side * f.denominator // short), f.denominator)
+    if f.numerator > 1:
+        img = img.zoom(f.numerator)
+    if f.denominator > 1:
+        img = img.subsample(f.denominator)
+    w, h = img.width(), img.height()
+    x0, y0 = (w - side) // 2, (h - side) // 2
+    out = tk.PhotoImage(master=img.tk, width=side, height=side)
+    out.tk.call(out.name, "copy", img.name, "-from", max(0, x0), max(0, y0),
+                max(0, x0) + min(side, w), max(0, y0) + min(side, h))
+    return out
 
 
 def copy_in(src, palette_path, yarn, img=None):

@@ -813,9 +813,11 @@ class YarnDialog(tk.Toplevel):
         side = self.PHOTO_SIDE
         left = tk.Frame(top, bg=BG)
         left.grid(row=0, column=0, sticky="nw")
+        # 1 px in from each side: the themed buttons below draw their border 1 px inside
+        # their space, so this lines the photo's border up with theirs.
         holder = tk.Frame(left, bg="#DDD", width=side, height=side, highlightthickness=1,
                           highlightbackground="#BBB")
-        holder.pack()
+        holder.pack(padx=1)
         holder.pack_propagate(False)
         self.picture = tk.Label(holder, bg="#DDD", font=HINT_FONT, fg="#777", justify="center",
                                 wraplength=side - 16, cursor="hand2")
@@ -860,7 +862,7 @@ class YarnDialog(tk.Toplevel):
         if path and os.path.isfile(path):
             try:
                 img = photos.load(path, master=self)
-                self.thumb = photos.thumbnail(img, self.PHOTO_SIDE)
+                self.thumb = photos.cover(img, self.PHOTO_SIDE)
                 self.avg, self.suggested = photos.colors(img)
             except ValueError as e:
                 self.problem = "Can't read the photo: %s" % e
