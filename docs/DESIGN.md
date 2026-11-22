@@ -138,8 +138,9 @@ leaves nothing behind); a replaced photo takes the old file's name once the old 
 
 **A color from a photo** is a suggestion only, shown as a copyable hex code next to the photo;
 a yarn's color never changes unless I paste it into HTML notation and save (or keep the
-suggestion when adding a yarn: choosing a photo fills in an empty name and color). It is the photo's average in
-linear light, with its lightness raised: `L = 0.957 × photo L + 6.44`, chroma and hue kept.
+suggestion when adding a yarn: choosing a photo fills in an empty name and color). It is the
+photo's average in linear light, with its lightness raised: `L = 0.957 × photo L + 6.44`,
+chroma and hue kept.
 That fit is my 57 Red Heart yarns that have both a picked color and a shop swatch photo (mean
 error 2.9 L); a photo's average reads 3–5 L darker than a picked pixel of the same yarn,
 because shadows between the strands count too.
