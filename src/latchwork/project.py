@@ -11,7 +11,7 @@ File format (JSON, version 1):
               "yarn": {"name": "Sage", "brand": "Loops & Threads", "pack": null,
                        "hex": "#959A78", "palette": "palette.csv"} | null,
               "confirmed": true, "carried_from": "mario-1",     # carried_from: optional
-              "candidates": [{"name": "Brass", "brand": "Hershner's", "hex": "#755940"}]}],
+              "candidates": [{"name": "Brass", "brand": "Herrschners", "hex": "#755940"}]}],
                                                        # candidates: optional, yarns I marked
   "settings": {"spare_percent": 0, "holes_per_inch": 3.75, "border_side": 3, ...}
 }

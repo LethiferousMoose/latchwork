@@ -188,7 +188,7 @@ class TestProject(unittest.TestCase):
         self.assertEqual(q.entry("#C86432").yarn["brand"], "Red Heart")
         self.assertIsNone(q.entry("#C86432").yarn["pack"])
         self.assertEqual((q.entry("#FFFFFF").yarn["brand"], q.entry("#FFFFFF").yarn["pack"]),
-                         ("Hershner's", 320))
+                         ("Herrschners", 320))
 
     def test_carry_over(self):
         old1, old2 = self.new(), self.new()

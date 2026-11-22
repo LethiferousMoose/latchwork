@@ -139,7 +139,7 @@ A `.latchwork` file is readable JSON:
             "data": "<base64 PNG>"},
   "colors": [
     {"hex": "#AAD2F0", "count": 280, "confirmed": true, "carried_from": "forest rug",
-     "yarn": {"name": "Light Blue", "brand": "Hershner's", "pack": 320,
+     "yarn": {"name": "Light Blue", "brand": "Herrschners", "pack": 320,
               "hex": "#ACD5F2", "palette": "palette.csv"},
      "candidates": [{"name": "Sky Blue", "brand": "Red Heart", "hex": "#A9C9E4"}]}
   ],

@@ -36,7 +36,7 @@ tidied so others can use it too. Keep it simple.
   earlier rugs from the demo image and the demo with a small house added (two new colors).
 
 ## My setup (the defaults)
-- Hershner's is pre-cut, 320 pieces per pack; Red Heart and Loops & Threads are cut from skeins.
+- Herrschners is pre-cut, 320 pieces per pack; Red Heart and Loops & Threads are cut from skeins.
 - Canvas 3.75 holes per inch; borders 3 per side, 8 top (hanging loop), 3 bottom + 1 empty row.
 - I hook bottom to top, generally left to right, reading the pattern on an Android phone.
 - Color weight 0.5 was fitted on my own rugs (see DESIGN.md).

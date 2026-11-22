@@ -22,7 +22,7 @@ class TestMath(unittest.TestCase):
         self.assertEqual(pl.with_spare(320, 10), 352)
         self.assertEqual(pl.with_spare(100, 5), 105)
         self.assertEqual(pl.with_spare(101, 5), 107)   # 106.05 rounds up
-        line = pl.YarnLine("Light Teal", "#53AACC", "palette.csv", "Hershner's", 320)
+        line = pl.YarnLine("Light Teal", "#53AACC", "palette.csv", "Herrschners", 320)
         for count, bags in ((1, 1), (320, 1), (321, 2), (640, 2), (641, 3)):
             line.count = count
             self.assertEqual(line.need(0)[1], bags, count)
@@ -61,11 +61,11 @@ class TestPlan(unittest.TestCase):
         self.p = Project.from_image_bytes(make_png(3, 2, RGB_ROWS, 2), "t.png",
                                           os.path.join(self.dir, "t.latchwork"))
         # colors: #FFFFFF x1, #C86432 x2, #0A141E x2, #000000 x1
-        self.brands = [Brand("Hershner's", 320), Brand("Red Heart")]
+        self.brands = [Brand("Herrschners", 320), Brand("Red Heart")]
         self.navy = Yarn("Navy", (20, 25, 60), brand="Red Heart")
         self.p.assign("#0A141E", self.navy, "palette.csv", self.brands)
         self.p.assign("#000000", self.navy, "palette.csv", self.brands)      # merged
-        self.p.assign("#C86432", Yarn("Rust", (180, 80, 40), brand="Hershner's"), "sky.csv",
+        self.p.assign("#C86432", Yarn("Rust", (180, 80, 40), brand="Herrschners"), "sky.csv",
                       self.brands)
 
     def tearDown(self):
@@ -75,7 +75,7 @@ class TestPlan(unittest.TestCase):
         plan = pl.Plan(self.p)
         self.assertEqual([(l.label, l.count, l.pack, l.colors) for l in plan.lines],
                          [("Navy (Red Heart)", 3, None, ["#0A141E", "#000000"]),
-                          ("Rust (Hershner's)", 2, 320, ["#C86432"])])
+                          ("Rust (Herrschners)", 2, 320, ["#C86432"])])
         self.assertEqual([l.name for l in plan.merged], ["Navy"])
         self.assertEqual(([c.hex for c in plan.unassigned], plan.unassigned_count), (["#FFFFFF"], 1))
         self.assertEqual((plan.assigned_count, plan.total_packs, plan.total_pieces_to_cut), (5, 1, 3))
@@ -102,7 +102,7 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(rows[0][:4], ["yarn", "brand", "hex", "count"])
         self.assertEqual(rows[1], ["Navy", "Red Heart", "#14193C", "3", "10", "4", "", "", "4",
                                    "#0A141E #000000", "palette.csv"])
-        self.assertEqual(rows[2][:9], ["Rust", "Hershner's", "#B45028", "2", "10", "3", "320",
+        self.assertEqual(rows[2][:9], ["Rust", "Herrschners", "#B45028", "2", "10", "3", "320",
                                        "1", ""])
         total = [r for r in rows if r and r[0] == "TOTAL"][0]
         self.assertEqual(total[3], "5")

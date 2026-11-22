@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 from latchwork import palette as pal  # noqa: E402
 from latchwork.palette import Brand, Entry, Yarn  # noqa: E402
 
-H, RH = "Hershner's", "Red Heart"
+H, RH = "Herrschners", "Red Heart"
 
 
 def bank():
@@ -110,7 +110,7 @@ class TestFiles(TempDir):
         with open(p, encoding="utf-8") as fh:
             text = fh.read()
         self.assertTrue(text.startswith("GIMP Palette\n"))
-        self.assertIn("254 250 190\tSunny Yellow (Hershner's)\n", text)
+        self.assertIn("254 250 190\tSunny Yellow (Herrschners)\n", text)
         entries, br = pal.read_import_file(p)
         self.assertEqual(len(entries), len(pal.active(bank())))
         self.assertEqual(br, [])
@@ -157,7 +157,7 @@ class TestHelpers(unittest.TestCase):
     def test_name_problem_is_per_brand(self):
         b = bank()
         self.assertIsNotNone(pal.name_problem("  ", H, b))
-        self.assertIn("Light Teal", pal.name_problem("light  TEAL", "hershner's", b))
+        self.assertIn("Light Teal", pal.name_problem("light  TEAL", "herrschners", b))
         self.assertIsNone(pal.name_problem("Light Teal", RH, b))       # other brand: fine
         self.assertIn("retired", pal.name_problem("old brown", RH, b))
         teal = [y for y in b if y.sku == "Light Teal"][0]
@@ -202,7 +202,7 @@ class TestImport(unittest.TestCase):
         self.assertEqual(items[0].kind, pal.NEW)
         new = pal.apply_import(bank(), items)
         self.assertEqual(sorted(y.label for y in new if y.sku == "Light Teal"),
-                         ["Light Teal (Caron)", "Light Teal (Hershner's)"])
+                         ["Light Teal (Caron)", "Light Teal (Herrschners)"])
 
     def test_retired_match(self):
         items = self.plan(("old brown", (101, 70, 50)), brand=RH)

@@ -78,7 +78,7 @@ class TestPaletteOrder(unittest.TestCase):
 
     def test_light_teal_before_dusty_grey(self):
         names = [y.label for y in load_palette(PALETTE)]
-        self.assertLess(names.index("Light Teal (Hershner's)"), names.index("Dusty Grey (Red Heart)"))
+        self.assertLess(names.index("Light Teal (Herrschners)"), names.index("Dusty Grey (Red Heart)"))
 
 
 class TestMatching(unittest.TestCase):

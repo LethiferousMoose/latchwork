@@ -20,8 +20,8 @@ _PLACEHOLDER = re.compile(r"^(|index\s*\d*|untitled.*|unnamed.*|color\s*\d*|colo
 # How palettes made before brands existed were read (from the name suffix). Used only when a
 # palette CSV has no brand column, and for projects saved before brands existed.
 _LEGACY_SUFFIX = (("L&T", "Loops & Threads"), ("RH", "Red Heart"))
-LEGACY_DEFAULT_BRAND = "Hershner's"
-LEGACY_PACKS = {"Hershner's": 320, "Red Heart": None, "Loops & Threads": None}
+LEGACY_DEFAULT_BRAND = "Herrschners"
+LEGACY_PACKS = {"Herrschners": 320, "Red Heart": None, "Loops & Threads": None}
 
 
 def legacy_brand(sku):

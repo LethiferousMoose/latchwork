@@ -19,7 +19,7 @@ and export a pattern you can read on your phone while hooking.
   Works offline on a phone, and prints on letter paper split into labelled pages.
 - **Manages your yarn palette.** Add, edit, retire and import yarns (CSV or GIMP `.gpl`), with
   brands and pack sizes. Keep several palettes and switch between them instantly.
-- **Comes with a ready-made palette** of 198 yarns from Hershner's, Red Heart and Loops &
+- **Comes with a ready-made palette** of 198 yarns from Herrschners, Red Heart and Loops &
   Threads, so you can start matching right away (see [The yarn palette](#the-yarn-palette)).
 
 <p>
@@ -78,9 +78,9 @@ weight.
 
 ## The yarn palette
 
-`data/palette.csv` ships with 198 yarns from Hershner's, Red Heart and Loops & Threads. Their
+`data/palette.csv` ships with 198 yarns from Herrschners, Red Heart and Loops & Threads. Their
 colors were sampled from photos, so treat them as close approximations. Pack sizes per brand are
-in `data/palette.brands.csv` (Hershner's comes pre-cut, 320 pieces per pack; the others are cut
+in `data/palette.brands.csv` (Herrschners comes pre-cut, 320 pieces per pack; the others are cut
 from skeins).
 
 To use your own yarns, open **Palette → Manage yarns** (Ctrl+P) to add or edit them, or start
