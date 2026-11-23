@@ -169,6 +169,23 @@ class TestProject(unittest.TestCase):
         p.suggest([], "empty.csv")
         self.assertIsNone(p.entry("#FFFFFF").yarn)
 
+    def test_state_and_restore(self):
+        """What undo keeps: restoring a state puts the color back exactly, by copy."""
+        p = self.new()
+        p.suggest(self.yarns, "palette.csv")
+        suggested = p.state("#C86432")
+        p.carry("#C86432", p.entry("#0A141E").yarn, "old rug")
+        carried = p.state("#C86432")
+        self.assertEqual(carried[1:], (True, "old rug"))
+        p.assign("#C86432", self.yarns[0], "palette.csv")
+        p.restore("#C86432", carried)
+        self.assertEqual(p.state("#C86432"), carried)
+        p.restore("#C86432", suggested)
+        e = p.entry("#C86432")
+        self.assertEqual((e.yarn["name"], e.confirmed, e.carried), ("Orange", False, None))
+        e.yarn["name"] = "changed"                  # the kept state isn't shared with the entry
+        self.assertEqual(suggested[0]["name"], "Orange")
+
     def test_project_saved_before_brands(self):
         p = self.new()
         p.save()

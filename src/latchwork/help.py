@@ -22,7 +22,7 @@ Latchwork takes a pixel-art image to a finished latch-hook pattern:
 - Click a column heading to sort by it, again to reverse, a third time for the default order. Color sorts by lightness; Status puts suggested colors first. Each project remembers its sort.
 - File → Export pattern (Ctrl+E): a single HTML file for your phone or printer.
 
-Projects save automatically on every change.
+Projects save automatically on every change. Edit → Undo (Ctrl+Z) takes back assignments.
 """),
     ("How matching works", """
 # How matching works
@@ -96,6 +96,7 @@ Pixel art is more vivid than any yarn; high weights chase colorfulness and light
 - M: mark the yarn on screen as a candidate for the selected color (again to unmark); right-click a tile in the strip does the same for that yarn. Candidates are per color, saved in the project, and kept when you assign: a shortlist while you decide. Marked tiles get a star, and the Colors list shows how many (★3).
 - C: next candidate (darker, wrapping around); Shift+C goes the other way. Middle-click (wheel click) over the strip does the same as C. The preview follows, so you can flip between your picks in the whole picture.
 - A: assign the yarn on screen to the selected color; press again to undo.
+- Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z): undo / redo an assignment, also under Edit. Covers Assign, un-assign, Carry over and Assign from yarn image (each of those last two is one step, however many colors it filled); candidate marks aren't included. Undoing one color selects it and shows its yarn. The history lasts until you open or close a project.
 - G: grayscale (judge lightness alone).
 - P: sidebar image: original / yarn preview (assigned yarns, and suggested yarns for unassigned colors; Mark unassigned stripes those). The selected color shows the yarn currently on screen, live as you step, so you can judge it in the whole picture; nothing changes until you Assign. Highlight selected color (off by default) fades everything else, to show where that color is: toward white, or toward dark gray when the selected color is light (so white or pale colors still stand out). View larger (above the image) opens it in its own window, as big as fits, for small, long or wide art; it follows the sidebar, you can click colors in it, and P works there too.
 - T: yarn texture (the Texture box above the image): the yarn preview shows each yarn's photo instead of its flat color, like a photo layer behind the picture, so you can judge the real yarns together before deciding. From the original, T goes straight to the textured preview. Yarns without a photo stay flat, and so does everything in grayscale and the colors that Highlight fades or Mark unassigned stripes. Works in View larger too.

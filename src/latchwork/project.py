@@ -199,6 +199,17 @@ class Project:
         c.confirmed = False
         c.carried = None
 
+    # ---------- undo / redo ----------
+    def state(self, hex_):
+        """A color's assignment (yarn, assigned or suggested, carried from), for undo."""
+        c = self.entry(hex_)
+        return (dict(c.yarn) if c.yarn else None, c.confirmed, c.carried)
+
+    def restore(self, hex_, state):
+        c = self.entry(hex_)
+        yarn, c.confirmed, c.carried = state
+        c.yarn = dict(yarn) if yarn else None
+
     # ---------- candidates: yarns I'm deciding between, per color ----------
     @staticmethod
     def _cand_match(y, yarn):

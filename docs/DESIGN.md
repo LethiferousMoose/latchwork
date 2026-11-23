@@ -216,6 +216,12 @@ A `.latchwork` file is readable JSON:
   later), a color no yarn has (renamed or edited), or transparent. Exact colors only, no
   near-matching. Retired yarns count (an old rug may use one); a color shared with an active
   yarn goes to the active one.
+- **Undo / redo** (Edit, Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z): each Assign, un-assign, Carry over
+  and Assign from yarn image is one step, holding every changed color's state before and after
+  (yarn snapshot, assigned or suggested, carried from). Undo puts the old state back exactly,
+  then refreshes suggestions from the palette as it is now, and saves. Candidate marks aren't
+  included. The history is in memory only (up to 200 steps) and starts empty with each opened
+  project; the file holds only the current state. Undoing a single color selects it.
 - Transparent pixels are not knots and are skipped. Images with more than 64 colors trigger a
   warning (probably not clean pixel art); more than 1,000 are refused with advice to reduce the
   colors first (each color gets a swatch in the Colors list, and Tk on Windows aborts the whole

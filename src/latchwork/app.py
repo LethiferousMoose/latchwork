@@ -191,6 +191,9 @@ class App:
         self.gray = False
         self.project = None
         self.selected_hex = None  # the project color being matched, if any
+        # Assignment history of the open project (this session only): (label, [(hex, before,
+        # after)]) per step, each state from Project.state.
+        self.undo_stack, self.redo_stack = [], []
 
         try:
             self.weight = min(1.0, max(0.0, float(read_settings().get("color_weight",
@@ -244,6 +247,11 @@ class App:
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.destroy)
         bar.add_cascade(label="File", menu=file_menu)
+        self.edit_menu = tk.Menu(bar, tearoff=False)
+        self.edit_menu.add_command(label="Undo", accelerator="Ctrl+Z", command=self.undo)
+        self.edit_menu.add_command(label="Redo", accelerator="Ctrl+Y", command=self.redo)
+        bar.add_cascade(label="Edit", menu=self.edit_menu)
+        self.update_edit_menu()
         self.pal_menu = tk.Menu(bar, tearoff=False)
         bar.add_cascade(label="Palette", menu=self.pal_menu)
         help_menu = tk.Menu(bar, tearoff=False)
@@ -414,6 +422,9 @@ class App:
             self.root.bind_all(k, lambda e: self._key(e, self.mark_candidate))
         self.root.bind_all("c", lambda e: self._key(e, lambda: self.cycle_candidate(1)))
         self.root.bind_all("C", lambda e: self._key(e, lambda: self.cycle_candidate(-1)))
+        for k, action in (("<Control-z>", self.undo), ("<Control-y>", self.redo),
+                          ("<Control-Shift-Z>", self.redo)):
+            self.root.bind_all(k, lambda e, a=action: self._key(e, a, always=True, large=True))
         for k in ("<Return>", "<Escape>"):
             self.entry.bind(k, lambda e: self.swatch.focus_set())
             self.yarn_entry.bind(k, lambda e: self.swatch.focus_set())   # FocusOut resets it
@@ -702,7 +713,8 @@ class App:
         picks = CarryDialog(self.root, self, self.project).result
         if not picks:
             return
-        self._apply_carry(picks, self.project)
+        self._record("carry over", [h for h, _, _ in picks],
+                     lambda: self._apply_carry(picks, self.project))
         self._after_bulk_assign()
 
     def _after_bulk_assign(self):
@@ -780,8 +792,10 @@ class App:
         if not messagebox.askyesno(title, text + "\n\nAssign %d color%s?" % (
                 len(picks), "" if len(picks) == 1 else "s")):
             return
-        for hex_, yarn in picks:
-            self.project.assign(hex_, yarn, self.palette_name, self.brands)
+        def apply():
+            for hex_, yarn in picks:
+                self.project.assign(hex_, yarn, self.palette_name, self.brands)
+        self._record("assign from yarn image", [h for h, _ in picks], apply)
         self._after_bulk_assign()
 
     @staticmethod
@@ -835,6 +849,7 @@ class App:
 
     def show_project(self, project):
         self.project = project
+        self.clear_history()
         self.sidebar.set_project(project)
         self.update_title()
         if self.remember:
@@ -846,6 +861,7 @@ class App:
 
     def close_project(self):
         self.project = None
+        self.clear_history()
         self.selected_hex = None
         self.sidebar.show_welcome()
         self.update_title()
@@ -910,8 +926,9 @@ class App:
         if state == "this":
             self.unassign()
             return
-        self.project.assign(self.selected_hex, self.yarns[self.index], self.palette_name,
-                            self.brands)
+        hex_, yarn = self.selected_hex, self.yarns[self.index]
+        self._record("assign", [hex_], lambda: self.project.assign(
+            hex_, yarn, self.palette_name, self.brands))
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
         self.refresh()
@@ -919,11 +936,66 @@ class App:
     def unassign(self):
         if not (self.project and self.selected_hex):
             return
-        self.project.unassign(self.selected_hex)
-        self.project.suggest(self.yarns, self.palette_name, self.brands, self.weight)
+        hex_ = self.selected_hex
+
+        def apply():
+            self.project.unassign(hex_)
+            self.project.suggest(self.yarns, self.palette_name, self.brands, self.weight)
+        self._record("un-assign", [hex_], apply)
         self.save_project()
         self.sidebar.update_row(self.selected_hex)
         self.refresh()  # stay on the same yarn; the button flips back to "Assign"
+
+    # ---------- undo / redo (assignments only, this session) ----------
+    UNDO_STEPS = 200
+
+    def _record(self, what, hexes, change):
+        """Run change() and remember what it did to these colors as one undo step."""
+        before = {h: self.project.state(h) for h in hexes}
+        change()
+        diff = [(h, b, self.project.state(h)) for h, b in before.items()]
+        diff = [d for d in diff if d[1] != d[2]]
+        if not diff:
+            return
+        label = "%s %s" % (what, diff[0][0]) if len(diff) == 1 else \
+            "%s (%d colors)" % (what, len(diff))
+        self.undo_stack.append((label, diff))
+        del self.undo_stack[:-self.UNDO_STEPS]
+        self.redo_stack.clear()
+        self.update_edit_menu()
+
+    def clear_history(self):
+        self.undo_stack.clear()
+        self.redo_stack.clear()
+        self.update_edit_menu()
+
+    def undo(self):
+        self._undo_redo(self.undo_stack, self.redo_stack, 1)
+
+    def redo(self):
+        self._undo_redo(self.redo_stack, self.undo_stack, 2)
+
+    def _undo_redo(self, take, put, which):
+        """which: 1 puts back the 'before' states (undo), 2 the 'after' ones (redo)."""
+        if not (self.project and take):
+            self.root.bell()
+            return
+        label, diff = take.pop()
+        put.append((label, diff))
+        for d in diff:
+            self.project.restore(d[0], d[which])
+        # suggestions follow the palette as it is now (nothing else changes)
+        self.project.suggest(self.yarns, self.palette_name, self.brands, self.weight)
+        self.update_edit_menu()
+        self._after_bulk_assign()
+        if len(diff) == 1:   # show the color that changed, with its yarn
+            self.sidebar.select(diff[0][0])
+            self.select_project_color(diff[0][0])
+
+    def update_edit_menu(self):
+        for i, (word, stack) in enumerate((("Undo", self.undo_stack), ("Redo", self.redo_stack))):
+            self.edit_menu.entryconfig(i, label="%s %s" % (word, stack[-1][0]) if stack else word,
+                                       state="normal" if stack else "disabled")
 
     # ---------- actions ----------
     def on_hex_changed(self):
