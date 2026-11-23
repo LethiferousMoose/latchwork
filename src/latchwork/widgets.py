@@ -194,6 +194,7 @@ class ColorPanel(tk.Frame):
         super().__init__(parent, bg=PANEL_BG, bd=1, relief="solid", padx=12, pady=10)
         self.bar_w = bar_w
         self.bars, self.values, self.images, self.deltas = [], [], [], []
+        self._shown = None   # the rgb whose gradients are drawn
         for row, name in enumerate("RGBLCh"):
             tk.Label(self, text=name, font=("Segoe UI", 10, "bold"), bg=PANEL_BG, width=2,
                      anchor="w").grid(row=row, column=0, sticky="w")
@@ -224,8 +225,12 @@ class ColorPanel(tk.Frame):
 
     def show(self, rgb, other=None):
         """Draw the channels for rgb (or blank if None). `other` (an rgb) adds hollow markers on
-        every bar for comparison; no hue marker when either color is near gray."""
-        self.images = []
+        every bar for comparison; no hue marker when either color is near gray. The gradients
+        are kept when rgb is the same as last time (stepping yarns only moves the markers)."""
+        same = rgb is not None and rgb == self._shown and len(self.images) == len(self.bars)
+        self._shown = rgb
+        if not same:
+            self.images = []
         if rgb is None:
             for d in self.deltas:
                 d.config(text="", bg=PANEL_BG)
@@ -255,14 +260,17 @@ class ColorPanel(tk.Frame):
             d.config(text=("%+.1f" % delta[name]).replace("-", "−"), fg=fg, bg=TINT[fg])
         for (name, value, pos, sample), bar, val in zip(_channels(rgb, lch),
                                                         self.bars, self.values):
-            bar.delete("all")
             w = self.bar_w
-            img = tk.PhotoImage(width=w, height=BAR_H)
-            row = "{" + " ".join(to_hex(*sample(x / (w - 1))) for x in range(w)) + "}"
-            img.put(row, to=(0, 0, w, BAR_H))
-            self.images.append(img)  # keep a reference or Tk drops the image
-            bar.create_image(0, 0, image=img, anchor="nw")
-            bar.create_rectangle(0, 0, w - 1, BAR_H - 1, outline="#999")
+            if same:
+                bar.delete("marker")
+            else:
+                bar.delete("all")
+                img = tk.PhotoImage(width=w, height=BAR_H)
+                row = "{" + " ".join(to_hex(*sample(x / (w - 1))) for x in range(w)) + "}"
+                img.put(row, to=(0, 0, w, BAR_H))
+                self.images.append(img)  # keep a reference or Tk drops the image
+                bar.create_image(0, 0, image=img, anchor="nw")
+                bar.create_rectangle(0, 0, w - 1, BAR_H - 1, outline="#999")
             if name in ghost:
                 self._marker(bar, ghost[name], fill="", outline="#888")
             self._marker(bar, pos, fill="#111", outline="#111")
@@ -272,7 +280,7 @@ class ColorPanel(tk.Frame):
         x = 1 + pos * (self.bar_w - 3)
         top = BAR_H + 1
         bar.create_polygon(x, top, x - 5, top + MARK_H - 1, x + 5, top + MARK_H - 1,
-                           fill=fill, outline=outline)
+                           fill=fill, outline=outline, tags="marker")
 
 
 class TreeSort:

@@ -77,6 +77,7 @@ class ProjectPanel(tk.Frame):
         self._quiet = False
         self._photos = {}        # yarn photo path -> (mtime, PhotoImage)
         self._textures = {}      # (path, mtime, w, h) -> (image, x offset, y offset)
+        self._render_job = None  # a picture redraw waiting for the app to be idle
         italic = tkfont.nametofont("TkDefaultFont").copy()
         italic.configure(slant="italic")
         self._italic = italic
@@ -560,6 +561,13 @@ class ProjectPanel(tk.Frame):
             self.on_view()
 
     def render_image(self):
+        """Redraw the picture once the current event is handled: selecting a color asks for a
+        redraw from several places, and they all share one."""
+        if not self._render_job:
+            self._render_job = self.after_idle(self._render_now)
+
+    def _render_now(self):
+        self._render_job = None
         c = self.canvas
         c.delete("all")
         if not self.project:
@@ -626,24 +634,39 @@ class ProjectPanel(tk.Frame):
         textured = self._textures_for(dw, dh, live, sel, unassigned) \
             if preview and self.texture.get() and not gray else {}
         xs = [min(w - 1, dx * sub // zoom) for dx in range(dw)]
-        rows = []
-        for dy in range(dh):
-            iy = min(h - 1, dy * sub // zoom)
-            base = iy * w
-            row = []
-            for dx, ix in enumerate(xs):
-                orig = self.orig_hex[base + ix]
-                if orig is None:
-                    row.append(TRANSPARENT_SHOW)
-                    continue
-                look(orig)
-                if unassigned and orig in unassigned and ((dx + dy) // 3) % 2 == 0:
-                    row.append(striped[orig])
-                else:
-                    row.append(shown[orig])
-            rows.append("{" + " ".join(row) + "}")
         photo = tk.PhotoImage(width=dw, height=dh)
-        photo.put(" ".join(rows), to=(0, 0))
+        if not unassigned and (zoom == 1 or sub == 1):
+            # One pixel per knot, then Tk zooms or shrinks it: much less for Tk to read than
+            # every screen pixel. (The stripes run across screen pixels, so they can't.)
+            orig_hex = self.orig_hex
+            art = tk.PhotoImage(width=w, height=h)
+            art.put(" ".join(
+                "{" + " ".join(TRANSPARENT_SHOW if o is None else look(o)
+                               for o in orig_hex[iy * w:(iy + 1) * w]) + "}"
+                for iy in range(h)), to=(0, 0))
+            if zoom > 1:
+                photo.tk.call(photo.name, "copy", art.name, "-zoom", zoom)
+            elif sub > 1:
+                photo.tk.call(photo.name, "copy", art.name, "-subsample", sub)
+            else:
+                photo = art
+        else:
+            rows = []
+            for dy in range(dh):
+                base = min(h - 1, dy * sub // zoom) * w
+                row = []
+                for dx, ix in enumerate(xs):
+                    orig = self.orig_hex[base + ix]
+                    if orig is None:
+                        row.append(TRANSPARENT_SHOW)
+                        continue
+                    look(orig)
+                    if unassigned and orig in unassigned and ((dx + dy) // 3) % 2 == 0:
+                        row.append(striped[orig])
+                    else:
+                        row.append(shown[orig])
+                rows.append("{" + " ".join(row) + "}")
+            photo.put(" ".join(rows), to=(0, 0))
         if textured:
             self._paint_textures(photo, textured, xs, w, h, scale, dw, dh)
         return photo
