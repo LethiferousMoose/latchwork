@@ -11,7 +11,7 @@ order,sku,brand,r,g,b,hex,L_gimp,pack_size,retired
 10,Vanilla,Herrschners,243,224,171,#F3E0AB,89.7884,,
 11,Soft White,Red Heart,225,226,221,#E1E2DD,89.6997,,
 12,Aran,Red Heart,226,225,217,#E2E1D9,89.4421,,
-13,Neon Yellow,Loops & Threads,212,233,79,#D4E94F,88.7035,,
+13,Neon Yellow,Loops & Threads,212,233,79,#D4E94F,88.7035,,yes
 14,Flesh,Herrschners,237,218,195,#EDDAC3,88.1664,,
 15,Pale Yellow,Herrschners,245,217,146,#F5D992,87.8729,,
 16,Lemon,Red Heart,234,215,158,#EAD79E,86.5510,,
@@ -63,7 +63,7 @@ order,sku,brand,r,g,b,hex,L_gimp,pack_size,retired
 62,Mauve,Loops & Threads,217,166,173,#D9A6AD,73.0946,,
 63,Straw Yellow,Herrschners,241,157,50,#F19D32,72.1856,,
 64,Persimmon,Red Heart,251,144,154,#FB909A,71.8370,,
-65,Coral,Loops & Threads,255,144,115,#FF9073,71.7466,,
+65,Coral,Loops & Threads,255,144,115,#FF9073,71.7466,,yes
 66,Curry,Loops & Threads,250,149,5,#FA9505,71.4363,,
 67,Frosty Green,Red Heart,174,177,147,#AEB193,71.3540,,
 68,Taupe,Loops & Threads,202,168,134,#CAA886,71.3220,,
@@ -119,7 +119,7 @@ order,sku,brand,r,g,b,hex,L_gimp,pack_size,retired
 118,Burnt Orange,Herrschners,213,80,32,#D55020,52.5571,,
 119,Delft Blue,Red Heart,69,126,170,#457EAA,50.3551,,
 120,Light Sage,Red Heart,96,124,111,#607C6F,49.5147,,
-121,Classic Fushia,Loops & Threads,217,10,162,#D90AA2,49.3096,,
+121,Classic Fushia,Loops & Threads,217,10,162,#D90AA2,49.3096,,yes
 122,Turquoise,Herrschners,13,130,137,#0D8289,49.0180,,
 123,Medium Thyme,Red Heart,101,118,99,#657663,47.8022,,
 124,Lavender,Red Heart,119,107,154,#776B9A,47.7565,,
