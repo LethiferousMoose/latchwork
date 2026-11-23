@@ -65,8 +65,13 @@ first and tells you what's missing.
    For small, long or wide art, **View larger** (above the sidebar image) opens the picture in
    its own window. With *Highlight selected color* on, everything but the selected color fades,
    toward dark gray around a light color like this sun.
+   Made a mistake? **Ctrl+Z** / **Ctrl+Y** (or *Edit*) undo and redo assignments.
 
-   <img src="docs/images/larger-view.png" alt="View larger, highlighting the sun" width="48%">
+   <p>
+     <img src="docs/images/larger-view.png" alt="View larger, highlighting the sun" width="48%">
+     &nbsp;
+     <img src="docs/images/texture.png" alt="View larger with Texture on: each yarn's photo instead of its flat color" width="48%">
+   </p>
 4. **Plan tab:** packs or pieces per yarn, finished size and canvas to cut. Canvas settings
    (holes per inch, borders) are per project under *Change…*.
 5. **File → Export pattern** (Ctrl+E) writes the HTML pattern. Copy it to your phone and open
@@ -94,7 +99,11 @@ yarn. A new yarn starts with its name and color suggested from the photo. Photos
 folder next to the palette (`data/palette.swatches/`), which isn't in git, so the shipped palette
 has none.
 
-![Palette manager](docs/images/palette-manager.png)
+<p>
+  <img src="docs/images/palette-manager.png" alt="Palette manager" width="64%">
+  &nbsp;
+  <img src="docs/images/yarn-dialog.png" alt="Editing a yarn with its photo" width="32%">
+</p>
 
 ## How matching works
 

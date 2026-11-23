@@ -33,7 +33,10 @@ tidied so others can use it too. Keep it simple.
   same way: same demo image, the real palette, 1300×820 main window (the big green selected,
   with Tea Leaf, Green and Rainforest marked as candidates), larger view at 720×560 with the sun
   highlighted, phone pattern at 390 px wide, desktop pattern at 1280×800 (rows 1–8 hooked, both
-  trackers on). The carry-over dialog uses two
+  trackers on). Main window and palette manager use a palette copy without photos (what a new
+  user gets); the texture shot (larger view, 720×560, Yarn preview + Texture, nothing
+  highlighted) and the yarn dialog (editing Light Blue, Loops & Threads) use my photos.
+  The carry-over dialog uses two
   earlier rugs from the demo image and the demo with a small house added (two new colors).
 
 ## My setup (the defaults)
