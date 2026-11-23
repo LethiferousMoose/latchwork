@@ -10,7 +10,8 @@ import tkinter as tk
 from . import palette as pal
 from .colormath import average_rgb, suggest_from_photo
 
-MAX_SIDE = 400      # photos larger than this are shrunk when they're copied in
+MAX_SIDE = 1280     # photos larger than this are shrunk (by whole steps) when they're copied in
+AVERAGE_SIDE = 400  # colors are averaged on a copy shrunk to about this (same result, faster)
 FILETYPES = [("Photos (PNG, GIF)", "*.png *.gif"), ("PNG", "*.png"), ("GIF", "*.gif")]
 
 
@@ -25,7 +26,7 @@ def load(path, master=None):
         raise ValueError("Could not read %s\n\n%s" % (os.path.basename(path), e))
 
 
-def shrink_factor(img, max_side=MAX_SIDE):
+def shrink_factor(img, max_side):
     """Whole-number step that brings the longest side to max_side or less (Tk subsample)."""
     side = max(img.width(), img.height())
     return max(1, -(-side // max_side))
@@ -42,7 +43,8 @@ def pixels(img):
 
 def colors(img):
     """(average, suggested palette color) of a photo, both sRGB 0..255 ints."""
-    avg = average_rgb(pixels(img))
+    f = shrink_factor(img, AVERAGE_SIDE)
+    avg = average_rgb(pixels(img.subsample(f) if f > 1 else img))
     return tuple(int(round(c)) for c in avg), suggest_from_photo(avg)
 
 
@@ -68,13 +70,15 @@ def cover_texture(img, w, h):
 
 
 def copy_in(src, palette_path, yarn, img=None):
-    """Copy a photo into the palette's swatch folder as 'Brand/Name.png' (shrunk when it's
-    larger than MAX_SIDE). Returns the relative name to store in yarn.photo."""
+    """Copy a photo into the palette's swatch folder as 'Brand/Name.png', at its own size up to
+    MAX_SIDE (a big photo covers a big picture without repeating; Tk can only shrink by whole
+    steps, so a 2000 px photo comes in at 1000). Returns the relative name to store in
+    yarn.photo."""
     img = img or load(src)
     rel = pal.new_photo_name(palette_path, yarn)
     dst = os.path.join(pal.swatch_dir(palette_path), *rel.split("/"))
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    f = shrink_factor(img)
+    f = shrink_factor(img, MAX_SIDE)
     if f == 1 and src.lower().endswith(".png"):
         shutil.copyfile(src, dst)
     else:

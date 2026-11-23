@@ -124,8 +124,10 @@ anything. A summary is shown first and nothing changes until confirmed:
 `.gpl` (active yarns only, `R G B<tab>Name (Brand)`).
 
 **Yarn photos** (optional, one per yarn) live in a folder named after the palette
-(`palette.csv` → `palette.swatches/`), copied in as `Brand/Name.png` and shrunk to 400 px on
-the long side when larger. `photos.csv` in that folder (`sku, brand, file`) links them to
+(`palette.csv` → `palette.swatches/`), copied in as `Brand/Name.png` at their
+own size up to 1280 px (big photos cover big pictures without repeating; larger ones are shrunk
+by whole steps, all Tk can do, so 2000 px becomes 1000). Colors are averaged on a copy shrunk
+to about 400 px, which gives the same result faster. `photos.csv` in that folder (`sku, brand, file`) links them to
 yarns, so `palette.csv` never mentions photos: a palette without its folder simply has no
 photos, and a link whose file is gone shows as "missing". The file name is fixed when the
 photo is copied in; renaming a yarn or brand in the app updates the link, not the file.
