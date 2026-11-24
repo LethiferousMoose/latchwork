@@ -1,6 +1,5 @@
-"""Latchwork: match pixel-art colors to latch-hook yarns by lightness (CIE L*, as GIMP shows it).
-
-Stages 1-2: comparison view and palette manager. Run:  python latchwork.py
+"""Latchwork main window: the comparison view (target next to a yarn), menus and keys, and what
+ties the project sidebar, palettes and exports together. Run:  python latchwork.py
 """
 import json
 import os
@@ -200,6 +199,7 @@ class App:
                                                                       DEFAULT_COLOR_WEIGHT))))
         except (TypeError, ValueError):
             self.weight = DEFAULT_COLOR_WEIGHT
+        self._live_key = None  # what the sidebar preview last showed live (see live_preview)
         self._order = None   # cached best-first order for (target, yarn list, weight)
         self._cycle = 0      # position in that order that N last jumped to
         root.title("Latchwork")
@@ -295,6 +295,7 @@ class App:
         self.yarn_title = tk.Label(r, text="", font=TITLE_FONT, bg=BG, anchor="w", width=1)
         self.yarn_title.grid(row=0, column=1, sticky="ew", padx=16, pady=(6, 0))
         self._title_font = tkfont.Font(font=TITLE_FONT)
+        self._badge_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
         self._title_text, self._title_cut = "", False
         self.yarn_title.bind("<Configure>", lambda e: self._fit_yarn_title())
         Tooltip(self.yarn_title, lambda e: (self._title_text, []) if self._title_cut else None)
@@ -1171,6 +1172,22 @@ class App:
             return False
         return True
 
+    def _export_file(self, heading, title, suffix, filetypes, write):
+        """Ask where to save an export next to the project ('<project><suffix>' suggested) and
+        write it there with write(path). Returns the path, or None (cancelled or failed)."""
+        folder = os.path.dirname(os.path.abspath(self.project.path))
+        path = filedialog.asksaveasfilename(
+            title=title, initialdir=folder, defaultextension=os.path.splitext(suffix)[1],
+            initialfile=free_name(folder, self.project.name + suffix), filetypes=filetypes)
+        if not path:
+            return None
+        try:
+            write(path)
+        except (OSError, ValueError) as e:
+            messagebox.showerror(heading, "Could not write %s\n\n%s" % (path, e))
+            return None
+        return path
+
     def export_yarn_list(self):
         if not self._need_project("export its yarn list"):
             return
@@ -1179,20 +1196,11 @@ class App:
                 "Export yarn list", "No colors are assigned yet, so the list will be empty. "
                                     "Export anyway?"):
             return
-        folder, _ = os.path.split(os.path.abspath(self.project.path))
-        path = filedialog.asksaveasfilename(
-            title="Export yarn list", initialdir=folder, defaultextension=".csv",
-            initialfile=free_name(folder, "%s-yarns.csv" % self.project.name),
-            filetypes=[("CSV", "*.csv")])
-        if not path:
-            return
-        try:
-            pl.write_yarn_list(plan, path)
-        except OSError as e:
-            messagebox.showerror("Export yarn list", "Could not write %s\n\n%s" % (path, e))
-            return
-        messagebox.showinfo("Export yarn list", "Saved %d yarn%s to\n%s" % (
-            len(plan.lines), "" if len(plan.lines) == 1 else "s", path))
+        path = self._export_file("Export yarn list", "Export yarn list", "-yarns.csv",
+                                 [("CSV", "*.csv")], lambda p: pl.write_yarn_list(plan, p))
+        if path:
+            messagebox.showinfo("Export yarn list", "Saved %d yarn%s to\n%s" % (
+                len(plan.lines), "" if len(plan.lines) == 1 else "s", path))
 
     def export_pattern(self):
         if not self._need_project("export its pattern"):
@@ -1203,55 +1211,29 @@ class App:
                 "pattern in their original color, marked with ? and listed as unassigned.\n\n"
                 "Export anyway?" % (n_un, " is" if n_un == 1 else "s are"), icon="warning"):
             return
-        folder, _ = os.path.split(os.path.abspath(self.project.path))
-        path = filedialog.asksaveasfilename(
-            title="Export pattern for phone / print", initialdir=folder, defaultextension=".html",
-            initialfile=free_name(folder, "%s-pattern.html" % self.project.name),
-            filetypes=[("Web page", "*.html")])
-        if not path:
-            return
-        try:
-            pattern.export_pattern(self.project, path, self.resolve)
-        except (OSError, ValueError) as e:
-            messagebox.showerror("Export pattern", "Could not write %s\n\n%s" % (path, e))
-            return
-        if messagebox.askyesno("Export pattern", "Saved the pattern to\n%s\n\nCopy it to your "
-                               "phone and open it in the browser. Open it here now?" % path):
+        path = self._export_file(
+            "Export pattern", "Export pattern for phone / print", "-pattern.html",
+            [("Web page", "*.html")],
+            lambda p: pattern.export_pattern(self.project, p, self.resolve))
+        if path and messagebox.askyesno(
+                "Export pattern", "Saved the pattern to\n%s\n\nCopy it to your phone and open "
+                "it in the browser. Open it here now?" % path):
             import webbrowser
             webbrowser.open("file:///" + os.path.abspath(path).replace("\\", "/"))
 
     def save_preview(self):
-        if not self._need_project("save its preview"):
-            return
-        folder, _ = os.path.split(os.path.abspath(self.project.path))
-        path = filedialog.asksaveasfilename(
-            title="Save yarn-color preview (1 pixel per knot)", initialdir=folder,
-            defaultextension=".png",
-            initialfile=free_name(folder, "%s-preview.png" % self.project.name),
-            filetypes=[("PNG", "*.png")])
-        if not path:
-            return
-        try:
-            pl.write_preview_png(self.project, path)
-        except OSError as e:
-            messagebox.showerror("Save preview", "Could not write %s\n\n%s" % (path, e))
+        if self._need_project("save its preview"):
+            self._export_file("Save preview", "Save yarn-color preview (1 pixel per knot)",
+                              "-preview.png", [("PNG", "*.png")],
+                              lambda p: pl.write_preview_png(self.project, p))
 
     def save_before_after(self):
         """File menu: the original next to the yarn preview, as one PNG to share."""
-        if not self._need_project("export its before/after"):
-            return
-        folder, _ = os.path.split(os.path.abspath(self.project.path))
-        path = filedialog.asksaveasfilename(
-            title="Export before/after (original next to the yarn preview)", initialdir=folder,
-            defaultextension=".png",
-            initialfile=free_name(folder, "%s-before-after.png" % self.project.name),
-            filetypes=[("PNG", "*.png")])
-        if not path:
-            return
-        try:
-            pl.write_before_after_png(self.project, path)
-        except OSError as e:
-            messagebox.showerror("Export before/after", "Could not write %s\n\n%s" % (path, e))
+        if self._need_project("export its before/after"):
+            self._export_file("Export before/after",
+                              "Export before/after (original next to the yarn preview)",
+                              "-before-after.png", [("PNG", "*.png")],
+                              lambda p: pl.write_before_after_png(self.project, p))
 
     def copy_hex(self):
         if self.yarns:
@@ -1276,7 +1258,7 @@ class App:
     def _refresh_live_preview(self):
         """Repaint the sidebar preview when the yarn shown for the selected color changes."""
         key = self.live_preview() if self.sidebar.view.get() == "preview" else None
-        if key != getattr(self, "_live_key", None):
+        if key != self._live_key:
             self._live_key = key
             self.sidebar.render_image()
 
@@ -1317,8 +1299,6 @@ class App:
                 tag = "%d candidate%s \u00b7 C to see" % (len(marks), "" if len(marks) == 1
                                                           else "s")
             for n, text in enumerate(t for t in (tag, self._note) if t):
-                if not hasattr(self, "_badge_font"):
-                    self._badge_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
                 tw = self._badge_font.measure(text)
                 y0 = 8 + n * 30
                 c.create_rectangle(w - 8 - tw - 20, y0, w - 8, y0 + 24, fill="#2B2B2B",
@@ -1329,8 +1309,6 @@ class App:
     def _draw_used_badge(self, c, x, bottom, hexes, room):
         """'Already used for [#87BEEB] [#5A9646] and 2 more' at the bottom-left of the yarn,
         listing as many colors as fit in `room` px."""
-        if not hasattr(self, "_badge_font"):
-            self._badge_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
         font = self._badge_font
 
         def layout(most):   # [(kind, text, x)], right edge

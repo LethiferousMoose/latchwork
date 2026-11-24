@@ -179,11 +179,23 @@ def preview_pixels(project):
     return out
 
 
+def _write_bytes(path, data):
+    """Write through a temporary file, so a failed write never leaves half a file."""
+    fd, tmp = tempfile.mkstemp(prefix=".latchwork-", suffix=".tmp",
+                               dir=os.path.dirname(os.path.abspath(path)))
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
+
+
 def write_preview_png(project, path):
     img = pixelart.PixelImage(project.image.width, project.image.height, preview_pixels(project))
-    data = pixelart.encode_png(img)
-    with open(path, "wb") as fh:
-        fh.write(data)
+    _write_bytes(path, pixelart.encode_png(img))
 
 
 BA_BOX = 500                 # each picture fits in this many pixels (whole-number zoom)
@@ -228,6 +240,4 @@ def before_after_image(project):
 
 
 def write_before_after_png(project, path):
-    data = pixelart.encode_png(before_after_image(project))
-    with open(path, "wb") as fh:
-        fh.write(data)
+    _write_bytes(path, pixelart.encode_png(before_after_image(project)))

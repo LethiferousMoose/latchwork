@@ -836,12 +836,13 @@ class YarnDialog(tk.Toplevel):
             return pal.photo_file(self.palette_path, self.yarn)
         return None
 
-    def show_photo(self):
+    def show_photo(self, img=None):
+        """img: the photo at photo_path(), when it's already loaded."""
         self.thumb = self.avg = self.suggested = self.problem = None
         path = self.photo_path()
-        if path and os.path.isfile(path):
+        if path and (img or os.path.isfile(path)):
             try:
-                img = photos.load(path, master=self)
+                img = img or photos.load(path, master=self)
                 self.thumb = photos.thumbnail(img, self.PHOTO_SIDE)
                 self.avg, self.suggested = photos.colors(img)
             except ValueError as e:
@@ -864,9 +865,9 @@ class YarnDialog(tk.Toplevel):
         has = bool(self.photo_src or (self.yarn and self.yarn.photo and not self.photo_removed))
         self.remove_btn.state(["!disabled"] if has else ["disabled"])
 
-    def set_photo(self, path):
+    def set_photo(self, path, img=None):
         self.photo_src, self.photo_removed = path, False
-        self.show_photo()
+        self.show_photo(img)
         if not self.yarn:      # a new yarn starts from the photo: its name and suggested color
             if not pal.clean_name(self.name_var.get()):
                 self.name_var.set(photo_title(path))
@@ -879,11 +880,11 @@ class YarnDialog(tk.Toplevel):
         if not path:
             return
         try:
-            photos.load(path, master=self)
+            img = photos.load(path, master=self)
         except ValueError as e:
             messagebox.showerror("Photo", str(e), parent=self)
             return
-        self.set_photo(path)
+        self.set_photo(path, img)
 
     def remove_photo(self):
         self.photo_src = None

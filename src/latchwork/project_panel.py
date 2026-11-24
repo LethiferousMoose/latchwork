@@ -295,8 +295,7 @@ class ProjectPanel(tk.Frame):
         self._color_order = {c.hex: i for i, c in enumerate(project.colors)}
         self.color_sort.state = None
         self.plan_sort.state = None
-        self.refresh_rows()
-        self.refresh_plan()
+        self.refresh_rows()   # also fills the plan
         self.color_sort.set(sort.get("colors"))
         self.plan_sort.set(sort.get("plan"))
         self.size_columns()
@@ -323,7 +322,7 @@ class ProjectPanel(tk.Frame):
         self.tree.delete(*self.tree.get_children())
         for c in self.project.colors:
             self.tree.insert("", "end", iid=c.hex)
-            self.update_row(c.hex, plan=False)
+            self._fill_row(c)
         self.color_sort.apply()
         self.size_columns()
         if keep and self.tree.exists(keep):
@@ -333,7 +332,15 @@ class ProjectPanel(tk.Frame):
         self.refresh_plan()
 
     def update_row(self, hex_, plan=True):
-        c = self.project.entry(hex_)
+        self._fill_row(self.project.entry(hex_))
+        if plan:
+            self.size_columns()
+        self.update_footer()
+        if plan:
+            self.refresh_plan()
+            self.render_image()
+
+    def _fill_row(self, c):
         yhex = c.yarn["hex"] if c.yarn else None
         key = (c.hex, yhex)
         if key not in self.row_images:
@@ -343,15 +350,9 @@ class ProjectPanel(tk.Frame):
         state = ("carried over" if c.carried else "assigned") if c.confirmed else "suggested"
         if c.candidates:
             state += " \u2605%d" % len(c.candidates)
-        self.tree.item(hex_, text="  " + c.hex, image=self.row_images[key],
+        self.tree.item(c.hex, text="  " + c.hex, image=self.row_images[key],
                        values=(format(c.count, ","), name, state),
                        tags=() if c.confirmed else ("suggested",))
-        if plan:
-            self.size_columns()
-        self.update_footer()
-        if plan:
-            self.refresh_plan()
-            self.render_image()
 
     def size_columns(self):
         """Color, Count and status fit their contents; Yarn takes the rest (scrolls if long)."""

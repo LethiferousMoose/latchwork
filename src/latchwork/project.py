@@ -64,6 +64,7 @@ class Project:
         self.image_filename = image_filename
         self.image = image
         self.colors = colors          # ColorEntry list, lightest -> darkest
+        self._by_hex = {c.hex: c for c in colors}   # the colors are fixed by the image
         self.transparent = transparent
         self.settings = settings or {"spare_percent": 0}
 
@@ -76,8 +77,7 @@ class Project:
         return sum(c.count for c in self.colors)
 
     def entry(self, hex_):
-        hex_ = hex_.upper()
-        return next((c for c in self.colors if c.hex == hex_), None)
+        return self._by_hex.get(hex_.upper())
 
     # ---------- create / load / save ----------
     @classmethod
