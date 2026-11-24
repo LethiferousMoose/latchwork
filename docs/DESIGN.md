@@ -96,16 +96,19 @@ No hue marker or difference below chroma 5, where hue means little.
 
 ## Palettes (`palette.py`, `palette_window.py`)
 
-**`palette.csv`** columns: `order, sku, brand, r, g, b, hex, L_gimp, pack_size, retired`.
-RGB is 0–255, `retired` is `yes` or blank, `L_gimp` is rewritten on every save, `pack_size`
-is a per-yarn override (blank = the brand's). The file is kept sorted by L\*, lightest first;
-ties keep their order.
+**`palette.csv`** columns: `order, sku, brand, r, g, b, hex, L_gimp, retired`.
+RGB is 0–255, `retired` is `yes` or blank, `L_gimp` is rewritten on every save. The file is
+kept sorted by L\*, lightest first; ties keep their order. Older palettes had a per-yarn
+`pack_size` column; it's ignored on load and dropped on the next save (pack size lives on the
+brand only).
 
 **Brands** live in a companion file named after the palette (`palette.csv` →
 `palette.brands.csv`): `brand, pack_size`, where pack size is pieces per pre-cut pack and
 blank means cut from skeins. A pack size change applies to open projects too.
 
 **A yarn is identified by name + brand** (case-insensitive) and shown as "Name (Brand)".
+The Add/Edit yarn dialog picks the brand from the brand list (or none); new brands are
+added under *Brands...*, where their pack size is set, so a typo can't create a stray brand.
 
 **Retire** hides a yarn from matching but keeps it (discontinued colors). **Delete** is for
 mistakes.

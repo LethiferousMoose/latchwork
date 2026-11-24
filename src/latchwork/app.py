@@ -232,6 +232,7 @@ class App:
                               command=self.open_project)
         self.recent_menu = tk.Menu(file_menu, tearoff=False, postcommand=self._fill_recent)
         file_menu.add_cascade(label="Open recent", menu=self.recent_menu)
+        self.file_menu = file_menu
         file_menu.add_command(label="Carry over assignments...", command=self.carry_over)
         file_menu.add_command(label="Assign from yarn image...", command=self.assign_from_image)
         file_menu.add_command(label="Close project", command=self.close_project)
@@ -247,6 +248,7 @@ class App:
         file_menu.add_separator()
         file_menu.add_command(label="Quit", command=self.root.destroy)
         bar.add_cascade(label="File", menu=file_menu)
+        self.update_file_menu()
         self.edit_menu = tk.Menu(bar, tearoff=False)
         self.edit_menu.add_command(label="Undo", accelerator="Ctrl+Z", command=self.undo)
         self.edit_menu.add_command(label="Redo", accelerator="Ctrl+Y", command=self.redo)
@@ -546,9 +548,7 @@ class App:
         """Take a palette off the list (the file stays). The active one can't be removed."""
         path = path or self.palette_path
         if self.palette_path and os.path.normcase(path) == os.path.normcase(self.palette_path):
-            messagebox.showinfo("Latchwork", "Switch to another palette first; the active "
-                                             "palette stays on the list.")
-            return
+            return      # the menus only offer the other palettes
         self.palette_list = [q for q in self.palette_list
                              if os.path.normcase(q) != os.path.normcase(path)]
         self._palette_cache.pop(os.path.normcase(path), None)
@@ -723,7 +723,7 @@ class App:
 
     def carry_over(self):
         """File menu: carry assignments from earlier projects into the open one."""
-        if not self._need_project("carry over assignments"):
+        if not self._need_project():
             return
         picks = CarryDialog(self.root, self, self.project).result
         if not picks:
@@ -743,7 +743,7 @@ class App:
     def assign_from_image(self):
         """File menu: assign yarns from a hand-made yarn image (the rug's image recolored with
         exact yarn colors, same size)."""
-        if not self._need_project("assign from a yarn image"):
+        if not self._need_project():
             return
         title = "Assign from yarn image"
         path = filedialog.askopenfilename(
@@ -864,6 +864,7 @@ class App:
 
     def show_project(self, project):
         self.project = project
+        self.update_file_menu()
         self.clear_history()
         self.sidebar.set_project(project)
         self.update_title()
@@ -874,8 +875,18 @@ class App:
         self.sidebar.select(first)
         self.select_project_color(first)
 
+    PROJECT_ITEMS = ("Carry over assignments...", "Assign from yarn image...", "Close project",
+                     "Export pattern (phone / print)...", "Export yarn list...",
+                     "Save preview image...", "Export before/after...")
+
+    def update_file_menu(self):
+        """The File menu's project items are only enabled while a project is open."""
+        for label in self.PROJECT_ITEMS:
+            self.file_menu.entryconfig(label, state="normal" if self.project else "disabled")
+
     def close_project(self):
         self.project = None
+        self.update_file_menu()
         self.clear_history()
         self.selected_hex = None
         self.sidebar.show_welcome()
@@ -1180,11 +1191,9 @@ class App:
         self.sidebar.render_image()
 
     # ---------- exports ----------
-    def _need_project(self, what):
-        if not self.project:
-            messagebox.showinfo("Latchwork", "Open a project first to %s." % what)
-            return False
-        return True
+    def _need_project(self):
+        """The project items are disabled without a project; this covers their shortcuts."""
+        return self.project is not None
 
     def _export_file(self, heading, title, suffix, filetypes, write):
         """Ask where to save an export next to the project ('<project><suffix>' suggested) and
@@ -1203,7 +1212,7 @@ class App:
         return path
 
     def export_yarn_list(self):
-        if not self._need_project("export its yarn list"):
+        if not self._need_project():
             return
         plan = pl.Plan(self.project, self.resolve)
         if not plan.lines and not messagebox.askyesno(
@@ -1217,7 +1226,7 @@ class App:
                 len(plan.lines), "" if len(plan.lines) == 1 else "s", path))
 
     def export_pattern(self):
-        if not self._need_project("export its pattern"):
+        if not self._need_project():
             return
         n_un = len(pl.Plan(self.project, self.resolve).unassigned)
         if n_un and not messagebox.askyesno(
@@ -1236,14 +1245,14 @@ class App:
             webbrowser.open("file:///" + os.path.abspath(path).replace("\\", "/"))
 
     def save_preview(self):
-        if self._need_project("save its preview"):
+        if self._need_project():
             self._export_file("Save preview", "Save yarn-color preview (1 pixel per knot)",
                               "-preview.png", [("PNG", "*.png")],
                               lambda p: pl.write_preview_png(self.project, p))
 
     def save_before_after(self):
         """File menu: the original next to the yarn preview, as one PNG to share."""
-        if self._need_project("export its before/after"):
+        if self._need_project():
             self._export_file("Export before/after",
                               "Export before/after (original next to the yarn preview)",
                               "-before-after.png", [("PNG", "*.png")],

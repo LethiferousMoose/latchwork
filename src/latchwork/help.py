@@ -117,7 +117,8 @@ Unassigned colors are re-suggested from the active palette when switching; assig
 Palette → Manage yarns (Ctrl+P) edits the active palette. Changes save immediately.
 
 - A yarn is identified by name + brand and shown as "Name (Brand)".
-- Pack size comes from the brand (Brands…): pieces per pre-cut pack, or blank when the yarn is cut from skeins. A yarn can override it with its own pack size.
+- Pack size comes from the brand (Brands…): pieces per pre-cut pack, or blank when the yarn is cut from skeins. Every yarn of a brand uses its pack size.
+- A yarn's brand is picked from the brand list; add a new brand under Brands… first.
 - Retire hides a yarn from matching but keeps it (e.g. discontinued). Delete is for mistakes.
 - Import (CSV or GIMP .gpl) always merges: nothing is removed, and a summary is shown before anything changes.
 - Selecting a yarn in the manager shows it in the main view.

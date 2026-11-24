@@ -81,7 +81,7 @@ class TestPlan(unittest.TestCase):
         self.assertEqual((plan.assigned_count, plan.total_packs, plan.total_pieces_to_cut), (5, 1, 3))
 
     def test_palette_pack_size_wins_over_snapshot(self):
-        def resolve(name, brand):          # the palette now sells Navy in packs of 2
+        def resolve(name, brand):          # Navy's brand now comes in packs of 2
             return (True, 2) if name == "Navy" else (False, None)
         plan = pl.Plan(self.p, resolve)
         navy = [l for l in plan.lines if l.name == "Navy"][0]

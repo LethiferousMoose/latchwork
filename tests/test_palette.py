@@ -19,7 +19,7 @@ def bank():
         Yarn("Light Teal", (83, 170, 204), brand=H),
         Yarn("Bright Red", (210, 25, 35), brand=H),
         Yarn("Old Brown", (100, 70, 50), retired=True, brand=RH),
-        Yarn("Black", (15, 14, 18), brand=RH, pack=100),
+        Yarn("Black", (15, 14, 18), brand=RH),
     ])
 
 
@@ -44,13 +44,13 @@ class TempDir(unittest.TestCase):
 
 
 class TestFiles(TempDir):
-    def test_bank_round_trip_keeps_brands_packs_retired_and_sorts(self):
+    def test_bank_round_trip_keeps_brands_retired_and_sorts(self):
         p = self.path("p.csv")
         pal.save_bank(p, list(reversed(bank())), brands())
         self.assertTrue(os.path.exists(self.path("p.brands.csv")))
         back, br = pal.load_bank(p)
-        self.assertEqual([(y.sku, y.brand, y.pack, y.retired, y.hex) for y in back],
-                         [(y.sku, y.brand, y.pack, y.retired, y.hex) for y in bank()])
+        self.assertEqual([(y.sku, y.brand, y.retired, y.hex) for y in back],
+                         [(y.sku, y.brand, y.retired, y.hex) for y in bank()])
         self.assertEqual([(b.name, b.pack) for b in br], [(H, 320), (RH, None)])
         Ls = [y.L for y in back]
         self.assertEqual(Ls, sorted(Ls, reverse=True))
@@ -101,8 +101,20 @@ class TestFiles(TempDir):
             pal.read_csv_entries(self.write("a.csv", "hex\n#FFFFFF\n"))
         with self.assertRaises(ValueError):
             pal.read_csv_entries(self.write("b.csv", "name,hex\nX,notahex\n"))
-        with self.assertRaises(ValueError):
-            pal.read_csv_entries(self.write("c.csv", "name,hex,pack_size\nX,#FFFFFF,lots\n"))
+
+    def test_old_per_yarn_pack_size_is_ignored(self):
+        # Older palettes had a pack_size column per yarn: still loads, pack comes from the brand,
+        # and saving drops the column.
+        p = self.write("old.csv", "order,sku,brand,r,g,b,hex,L_gimp,pack_size,retired\n"
+                                  "1,Mint,Caron,152,216,176,#98D8B0,82.6,100,\n"
+                                  "2,Ash,Caron,90,90,90,#5A5A5A,38.0,lots,\n")
+        self.write("old.brands.csv", "brand,pack_size\nCaron,250\n")
+        yarns, br = pal.load_bank(p)
+        self.assertEqual([pal.effective_pack(y, br) for y in yarns], [250, 250])
+        pal.save_bank(p, yarns, br)
+        with open(p, encoding="utf-8") as fh:
+            self.assertEqual(fh.readline().strip(), ",".join(pal.FIELDS))
+        self.assertNotIn("pack_size", pal.FIELDS)
 
     def test_gpl_round_trip_active_only(self):
         p = self.path("y.gpl")
@@ -143,7 +155,7 @@ class TestHelpers(unittest.TestCase):
     def test_effective_pack_and_label(self):
         b = {y.sku: y for y in bank()}
         self.assertEqual(pal.effective_pack(b["Light Teal"], brands()), 320)
-        self.assertEqual(pal.effective_pack(b["Black"], brands()), 100)        # own override
+        self.assertIsNone(pal.effective_pack(b["Black"], brands()))            # brand is cut
         self.assertIsNone(pal.effective_pack(b["Old Brown"], brands()))        # cut
         self.assertIsNone(pal.effective_pack(Yarn("X", (1, 2, 3)), brands()))  # no brand
         self.assertEqual(b["Black"].label, "Black (Red Heart)")

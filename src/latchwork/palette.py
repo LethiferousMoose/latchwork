@@ -4,7 +4,7 @@ Files: a palette CSV (one row per yarn) and its companion brand list next to it,
 (palette.csv -> palette.brands.csv). A yarn is identified by name + brand (case-insensitive).
 Yarn photos (optional) live in a folder next to it (palette.csv -> palette.swatches/), with
 photos.csv there linking each photo to its yarn; the palette CSV itself never mentions them.
-Pack size: a brand's default (blank = cut from skeins), optionally overridden per yarn.
+Pack size lives on the brand (blank = cut from skeins).
 
 No Tk in here, so everything is unit-testable.
 """
@@ -16,7 +16,7 @@ import tempfile
 
 from .colormath import lightness, parse_hex, rgb_to_lab, rgb_to_lch, to_hex
 
-FIELDS = ["order", "sku", "brand", "r", "g", "b", "hex", "L_gimp", "pack_size", "retired"]
+FIELDS = ["order", "sku", "brand", "r", "g", "b", "hex", "L_gimp", "retired"]
 BRAND_FIELDS = ["brand", "pack_size"]
 PHOTO_FIELDS = ["sku", "brand", "file"]
 PHOTOS_FILE = "photos.csv"
@@ -102,10 +102,9 @@ class Brand:
 
 
 class Yarn:
-    def __init__(self, sku, rgb, retired=False, brand="", pack=None, photo=None):
+    def __init__(self, sku, rgb, retired=False, brand="", photo=None):
         self.sku = clean_name(sku)
         self.brand = clean_name(brand)
-        self.pack = pack          # per-yarn override; None = use the brand's pack size
         self.retired = bool(retired)
         self.photo = photo        # file in the palette's swatch folder ('Red Heart/Gold.png')
         self.set_rgb(rgb)
@@ -126,7 +125,7 @@ class Yarn:
         return label(self.sku, self.brand)
 
     def copy(self):
-        return Yarn(self.sku, self.rgb, self.retired, self.brand, self.pack, self.photo)
+        return Yarn(self.sku, self.rgb, self.retired, self.brand, self.photo)
 
     def __repr__(self):
         return "Yarn(%r, %s%s)" % (self.label, self.hex, ", retired" if self.retired else "")
@@ -135,10 +134,9 @@ class Yarn:
 class Entry:
     """A color read from an import file. brand None = the file had no brand information."""
 
-    def __init__(self, name, rgb, retired=False, brand=None, pack=None):
+    def __init__(self, name, rgb, retired=False, brand=None):
         self.name, self.rgb, self.retired = clean_name(name), tuple(rgb), bool(retired)
         self.brand = None if brand is None else clean_name(brand)
-        self.pack = pack
         self.hex = to_hex(*self.rgb)
 
     @property
@@ -166,9 +164,7 @@ def brand_by_key(brands, name):
 
 
 def effective_pack(yarn, brands):
-    """Pieces per pre-cut pack for this yarn, or None when it's cut from skeins."""
-    if yarn.pack:
-        return yarn.pack
+    """Pieces per pre-cut pack for this yarn (its brand's), or None when it's cut from skeins."""
     b = brand_by_key(brands, yarn.brand)
     return b.pack if b else None
 
@@ -210,7 +206,8 @@ def read_brands(path):
 # ---------- CSV ----------
 def read_csv_entries(path):
     """Rows of a palette-style CSV. Needs a name column (sku or name) and hex or r,g,b.
-    Optional: brand, pack_size, retired."""
+    Optional: brand, retired. A pack_size column (older palettes had one per yarn) is ignored:
+    pack size lives on the brand."""
     with open(path, newline="", encoding="utf-8-sig") as fh:
         reader = csv.DictReader(fh)
         cols = {c.strip().lower(): c for c in (reader.fieldnames or [])}
@@ -236,14 +233,10 @@ def read_csv_entries(path):
                         raise ValueError
             except (ValueError, KeyError):
                 raise ValueError("line %d: can't read a color for %r" % (n, row.get(name_col)))
-            try:
-                pack = parse_pack(row.get(cols.get("pack_size", ""), ""))
-            except ValueError:
-                raise ValueError("line %d: bad pack size for %r" % (n, row.get(name_col)))
             out.append(Entry(row[name_col] or "", rgb,
                              str(row.get(cols.get("retired", ""), "") or "").strip().lower()
                              in ("1", "yes", "y", "true", "x", "retired"),
-                             brand=(row.get(brand_col) or "") if brand_col else None, pack=pack))
+                             brand=(row.get(brand_col) or "") if brand_col else None))
     return out
 
 
@@ -259,7 +252,7 @@ def load_bank(path):
         if not e.name:
             raise ValueError("a row has no name (hex %s)" % e.hex)
         brand = legacy_brand(e.name) if e.brand is None else e.brand
-        yarns.append(Yarn(e.name, e.rgb, e.retired, brand, e.pack))
+        yarns.append(Yarn(e.name, e.rgb, e.retired, brand))
     bpath = brands_path(path)
     if os.path.exists(bpath):
         brands = read_brands(bpath)
@@ -294,7 +287,7 @@ def save_palette(path, yarns):
         w = csv.writer(fh)
         w.writerow(FIELDS)
         for i, y in enumerate(sort_yarns(yarns), 1):
-            w.writerow([i, y.sku, y.brand, *y.rgb, y.hex, "%.4f" % y.L, y.pack or "",
+            w.writerow([i, y.sku, y.brand, *y.rgb, y.hex, "%.4f" % y.L,
                         "yes" if y.retired else ""])
     _atomic_write(path, write)
 
@@ -604,7 +597,7 @@ def suggest_name(name, brand, taken_keys):
 
 
 def _new_yarn(name, e):
-    return Yarn(name, e.rgb, e.retired, e.brand or "", e.pack)
+    return Yarn(name, e.rgb, e.retired, e.brand or "")
 
 
 def _apply(bank, items):
