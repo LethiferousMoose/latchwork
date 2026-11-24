@@ -344,18 +344,17 @@ class App:
         tk.Label(wbox, text="0 = lightness only", font=("Segoe UI", 8), bg=BG,
                  fg="#888").pack(anchor="w")
 
-        # Buttons share the width evenly (keys are in the hint bar below, so they stay short).
+        # Buttons keep one size, centered (keys are in the hint bar below, so they stay short).
         nav = tk.Frame(r, bg=BG)
-        nav.grid(row=4, column=0, columnspan=2, sticky="ew", padx=13, pady=6)  # + 3 per button
-        buttons = [ttk.Button(nav, text=text, width=1, command=cmd) for text, cmd in (
+        nav.grid(row=4, column=0, columnspan=2, pady=6)
+        buttons = [ttk.Button(nav, text=text, width=15, command=cmd) for text, cmd in (
             ("◀  Lighter", lambda: self.step(-1)), ("Darker  ▶", lambda: self.step(1)),
             ("▲ Better match", lambda: self.cycle_match(-1)),
             ("Next match ▼", lambda: self.cycle_match(1)),
             ("Grayscale", self.toggle_gray), ("Assign", self.assign))]
         self.gray_btn, self.assign_main = buttons[4], buttons[5]
-        for col, b in enumerate(buttons):
-            b.grid(row=0, column=col, sticky="ew", padx=3)
-            nav.columnconfigure(col, weight=1, uniform="nav", minsize=96)
+        for b in buttons:
+            b.pack(side="left", padx=3)
 
         self.strip = tk.Canvas(r, height=96, bg=BG, highlightthickness=0)
         self.strip.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(6, 0))
