@@ -798,7 +798,8 @@ class LargeView(tk.Toplevel):
         p = panel.project.image
         if panel._large_geometry:
             self.geometry(panel._large_geometry)
-        else:   # start at about 8 screen pixels per art pixel, within most of the screen
+        elif not panel.app.restore_geometry(self, "larger_view"):
+            # start at about 8 screen pixels per art pixel, within most of the screen
             z = max(1, min(8, (self.winfo_screenwidth() * 3 // 4) // p.width,
                            (self.winfo_screenheight() * 3 // 4) // p.height))
             self.geometry("%dx%d" % (max(480, p.width * z + 40), max(320, p.height * z + 40)))
@@ -842,6 +843,8 @@ class LargeView(tk.Toplevel):
             self.panel.large = None
             try:
                 self.panel._large_geometry = self.geometry()
+                if self.state() == "normal":
+                    self.panel.app.keep_geometry("larger_view", self.geometry())
             except tk.TclError:
                 pass
         super().destroy()

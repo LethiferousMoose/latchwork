@@ -66,7 +66,8 @@ class PaletteWindow(tk.Toplevel):
         self.title("Latchwork - Yarn palette")
         self.configure(bg=BG)
         self.minsize(760, 480)
-        self.geometry("880x620")
+        if not app.restore_geometry(self, "palette_manager"):
+            self.geometry("880x620")
 
         head = tk.Frame(self, bg=BG)
         head.pack(fill="x", padx=12, pady=(12, 0))
@@ -402,6 +403,8 @@ class PaletteWindow(tk.Toplevel):
 
     def close(self):
         self.app.palette_window = None
+        if self.state() == "normal":
+            self.app.keep_geometry("palette_manager", self.geometry())
         self.destroy()
 
 
@@ -438,20 +441,14 @@ class BrandChoiceDialog(tk.Toplevel):
         box = ttk.Combobox(self, textvariable=self.brand_var, width=28,
                            values=[b.name for b in brands])
         box.grid(row=1, column=1, sticky="w", padx=8)
-        tk.Label(self, text="Pack size", font=UI_FONT, bg=BG).grid(row=2, column=0, sticky="w",
-                                                                   pady=(6, 0))
+        pack_label = tk.Label(self, text="Pack size", font=UI_FONT, bg=BG)
+        pack_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
         self.pack_var = tk.StringVar()      # what I type for a new brand
         self.brand_pack = tk.StringVar()    # an existing brand's, shown in the disabled field
         self.pack_entry = ttk.Entry(self, textvariable=self.pack_var, width=8)
         self.pack_entry.grid(row=2, column=1, sticky="w", padx=8, pady=(6, 0))
-        # The hint's text changes with the brand: a fixed-size area keeps the dialog still.
-        lines = tkfont.Font(font=HINT_FONT).metrics("linespace")
-        area = tk.Frame(self, bg=BG, width=380, height=2 * lines + 2)
-        area.grid(row=3, column=0, columnspan=2, sticky="w", pady=(4, 0))
-        area.grid_propagate(False)
-        self.hint = tk.Label(area, font=HINT_FONT, bg=BG, fg="#666", wraplength=380,
-                             justify="left")
-        self.hint.place(x=0, y=0)
+        for w in (pack_label, self.pack_entry):
+            tip(w, self._pack_tip)
         self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020")
         self.error.grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
         btns = tk.Frame(self, bg=BG)
@@ -469,6 +466,12 @@ class BrandChoiceDialog(tk.Toplevel):
         self.grab_set()
         self.wait_window()
 
+    def _pack_tip(self):
+        if pal.brand_by_key(self.brands, self.brand_var.get()):
+            return "This brand's pack size. Change it under Brands..."
+        return ("New brand: pieces per pre-cut pack.\n"
+                "Leave it blank if this brand is cut from skeins.")
+
     def check(self):
         name = pal.clean_name(self.brand_var.get())
         if not name:
@@ -479,7 +482,7 @@ class BrandChoiceDialog(tk.Toplevel):
         try:
             pack = pal.parse_pack(self.pack_var.get())
         except ValueError:
-            return None, "Pack size must be a whole number (or blank)"
+            return None, "Pack size: a whole number, or blank"
         return {"brand": name, "new": True, "pack": pack}, None
 
     def update_view(self):
@@ -488,12 +491,9 @@ class BrandChoiceDialog(tk.Toplevel):
             self.brand_pack.set(str(b.pack) if b.pack else "cut")
             self.pack_entry.config(textvariable=self.brand_pack)
             self.pack_entry.state(["disabled"])
-            self.hint.config(text="")      # the field shows its pack size
         else:
             self.pack_entry.config(textvariable=self.pack_var)   # back to what I typed
             self.pack_entry.state(["!disabled"])
-            self.hint.config(text="New brand. Pack size = pieces per pre-cut pack; leave blank "
-                                  "if it's cut from skeins.")
         r, err = self.check()
         self.error.config(text=err if pal.clean_name(self.brand_var.get()) else "")
         self.ok.state(["disabled"] if err else ["!disabled"])

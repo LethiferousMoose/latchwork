@@ -3,6 +3,8 @@ ties the project sidebar, palettes and exports together. Run:  python latchwork.
 """
 import json
 import os
+import re
+import sys
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
@@ -84,6 +86,35 @@ def remember_setting(key, value):
     else:
         settings[key] = value
     write_settings(settings)
+
+
+def _screen_area(root):
+    """(x, y, width, height) of the desktop across all monitors."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            m = ctypes.windll.user32.GetSystemMetrics
+            area = (m(76), m(77), m(78), m(79))   # SM_X/YVIRTUALSCREEN, SM_CX/CYVIRTUALSCREEN
+            if area[2] > 0 and area[3] > 0:
+                return area
+        except (AttributeError, OSError):
+            pass
+    return 0, 0, root.winfo_screenwidth(), root.winfo_screenheight()
+
+
+def on_screen(geometry, root):
+    """The saved 'WxH+X+Y' if its title bar is still on a screen (a monitor may have been
+    unplugged since), else None."""
+    m = re.match(r"^(\d+)x(\d+)([+-]-?\d+)([+-]-?\d+)$", geometry or "")
+    if not m:
+        return None
+    w, h = int(m.group(1)), int(m.group(2))
+    x, y = (int(g.replace("+-", "-").lstrip("+")) for g in (m.group(3), m.group(4)))
+    sx, sy, sw, sh = _screen_area(root)
+    if (w < 100 or h < 100 or x + w < sx + 100 or x > sx + sw - 100
+            or y < sy - 20 or y > sy + sh - 60):
+        return None
+    return geometry
 
 
 RECENT_MAX = 8   # File > Open recent
@@ -205,6 +236,11 @@ class App:
         root.title("Latchwork")
         root.configure(bg=BG)
         root.minsize(1240, 780)
+        self._normal_geometry = None   # the main window's size and place when not maximized
+        if remember:
+            self._restore_main_window()
+        root.bind("<Configure>", self._track_main_window, add="+")
+        root.protocol("WM_DELETE_WINDOW", self.quit)
         root.columnconfigure(2, weight=1)
         root.rowconfigure(0, weight=1)
         self.sidebar = ProjectPanel(root, self)
@@ -221,6 +257,67 @@ class App:
         self._build_ui()
         self._bind_keys()
         self.load(palette_path)
+
+    # ---------- window size and place (remembered between sessions) ----------
+    def _is_zoomed(self):
+        try:
+            return self.root.state() == "zoomed"            # Windows, macOS
+        except tk.TclError:
+            return False
+
+    def _restore_main_window(self):
+        saved = read_settings().get("windows", {})
+        main = saved.get("main") if isinstance(saved, dict) else None
+        if not isinstance(main, dict):
+            return
+        geometry = on_screen(main.get("geometry"), self.root)
+        if geometry:
+            self.root.geometry(geometry)
+            self._normal_geometry = geometry
+        if main.get("zoomed"):
+            try:
+                self.root.state("zoomed")
+            except tk.TclError:
+                pass
+
+    def _track_main_window(self, event):
+        if event.widget is self.root and not self._is_zoomed():
+            try:
+                if self.root.state() == "normal":
+                    self._normal_geometry = self.root.geometry()
+            except tk.TclError:
+                pass
+
+    def restore_geometry(self, win, key):
+        """Give a window its size and place from last time. False when there's none."""
+        if not self.remember:
+            return False
+        saved = read_settings().get("windows", {})
+        geometry = on_screen(saved.get(key) if isinstance(saved, dict) else None, self.root)
+        if geometry:
+            win.geometry(geometry)
+        return bool(geometry)
+
+    def keep_geometry(self, key, value):
+        if not self.remember:
+            return
+        settings = read_settings()
+        windows = settings.get("windows")
+        if not isinstance(windows, dict):
+            windows = settings["windows"] = {}
+        windows[key] = value
+        write_settings(settings)
+
+    def quit(self):
+        """Close the app, remembering where its windows were."""
+        if self.palette_window:
+            self.palette_window.close()
+        if self.sidebar.large:
+            self.sidebar.large.destroy()
+        if self._normal_geometry or self._is_zoomed():
+            self.keep_geometry("main", {"geometry": self._normal_geometry or self.root.geometry(),
+                                        "zoomed": self._is_zoomed()})
+        self.root.destroy()
 
     # ---------- layout ----------
     def _build_menu(self):
@@ -246,7 +343,7 @@ class App:
         file_menu.add_command(label="New palette...", command=self.new_palette)
         file_menu.add_command(label="Open palette...", command=self.open_palette)
         file_menu.add_separator()
-        file_menu.add_command(label="Quit", command=self.root.destroy)
+        file_menu.add_command(label="Quit", command=self.quit)
         bar.add_cascade(label="File", menu=file_menu)
         self.update_file_menu()
         self.edit_menu = tk.Menu(bar, tearoff=False)
