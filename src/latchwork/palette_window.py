@@ -49,10 +49,6 @@ def iid(yarn):
 NO_BRAND = "(no brand)"   # the yarn dialog's choice for a yarn without one
 
 
-def pack_text(pack):
-    return "%d per pack" % pack if pack else "cut from skein"
-
-
 def duplicates(yarns):
     seen, dup = set(), []
     for y in yarns:
@@ -492,7 +488,7 @@ class BrandChoiceDialog(tk.Toplevel):
             self.brand_pack.set(str(b.pack) if b.pack else "cut")
             self.pack_entry.config(textvariable=self.brand_pack)
             self.pack_entry.state(["disabled"])
-            self.hint.config(text="Existing brand: %s. Change it under Brands..." % pack_text(b.pack))
+            self.hint.config(text="")      # the field shows its pack size
         else:
             self.pack_entry.config(textvariable=self.pack_var)   # back to what I typed
             self.pack_entry.state(["!disabled"])
