@@ -3,6 +3,7 @@ colors and assignments, and the plan."""
 import math
 import os
 import tkinter as tk
+from collections import OrderedDict
 import tkinter.font as tkfont
 from tkinter import ttk
 
@@ -18,6 +19,12 @@ UI_FONT = ("Segoe UI", 10)
 IMG_W, IMG_H = 400, 250
 TRANSPARENT_SHOW = "#F7F7F7"
 TABLE_ROWS = 6     # requested table height; tables shrink on short windows
+# Yarn photos kept in memory besides the ones the picture uses (stepping back is instant, and
+# memory stays bounded: a 1280 px photo takes about 6 MB).
+SPARE_PHOTOS = 12
+# Textures are painted into strips about this tall, then each strip into the picture: every
+# copy into a Tk photo costs time in proportion to the size of the image copied into.
+TEXTURE_BAND = 32
 
 
 def fit_scale(w, h, box_w, box_h):
@@ -75,8 +82,10 @@ class ProjectPanel(tk.Frame):
         self.large = None        # the "View larger" window, while open
         self._large_geometry = None
         self._quiet = False
-        self._photos = {}        # yarn photo path -> (mtime, PhotoImage)
+        # yarn photo path -> (mtime, PhotoImage), least recently used first (see _trim_textures)
+        self._photos = OrderedDict()
         self._textures = {}      # (path, mtime, w, h) -> (image, x offset, y offset)
+        self._texture_sizes = []  # picture sizes drawn lately (sidebar, larger view), newest last
         self._render_job = None  # a picture redraw waiting for the app to be idle
         italic = tkfont.nametofont("TkDefaultFont").copy()
         italic.configure(slant="italic")
@@ -675,7 +684,7 @@ class ProjectPanel(tk.Frame):
     def _textures_for(self, dw, dh, live, sel, unassigned):
         """{image color: (texture, x offset, y offset)} for the colors whose yarn has a photo."""
         bank = {y.key: y for y in self.app.bank}
-        out = {}
+        out, used = {}, set()
         for e in self.project.colors:
             if (sel and e.hex != sel) or e.hex in unassigned:
                 continue
@@ -689,6 +698,8 @@ class ProjectPanel(tk.Frame):
             tex = self._texture(path, dw, dh) if path else None
             if tex:
                 out[e.hex] = tex
+                used.add(path)
+        self._trim_textures(used, (dw, dh))
         return out
 
     def _texture(self, path, w, h):
@@ -696,44 +707,81 @@ class ProjectPanel(tk.Frame):
             mtime = os.path.getmtime(path)
         except OSError:
             return None
+        cached = self._photos.get(path)
+        if not cached or cached[0] != mtime:
+            try:
+                cached = self._photos[path] = (mtime, photos.load(path, master=self))
+            except ValueError:
+                return None
+        self._photos.move_to_end(path)
         key = (path, mtime, w, h)
         tex = self._textures.get(key)
         if tex is None:
-            cached = self._photos.get(path)
-            if not cached or cached[0] != mtime:
-                try:
-                    cached = self._photos[path] = (mtime, photos.load(path, master=self))
-                except ValueError:
-                    return None
             tex = self._textures[key] = photos.cover_texture(cached[1], w, h)
-            while len(self._textures) > 60:          # keep the most recent sizes only
-                del self._textures[next(iter(self._textures))]
         return tex
+
+    def _trim_textures(self, used, size):
+        """Keep the photos this picture uses plus the SPARE_PHOTOS used most recently, and
+        textures only for those photos at the two sizes drawn last (sidebar and larger view)."""
+        if size in self._texture_sizes:
+            self._texture_sizes.remove(size)
+        self._texture_sizes = (self._texture_sizes + [size])[-2:]
+        spare = len(self._photos) - len(used) - SPARE_PHOTOS
+        for path in list(self._photos):          # least recently used first
+            if spare <= 0:
+                break
+            if path not in used:
+                del self._photos[path]
+                spare -= 1
+        for key in list(self._textures):
+            path, mtime, w, h = key
+            if (w, h) not in self._texture_sizes or path not in self._photos \
+                    or self._photos[path][0] != mtime:
+                del self._textures[key]
 
     def _paint_textures(self, photo, textured, xs, w, h, scale, dw, dh):
         """Copy each textured color's photo into its knots: one rectangle per run of the same
-        color along a row of art pixels."""
+        color along a row of art pixels, painted into a strip of a few rows that then goes into
+        the picture in one copy (much faster than many copies straight into a big picture)."""
         zoom, sub = scale
-        call, name = photo.tk.call, photo.name
+        call = photo.tk.call
+        groups = []                      # (screen y0, y1, image row) for each row of knots
         y0 = 0
         while y0 < dh:
             iy = min(h - 1, y0 * sub // zoom)
             y1 = y0 + 1
             while y1 < dh and min(h - 1, y1 * sub // zoom) == iy:
                 y1 += 1
-            base, x0 = iy * w, 0
-            while x0 < dw:
-                orig = self.orig_hex[base + xs[x0]]
-                x1 = x0 + 1
-                while x1 < dw and self.orig_hex[base + xs[x1]] == orig:
-                    x1 += 1
-                tex = textured.get(orig)
-                if tex:
-                    img, ox, oy = tex
-                    call(name, "copy", img.name, "-from", x0 + ox, y0 + oy, x1 + ox, y1 + oy,
-                         "-to", x0, y0)
-                x0 = x1
+            groups.append((y0, y1, iy))
             y0 = y1
+        band = tk.PhotoImage(master=self, width=dw,
+                             height=min(dh, TEXTURE_BAND + max(g[1] - g[0] for g in groups)))
+        start = 0
+        while start < len(groups):
+            end = start + 1
+            while end < len(groups) and groups[end][1] - groups[start][0] <= TEXTURE_BAND:
+                end += 1
+            top, bottom = groups[start][0], groups[end - 1][1]
+            runs = []
+            for y0, y1, iy in groups[start:end]:
+                base, x0 = iy * w, 0
+                while x0 < dw:
+                    orig = self.orig_hex[base + xs[x0]]
+                    x1 = x0 + 1
+                    while x1 < dw and self.orig_hex[base + xs[x1]] == orig:
+                        x1 += 1
+                    tex = textured.get(orig)
+                    if tex:
+                        runs.append((tex, x0, x1, y0, y1))
+                    x0 = x1
+            if runs:
+                call(band.name, "copy", photo.name, "-from", 0, top, dw, bottom, "-to", 0, 0)
+                for (img, ox, oy), x0, x1, y0, y1 in runs:
+                    call(band.name, "copy", img.name, "-from", x0 + ox, y0 + oy, x1 + ox,
+                         y1 + oy, "-to", x0, y0 - top)
+                call(photo.name, "copy", band.name, "-from", 0, 0, dw, bottom - top,
+                     "-to", 0, top)
+            start = end
 
 
 class LargeView(tk.Toplevel):
