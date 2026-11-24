@@ -865,21 +865,20 @@ class CanvasDialog(tk.Toplevel):
         self.configure(bg=BG, padx=16, pady=14)
         self.resizable(False, False)
         self.transient(parent)
-        self.vars = {}
+        self.vars, self.hints = {}, {}
         for row, (key, text, hint) in enumerate(self.FIELDS):
             tk.Label(self, text=text, font=UI_FONT, bg=BG).grid(row=row, column=0, sticky="w",
                                                                 pady=3)
             v = tk.StringVar(value="%g" % values[key])
             ttk.Entry(self, textvariable=v, width=7).grid(row=row, column=1, sticky="w", padx=8)
-            tk.Label(self, text=hint, font=("Segoe UI", 9), bg=BG, fg="#777").grid(
-                row=row, column=2, sticky="w")
+            # the hint doubles as the error line: it turns red with what's wrong
+            self.hints[key] = tk.Label(self, text=hint, font=("Segoe UI", 9), bg=BG, fg="#777")
+            self.hints[key].grid(row=row, column=2, sticky="w")
             v.trace_add("write", lambda *_: self.update_view())
             self.vars[key] = v
         self.default = tk.BooleanVar(value=False)
         ttk.Checkbutton(self, text="Also use these for new projects", variable=self.default).grid(
             row=len(self.FIELDS), column=0, columnspan=3, sticky="w", pady=(10, 0))
-        self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020")
-        self.error.grid(row=len(self.FIELDS) + 1, column=0, columnspan=3, sticky="w")
         btns = tk.Frame(self, bg=BG)
         btns.grid(row=len(self.FIELDS) + 2, column=0, columnspan=3, sticky="e", pady=(8, 0))
         self.ok = ttk.Button(btns, text="Save", command=self.accept)
@@ -896,26 +895,30 @@ class CanvasDialog(tk.Toplevel):
         self.wait_window()
 
     def check(self):
-        out = {}
+        """(values or None, {field: what's wrong})."""
+        out, errs = {}, {}
         for key, text, _ in self.FIELDS:
             try:
                 v = float(self.vars[key].get())
             except ValueError:
-                return None, "%s must be a number" % text
+                errs[key] = "Must be a number"
+                continue
             if key == "holes_per_inch":
                 if v <= 0:
-                    return None, "Holes per inch must be more than 0"
+                    errs[key] = "Must be more than 0"
                 out[key] = v
             else:
                 if v < 0 or v != int(v):
-                    return None, "%s must be a whole number, 0 or more" % text
-                out[key] = int(v)
-        return out, None
+                    errs[key] = "Must be a whole number, 0 or more"
+                out[key] = int(v) if v == int(v) else v
+        return (None if errs else out), errs
 
     def update_view(self):
-        _, err = self.check()
-        self.error.config(text=err or "")
-        self.ok.state(["disabled"] if err else ["!disabled"])
+        _, errs = self.check()
+        for key, _, hint in self.FIELDS:
+            e = errs.get(key)
+            self.hints[key].config(text=e or hint, fg="#C62828" if e else "#777")
+        self.ok.state(["disabled"] if errs else ["!disabled"])
 
     def accept(self):
         values, err = self.check()

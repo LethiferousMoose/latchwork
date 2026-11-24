@@ -2,6 +2,7 @@
 import math
 import os
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk
 
 from .colormath import lch_to_rgb, rgb_to_lch, to_hex
@@ -13,6 +14,39 @@ C_MAX = 200.0           # GIMP's LCh chroma slider range
 PANEL_BG = "#F7F7F7"
 UI_FONT = ("Segoe UI", 10)
 VALUE_FONT = ("Consolas", 11)
+NOTE_FONT = ("Segoe UI", 9)
+NOTE_GREY, NOTE_RED = "#777", "#C62828"
+
+
+def required_label(parent, text, bg, font=UI_FONT):
+    """A field label with a red * after it: the field must be filled in."""
+    f = tk.Frame(parent, bg=bg)
+    tk.Label(f, text=text, font=font, bg=bg).pack(side="left")
+    tk.Label(f, text=" *", font=(font[0], font[1], "bold"), bg=bg, fg=NOTE_RED).pack(side="left")
+    return f
+
+
+def required_legend(parent, bg):
+    return tk.Label(parent, text="* Required", font=NOTE_FONT, bg=bg, fg=NOTE_GREY)
+
+
+class FieldNote(tk.Frame):
+    """The line under a form field: grey help text, or what's wrong in red. It always takes
+    one line and never asks for width (grid it sticky "ew"), so a message coming or going never
+    resizes the dialog."""
+
+    def __init__(self, parent, bg, helper=""):
+        h = tkfont.Font(font=NOTE_FONT).metrics("linespace") + 2
+        super().__init__(parent, bg=bg, height=h, width=1)
+        self.helper = helper
+        self.label = tk.Label(self, font=NOTE_FONT, bg=bg, bd=0, padx=0, pady=0, anchor="w")
+        self.label.place(x=0, y=0)
+        self.set()
+
+    def set(self, error=None, helper=None):
+        if helper is not None:
+            self.helper = helper
+        self.label.config(text=error or self.helper, fg=NOTE_RED if error else NOTE_GREY)
 
 
 def free_name(folder, filename, also=None):
@@ -193,7 +227,9 @@ class ColorPanel(tk.Frame):
     panel is given (bar_w is what they ask for)."""
 
     def __init__(self, parent, hex_var, editable, on_copy=None, deltas=False, bar_w=BAR_W,
-                 delta_space=False):
+                 delta_space=False, note=None):
+        """note: helper text for a FieldNote under HTML notation (self.note), which then
+        is a required field; None = no note (the main window uses self.status instead)."""
         super().__init__(parent, bg=PANEL_BG, bd=1, relief="solid", padx=12, pady=10)
         self.bar_w = bar_w
         self.bars, self.values, self.images, self.deltas = [], [], [], []
@@ -222,14 +258,22 @@ class ColorPanel(tk.Frame):
 
         html = tk.Frame(self, bg=PANEL_BG)
         html.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(10, 0))
-        tk.Label(html, text="HTML notation", font=UI_FONT, bg=PANEL_BG).pack(side="left")
+        html.columnconfigure(3, weight=1)
+        if note is None:
+            tk.Label(html, text="HTML notation", font=UI_FONT, bg=PANEL_BG).grid(row=0, column=0)
+        else:
+            required_label(html, "HTML notation", PANEL_BG).grid(row=0, column=0)
         self.entry = ttk.Entry(html, textvariable=hex_var, font=("Consolas", 12), width=9,
                                state="normal" if editable else "readonly")
-        self.entry.pack(side="left", padx=8)
+        self.entry.grid(row=0, column=1, padx=8)
         if on_copy:
-            ttk.Button(html, text="Copy", width=6, command=on_copy).pack(side="left")
+            ttk.Button(html, text="Copy", width=6, command=on_copy).grid(row=0, column=2)
         self.status = tk.Label(html, text="", font=("Segoe UI", 9), bg=PANEL_BG, fg="#B00020")
-        self.status.pack(side="left", padx=4)
+        self.status.grid(row=0, column=3, sticky="w", padx=4)
+        self.note = None
+        if note is not None:
+            self.note = FieldNote(html, PANEL_BG, note)
+            self.note.grid(row=1, column=1, columnspan=3, sticky="ew", padx=8)
 
     def show(self, rgb, other=None):
         """Draw the channels for rgb (or blank if None). `other` (an rgb) adds hollow markers on

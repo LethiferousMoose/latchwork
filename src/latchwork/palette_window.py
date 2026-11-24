@@ -8,7 +8,8 @@ from tkinter import filedialog, messagebox, ttk
 from . import palette as pal
 from . import photos
 from .colormath import SWATCH_L_OFFSET, SWATCH_L_SCALE, lightness, parse_hex, to_hex
-from .widgets import ColorPanel, Tooltip, free_name
+from .widgets import (ColorPanel, FieldNote, Tooltip, free_name, required_label,
+                      required_legend)
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
@@ -436,29 +437,31 @@ class BrandChoiceDialog(tk.Toplevel):
         self.transient(parent)
         tk.Label(self, text=message, font=UI_FONT, bg=BG, wraplength=380, justify="left").grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
-        tk.Label(self, text="Brand", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w")
+        required_label(self, "Brand", BG).grid(row=1, column=0, sticky="w")
         self.brand_var = tk.StringVar(value=current)
         box = ttk.Combobox(self, textvariable=self.brand_var, width=28,
                            values=[b.name for b in brands])
         box.grid(row=1, column=1, sticky="w", padx=8)
-        pack_label = tk.Label(self, text="Pack size", font=UI_FONT, bg=BG)
-        pack_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
+        self.brand_note = FieldNote(self, BG)
+        self.brand_note.grid(row=2, column=1, sticky="ew", padx=8)
+        tk.Label(self, text="Pack size", font=UI_FONT, bg=BG).grid(row=3, column=0, sticky="w",
+                                                                   pady=(2, 0))
         self.pack_var = tk.StringVar()      # what I type for a new brand
         self.brand_pack = tk.StringVar()    # an existing brand's, shown in the disabled field
         self.pack_entry = ttk.Entry(self, textvariable=self.pack_var, width=8)
-        self.pack_entry.grid(row=2, column=1, sticky="w", padx=8, pady=(6, 0))
-        for w in (pack_label, self.pack_entry):
-            tip(w, self._pack_tip)
-        self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020")
-        self.error.grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self.pack_entry.grid(row=3, column=1, sticky="w", padx=8, pady=(2, 0))
+        self.pack_note = FieldNote(self, BG)
+        self.pack_note.grid(row=4, column=1, sticky="ew", padx=8)
+        required_legend(self, BG).grid(row=5, column=0, sticky="sw", pady=(10, 0))
         btns = tk.Frame(self, bg=BG)
-        btns.grid(row=5, column=0, columnspan=2, sticky="e", pady=(8, 0))
+        btns.grid(row=5, column=1, sticky="e", pady=(10, 0))
+        self.touched = False   # "Required" only once I've typed in the brand box
         self.ok = ttk.Button(btns, text="OK", command=self.accept)
         self.ok.pack(side="left", padx=4)
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left")
         self.bind("<Return>", lambda e: self.accept())
         self.bind("<Escape>", lambda e: self.destroy())
-        self.brand_var.trace_add("write", lambda *_: self.update_view())
+        self.brand_var.trace_add("write", lambda *_: self.update_view(touched=True))
         self.pack_var.trace_add("write", lambda *_: self.update_view())
         self.update_view()
         center_on(self, parent)
@@ -466,26 +469,22 @@ class BrandChoiceDialog(tk.Toplevel):
         self.grab_set()
         self.wait_window()
 
-    def _pack_tip(self):
-        if pal.brand_by_key(self.brands, self.brand_var.get()):
-            return "This brand's pack size. Change it under Brands..."
-        return ("New brand: pieces per pre-cut pack.\n"
-                "Leave it blank if this brand is cut from skeins.")
-
     def check(self):
+        """(result or None, {field: what's wrong})."""
         name = pal.clean_name(self.brand_var.get())
         if not name:
-            return None, "Choose or type a brand"
+            return None, {"brand": "Required"}
         b = pal.brand_by_key(self.brands, name)
         if b:
-            return {"brand": b.name, "new": False, "pack": b.pack}, None
+            return {"brand": b.name, "new": False, "pack": b.pack}, {}
         try:
             pack = pal.parse_pack(self.pack_var.get())
         except ValueError:
-            return None, "Pack size: a whole number, or blank"
-        return {"brand": name, "new": True, "pack": pack}, None
+            return None, {"pack": "Must be a whole number"}
+        return {"brand": name, "new": True, "pack": pack}, {}
 
-    def update_view(self):
+    def update_view(self, touched=False):
+        self.touched = self.touched or touched
         b = pal.brand_by_key(self.brands, self.brand_var.get())
         if b:
             self.brand_pack.set(str(b.pack) if b.pack else "cut")
@@ -494,9 +493,10 @@ class BrandChoiceDialog(tk.Toplevel):
         else:
             self.pack_entry.config(textvariable=self.pack_var)   # back to what I typed
             self.pack_entry.state(["!disabled"])
-        r, err = self.check()
-        self.error.config(text=err if pal.clean_name(self.brand_var.get()) else "")
-        self.ok.state(["disabled"] if err else ["!disabled"])
+        r, errs = self.check()
+        self.brand_note.set(errs.get("brand") if self.touched else None)
+        self.pack_note.set(errs.get("pack"), helper="" if b else PACK_HELP)
+        self.ok.state(["disabled"] if errs else ["!disabled"])
 
     def accept(self):
         r, err = self.check()
@@ -607,28 +607,29 @@ class BrandEditDialog(tk.Toplevel):
         self.configure(bg=BG, padx=16, pady=14)
         self.resizable(False, False)
         self.transient(parent)
-        tk.Label(self, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
+        required_label(self, "Name", BG).grid(row=0, column=0, sticky="w")
         self.name_var = tk.StringVar(value=brand.name if brand else "")
         e = ttk.Entry(self, textvariable=self.name_var, width=28)
         e.grid(row=0, column=1, sticky="w", padx=8)
-        tk.Label(self, text="Pack size", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w",
-                                                                   pady=(6, 0))
+        self.name_note = FieldNote(self, BG)
+        self.name_note.grid(row=1, column=1, sticky="ew", padx=8)
+        tk.Label(self, text="Pack size", font=UI_FONT, bg=BG).grid(row=2, column=0, sticky="w",
+                                                                   pady=(2, 0))
         self.pack_var = tk.StringVar(value=str(brand.pack) if brand and brand.pack else "")
-        ttk.Entry(self, textvariable=self.pack_var, width=8).grid(row=1, column=1, sticky="w",
-                                                                 padx=8, pady=(6, 0))
-        tk.Label(self, text="Pieces per pre-cut pack. Leave blank if you cut this brand from "
-                            "skeins.", font=HINT_FONT, bg=BG, fg="#666", wraplength=320,
-                 justify="left").grid(row=2, column=0, columnspan=2, sticky="w", pady=(4, 0))
-        self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020")
-        self.error.grid(row=3, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        ttk.Entry(self, textvariable=self.pack_var, width=8).grid(row=2, column=1, sticky="w",
+                                                                 padx=8, pady=(2, 0))
+        self.pack_note = FieldNote(self, BG, PACK_HELP)
+        self.pack_note.grid(row=3, column=1, sticky="ew", padx=8)
+        required_legend(self, BG).grid(row=4, column=0, sticky="sw", pady=(10, 0))
         btns = tk.Frame(self, bg=BG)
-        btns.grid(row=4, column=0, columnspan=2, sticky="e", pady=(8, 0))
+        btns.grid(row=4, column=1, sticky="e", pady=(10, 0))
+        self.touched = False   # "Required" only once I've typed in the name
         self.ok = ttk.Button(btns, text="Save" if brand else "Add", command=self.accept)
         self.ok.pack(side="left", padx=4)
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left")
         self.bind("<Return>", lambda ev: self.accept())
         self.bind("<Escape>", lambda ev: self.destroy())
-        self.name_var.trace_add("write", lambda *_: self.update_view())
+        self.name_var.trace_add("write", lambda *_: self.update_view(touched=True))
         self.pack_var.trace_add("write", lambda *_: self.update_view())
         self.update_view()
         center_on(self, parent)
@@ -637,28 +638,36 @@ class BrandEditDialog(tk.Toplevel):
         self.wait_window()
 
     def check(self):
+        """(result or None, {field: what's wrong})."""
+        errs = {}
         name = pal.clean_name(self.name_var.get())
-        if not name:
-            return None, "Name is empty"
         other = pal.brand_by_key(self.brands, name)
-        if other and (self.brand is None or other.key != self.brand.key):
-            return None, "%s already exists" % other.name
+        if not name:
+            errs["name"] = "Required"
+        elif other and (self.brand is None or other.key != self.brand.key):
+            errs["name"] = "Already exists"
         try:
             pack = pal.parse_pack(self.pack_var.get())
         except ValueError:
-            return None, "Pack size must be a whole number (or blank)"
-        return {"name": name, "pack": pack}, None
+            errs["pack"] = "Must be a whole number"
+        return (None if errs else {"name": name, "pack": pack}), errs
 
-    def update_view(self):
-        _, err = self.check()
-        self.error.config(text=err or "")
-        self.ok.state(["disabled"] if err else ["!disabled"])
+    def update_view(self, touched=False):
+        self.touched = self.touched or touched
+        _, errs = self.check()
+        name_err = errs.get("name")
+        self.name_note.set(name_err if self.touched or name_err != "Required" else None)
+        self.pack_note.set(errs.get("pack"))
+        self.ok.state(["disabled"] if errs else ["!disabled"])
 
     def accept(self):
         r, err = self.check()
         if not err:
             self.result = r
             self.destroy()
+
+
+PACK_HELP = "Blank = cut from skeins"
 
 
 def tip(widget, text, title=None):
@@ -695,13 +704,14 @@ class YarnDialog(tk.Toplevel):
         self._build_photo(top)
         form = tk.Frame(top, bg=BG)
         form.grid(row=0, column=1, sticky="nw", padx=(14, 0))
-        tk.Label(form, text="Name", font=UI_FONT, bg=BG).grid(row=0, column=0, sticky="w")
+        required_label(form, "Name", BG).grid(row=0, column=0, sticky="w")
         self.name_var = tk.StringVar(value=yarn.sku if yarn else "")
         self.name_entry = name_entry = ttk.Entry(form, textvariable=self.name_var, width=21,
                                                  font=("Segoe UI", 11))
         name_entry.grid(row=0, column=1, columnspan=3, sticky="ew", padx=(8, 0))
-        tk.Label(form, text="Brand", font=UI_FONT, bg=BG).grid(row=1, column=0, sticky="w",
-                                                               pady=(6, 0))
+        self.name_note = FieldNote(form, BG)
+        self.name_note.grid(row=1, column=1, columnspan=3, sticky="ew", padx=(8, 0))
+        tk.Label(form, text="Brand", font=UI_FONT, bg=BG).grid(row=2, column=0, sticky="w")
         # Picked from the palette's brands only: new brands are added under Brands...,
         # where their pack size is set, so a typo can't make a stray brand.
         if yarn:
@@ -712,7 +722,7 @@ class YarnDialog(tk.Toplevel):
         self.brand_var = tk.StringVar(value=last)
         brand_box = ttk.Combobox(form, textvariable=self.brand_var, state="readonly",
                                  values=[b.name for b in brands] + [NO_BRAND])
-        brand_box.grid(row=1, column=1, columnspan=3, sticky="ew", padx=(8, 0), pady=(6, 0))
+        brand_box.grid(row=2, column=1, columnspan=3, sticky="ew", padx=(8, 0))
         tip(brand_box, "The yarn's brand, from the palette's brand list.\n"
                        "Add a new brand under Brands... first.")
 
@@ -727,7 +737,7 @@ class YarnDialog(tk.Toplevel):
                  "their photos. Copy it into HTML notation to use it."
                  % (SWATCH_L_SCALE, SWATCH_L_OFFSET))
         for r, (label, var, help_) in enumerate((("Average", self.avg_var, helps[0]),
-                                                 ("Suggested", self.sug_var, helps[1])), 2):
+                                                 ("Suggested", self.sug_var, helps[1])), 3):
             lab = tk.Label(form, text=label, font=UI_FONT, bg=BG)
             line = tk.Frame(form, bg=BG)
             chip = tk.Frame(line, width=18, height=18, highlightthickness=1,
@@ -740,9 +750,9 @@ class YarnDialog(tk.Toplevel):
                 lambda w=e.widget: w.select_range(0, "end")))
             Lval = tk.Label(line, font=UI_FONT, bg=BG, fg="#444")
             Lval.pack(side="left", padx=(8, 0))
-            lab.grid(row=r, column=0, sticky="w", pady=(8 if r == 2 else 3, 0))
+            lab.grid(row=r, column=0, sticky="w", pady=(8 if r == 3 else 3, 0))
             line.grid(row=r, column=1, columnspan=3, sticky="w", padx=(8, 0),
-                      pady=(8 if r == 2 else 3, 0))
+                      pady=(8 if r == 3 else 3, 0))
             for w in (lab, chip, entry, Lval):
                 tip(w, help_)
             self.photo_rows.append((chip, Lval, [lab, line]))
@@ -753,25 +763,26 @@ class YarnDialog(tk.Toplevel):
         self.swatch.grid(row=1, column=0, columnspan=2, pady=(0, 8))
 
         self.hex_var = tk.StringVar(value=yarn.hex if yarn else "")
-        self.panel = ColorPanel(self, self.hex_var, editable=True)
+        self.panel = ColorPanel(self, self.hex_var, editable=True, note="e.g. #88A048")
         self.panel.grid(row=2, column=0, columnspan=2, sticky="ew")
 
-        self.info = tk.Label(self, font=UI_FONT, bg=BG, justify="left", anchor="w",
-                             wraplength=self.SW_W)
+        # Where it would sit: always two lines tall (three for a retired yarn's note), so the
+        # dialog doesn't change size as the color becomes valid or invalid.
+        self.info = tk.Label(self, font=UI_FONT, bg=BG, justify="left", anchor="nw",
+                             wraplength=self.SW_W, height=3 if yarn and yarn.retired else 2)
         self.info.grid(row=3, column=0, columnspan=2, sticky="w", pady=(8, 0))
-        self.error = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020", anchor="w")
-        self.error.grid(row=4, column=0, columnspan=2, sticky="w", pady=(2, 0))
-
+        required_legend(self, BG).grid(row=6, column=0, sticky="sw", pady=(12, 0))
         btns = tk.Frame(self, bg=BG)
-        btns.grid(row=6, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        btns.grid(row=6, column=1, sticky="e", pady=(12, 0))
+        self.touched = set()   # fields I've typed in: only those can say "Required"
         self.ok = ttk.Button(btns, text="Save" if yarn else "Add", command=self.accept)
         self.ok.pack(side="left", padx=4)
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left")
         self.bind("<Return>", lambda e: self.accept())
         self.bind("<Escape>", lambda e: self.destroy())
 
-        for v in (self.name_var, self.hex_var, self.brand_var):
-            v.trace_add("write", lambda *_: self.update_view())
+        for v, field in ((self.name_var, "name"), (self.hex_var, "hex"), (self.brand_var, None)):
+            v.trace_add("write", lambda *_, f=field: self.update_view(touched=f))
         self.show_photo()
         self.update_view()
         center_on(self, parent)
@@ -895,17 +906,31 @@ class YarnDialog(tk.Toplevel):
         b = pal.brand_by_key(self.brands, brand)
         if b:
             brand = b.name   # use the brand's own spelling
-        name_err = pal.name_problem(self.name_var.get(), brand, self.bank, exclude=self.yarn)
-        if name_err:
-            return None, name_err
-        if rgb is None:
-            return None, "Enter a hex color in HTML notation, e.g. #88A048"
+        errs = {}
+        if not pal.clean_name(self.name_var.get()):
+            errs["name"] = "Required"
+        elif pal.name_problem(self.name_var.get(), brand, self.bank, exclude=self.yarn):
+            same = next(y for y in self.bank if y is not self.yarn
+                        and y.key == pal.yarn_key(self.name_var.get(), brand))
+            errs["name"] = ("Already in the palette (retired)" if same.retired
+                            else "Already in the palette")
+        if not self.hex_var.get().strip():
+            errs["hex"] = "Required"
+        elif rgb is None:
+            errs["hex"] = "Not a valid hex color"
+        if errs:
+            return None, errs
         return {"name": pal.clean_name(self.name_var.get()), "rgb": rgb, "brand": brand,
                 "photo_src": self.photo_src,
-                "photo_removed": self.photo_removed}, None
+                "photo_removed": self.photo_removed}, {}
 
-    def update_view(self):
-        r, err = self.problems()
+    def update_view(self, touched=None):
+        if touched:
+            self.touched.add(touched)
+        r, errs = self.problems()
+        for field, note in (("name", self.name_note), ("hex", self.panel.note)):
+            e = errs.get(field)
+            note.set(e if field in self.touched or e != "Required" else None)
         rgb = parse_hex(self.hex_var.get())
         c = self.swatch
         c.delete("all")
@@ -937,8 +962,7 @@ class YarnDialog(tk.Toplevel):
             c.create_text((mid0 + mid1) / 2, self.BLOCK_H / 2, text="enter HTML notation below",
                           font=UI_FONT, fill="#777")
             self.info.config(text="")
-        self.error.config(text=err or "")
-        self.ok.state(["disabled"] if err else ["!disabled"])
+        self.ok.state(["disabled"] if errs else ["!disabled"])
 
     def accept(self):
         r, err = self.problems()
