@@ -188,29 +188,37 @@ def channel_delta(name, value, other):
 class ColorPanel(tk.Frame):
     """GIMP-style channel readout: label, gradient bar with marker, boxed value, per channel,
     plus an HTML notation box (editable or read-only). With deltas=True, a column after the
-    values shows this color minus the `other` one passed to show()."""
+    values shows this color minus the `other` one passed to show(); delta_space=True keeps that
+    column's room empty (so two panels side by side line up). The bars take whatever width the
+    panel is given (bar_w is what they ask for)."""
 
-    def __init__(self, parent, hex_var, editable, on_copy=None, deltas=False, bar_w=BAR_W):
+    def __init__(self, parent, hex_var, editable, on_copy=None, deltas=False, bar_w=BAR_W,
+                 delta_space=False):
         super().__init__(parent, bg=PANEL_BG, bd=1, relief="solid", padx=12, pady=10)
         self.bar_w = bar_w
         self.bars, self.values, self.images, self.deltas = [], [], [], []
         self._shown = None   # the rgb whose gradients are drawn
+        self._last = (None, None)   # what show() was last given, to redraw at a new width
+        self._resize_job = None
+        self.columnconfigure(1, weight=1)
         for row, name in enumerate("RGBLCh"):
             tk.Label(self, text=name, font=("Segoe UI", 10, "bold"), bg=PANEL_BG, width=2,
                      anchor="w").grid(row=row, column=0, sticky="w")
             bar = tk.Canvas(self, width=bar_w, height=BAR_H + MARK_H, bg=PANEL_BG,
                             highlightthickness=0)
-            bar.grid(row=row, column=1, padx=(4, 8), pady=2)
+            bar.grid(row=row, column=1, sticky="ew", padx=(4, 8), pady=2)
             val = tk.Label(self, font=VALUE_FONT, bg="white", width=6, anchor="e",
                            relief="sunken", bd=1, padx=4)
             val.grid(row=row, column=2, sticky="e")
-            if deltas:
+            if deltas or delta_space:
                 d = tk.Label(self, font=("Consolas", 10), bg=PANEL_BG, width=6, anchor="e",
                              padx=3)
                 d.grid(row=row, column=3, sticky="e", padx=(6, 0))
-                self.deltas.append(d)
+                if deltas:
+                    self.deltas.append(d)
             self.bars.append(bar)
             self.values.append(val)
+        self.bars[0].bind("<Configure>", self._on_resize)
 
         html = tk.Frame(self, bg=PANEL_BG)
         html.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(10, 0))
@@ -227,6 +235,7 @@ class ColorPanel(tk.Frame):
         """Draw the channels for rgb (or blank if None). `other` (an rgb) adds hollow markers on
         every bar for comparison; no hue marker when either color is near gray. The gradients
         are kept when rgb is the same as last time (stepping yarns only moves the markers)."""
+        self._last = (rgb, other)
         same = rgb is not None and rgb == self._shown and len(self.images) == len(self.bars)
         self._shown = rgb
         if not same:
@@ -275,6 +284,18 @@ class ColorPanel(tk.Frame):
                 self._marker(bar, ghost[name], fill="", outline="#888")
             self._marker(bar, pos, fill="#111", outline="#111")
             val.config(text="%.1f" % value)
+
+    def _on_resize(self, event):
+        """The bars got a new width (window resized): draw them again at that width."""
+        if event.width > 20 and event.width != self.bar_w:
+            self.bar_w = event.width
+            if not self._resize_job:
+                self._resize_job = self.after_idle(self._redraw)
+
+    def _redraw(self):
+        self._resize_job = None
+        self._shown = None   # the gradients are redrawn at the new width
+        self.show(*self._last)
 
     def _marker(self, bar, pos, fill, outline):
         x = 1 + pos * (self.bar_w - 3)

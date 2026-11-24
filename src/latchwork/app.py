@@ -24,7 +24,7 @@ from .widgets import ColorPanel, StatCard, Tooltip, describe_delta_L, free_name
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(ROOT, "data")
 DEFAULT_PALETTE = os.path.join(DATA_DIR, "palette.csv")
-COMPARE_BAR_W = 200   # channel bars in the comparison: room for the yarn's difference column
+COMPARE_BAR_W = 140   # channel bars in the comparison at least; they grow with the window
 SETTINGS = os.path.join(ROOT, "settings", "latchwork_settings.json")  # per-user, not in git
 OLD_SETTINGS = os.path.join(ROOT, "latchwork_settings.json")          # before the data/ move
 
@@ -293,7 +293,7 @@ class App:
         # width=1: a long name never widens its column; it's cut with "..." to fit instead,
         # and the full name shows on hover
         self.yarn_title = tk.Label(r, text="", font=TITLE_FONT, bg=BG, anchor="w", width=1)
-        self.yarn_title.grid(row=0, column=1, sticky="ew", padx=16, pady=(6, 0))
+        self.yarn_title.grid(row=0, column=1, sticky="ew", padx=(8, 16), pady=(6, 0))
         self._title_font = tkfont.Font(font=TITLE_FONT)
         self._badge_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
         self._title_text, self._title_cut = "", False
@@ -308,27 +308,32 @@ class App:
 
         self.hex_var = tk.StringVar()
         self.yarn_hex_var = tk.StringVar()
-        self.target_panel = ColorPanel(r, self.hex_var, editable=True, bar_w=COMPARE_BAR_W)
-        self.target_panel.grid(row=2, column=0, sticky="n", padx=16, pady=4)
+        # Everything below the swatch lines up with its edges: each panel fills its half, and
+        # the rows under them span the whole width.
+        self.target_panel = ColorPanel(r, self.hex_var, editable=True, bar_w=COMPARE_BAR_W,
+                                       delta_space=True)
+        self.target_panel.grid(row=2, column=0, sticky="new", padx=(16, 8), pady=4)
         self.yarn_panel = ColorPanel(r, self.yarn_hex_var, editable=True, on_copy=self.copy_hex,
                                      deltas=True, bar_w=COMPARE_BAR_W)
         self.yarn_entry = self.yarn_panel.entry
         self.yarn_hex_var.trace_add("write", lambda *_: self.on_yarn_hex_changed())
         self.yarn_entry.bind("<FocusOut>", lambda e: self.reset_yarn_hex())
-        self.yarn_panel.grid(row=2, column=1, sticky="n", padx=16, pady=4)
+        self.yarn_panel.grid(row=2, column=1, sticky="new", padx=(8, 16), pady=4)
         self.entry = self.target_panel.entry
         self.hex_var.trace_add("write", lambda *_: self.on_hex_changed())
 
+        # Cards share the width in proportion to how much they say; Color weight sits at the end.
         stats = tk.Frame(r, bg=BG)
-        stats.grid(row=3, column=0, columnspan=2, pady=(10, 2))
-        self.delta_card = StatCard(stats, "Lightness difference (yarn \u2212 target)", width=260)
-        self.delta_card.pack(side="left", padx=6)
-        self.pos_card = StatCard(stats, "Position in palette", width=190)
-        self.pos_card.pack(side="left", padx=6)
-        self.match_card = StatCard(stats, "Match rank", width=150)
-        self.match_card.pack(side="left", padx=6)
+        stats.grid(row=3, column=0, columnspan=2, sticky="ew", padx=16, pady=(10, 2))
+        self.delta_card = StatCard(stats, "Lightness difference (yarn \u2212 target)", width=240)
+        self.pos_card = StatCard(stats, "Position in palette", width=170)
+        self.match_card = StatCard(stats, "Match rank", width=140)
+        for col, (card, weight) in enumerate(((self.delta_card, 24), (self.pos_card, 17),
+                                              (self.match_card, 14))):
+            card.grid(row=0, column=col, sticky="ew", padx=(0, 12))
+            stats.columnconfigure(col, weight=weight)
         wbox = tk.Frame(stats, bg=BG)
-        wbox.pack(side="left", padx=(10, 0))
+        wbox.grid(row=0, column=3, sticky="e")
         tk.Label(wbox, text="Color weight", font=UI_FONT, bg=BG).pack(anchor="w")
         self.weight_var = tk.StringVar(value="%g" % self.weight)
         sp = ttk.Spinbox(wbox, from_=0, to=1, increment=0.1, width=5,
@@ -339,18 +344,18 @@ class App:
         tk.Label(wbox, text="0 = lightness only", font=("Segoe UI", 8), bg=BG,
                  fg="#888").pack(anchor="w")
 
+        # Buttons share the width evenly (keys are in the hint bar below, so they stay short).
         nav = tk.Frame(r, bg=BG)
-        nav.grid(row=4, column=0, columnspan=2, pady=6)
-        for text, cmd in (("◀  Lighter", lambda: self.step(-1)),
-                          ("Darker  ▶", lambda: self.step(1)),
-                          ("▲ Better match", lambda: self.cycle_match(-1)),
-                          ("Next match ▼", lambda: self.cycle_match(1))):
-            # keys are in the hint bar below, so the buttons stay short and even
-            ttk.Button(nav, text=text, width=15, command=cmd).pack(side="left", padx=3)
-        self.gray_btn = ttk.Button(nav, text="Grayscale", width=15, command=self.toggle_gray)
-        self.gray_btn.pack(side="left", padx=3)
-        self.assign_main = ttk.Button(nav, text="Assign", width=15, command=self.assign)
-        self.assign_main.pack(side="left", padx=3)
+        nav.grid(row=4, column=0, columnspan=2, sticky="ew", padx=13, pady=6)  # + 3 per button
+        buttons = [ttk.Button(nav, text=text, width=1, command=cmd) for text, cmd in (
+            ("◀  Lighter", lambda: self.step(-1)), ("Darker  ▶", lambda: self.step(1)),
+            ("▲ Better match", lambda: self.cycle_match(-1)),
+            ("Next match ▼", lambda: self.cycle_match(1)),
+            ("Grayscale", self.toggle_gray), ("Assign", self.assign))]
+        self.gray_btn, self.assign_main = buttons[4], buttons[5]
+        for col, b in enumerate(buttons):
+            b.grid(row=0, column=col, sticky="ew", padx=3)
+            nav.columnconfigure(col, weight=1, uniform="nav", minsize=96)
 
         self.strip = tk.Canvas(r, height=96, bg=BG, highlightthickness=0)
         self.strip.grid(row=5, column=0, columnspan=2, sticky="ew", padx=16, pady=(6, 0))
@@ -369,7 +374,8 @@ class App:
 
         hints = tk.Frame(r, bg=BG)
         hints.grid(row=6, column=0, columnspan=2, padx=16, pady=(4, 10))
-        self.hint_rows = [tk.Frame(hints, bg=BG), tk.Frame(hints, bg=BG)]
+        self._hints = hints
+        self.hint_rows = []
         self.hint_items = []
         for keys, text in (("←→", "lighter / darker"), ("N", "next match"), ("B", "better match"),
                            ("Home", "best match"), ("M", "mark candidate"),
@@ -385,21 +391,30 @@ class App:
         r.bind("<Configure>", lambda e: self.layout_hints(e.width), add="+")
 
     def layout_hints(self, width):
-        """One line of key hints when it fits, otherwise two centered lines."""
-        gap = 10
-        total = sum(i.winfo_reqwidth() + gap for i in self.hint_items)
-        split = len(self.hint_items) if total + 32 <= width else (len(self.hint_items) + 1) // 2
+        """Key hints on as few centered lines as fit the width, evened out (2 lines of 6 and
+        5 rather than 10 and 1)."""
+        gap, room = 10, width - 32
+        widths = [i.winfo_reqwidth() + gap for i in self.hint_items]
+        n = len(widths)
+        for lines in range(1, n + 1):
+            per = -(-n // lines)                      # items per line, the same on every line
+            if all(sum(widths[k:k + per]) <= room for k in range(0, n, per)):
+                break
+        split = tuple(range(0, n, per))
         if split == self._hint_split:
             return
         self._hint_split = split
         for row in self.hint_rows:
             row.pack_forget()
-        for n, item in enumerate(self.hint_items):
+        while len(self.hint_rows) < len(split):
+            self.hint_rows.append(tk.Frame(self._hints, bg=BG))
+        for k, item in enumerate(self.hint_items):
             item.pack_forget()
-            item.pack(in_=self.hint_rows[0 if n < split else 1], side="left", padx=(0, gap))
-        self.hint_rows[0].pack()
-        if split < len(self.hint_items):
-            self.hint_rows[1].pack(pady=(3, 0))
+            last = (k + 1) % per == 0 or k == n - 1          # no gap after a line's last item
+            item.pack(in_=self.hint_rows[k // per], side="left", padx=(0, 0 if last else gap))
+            item.lift()   # above the line frames, which may have been created after it
+        for line in range(len(split)):
+            self.hint_rows[line].pack(pady=(0 if line == 0 else 3, 0))
 
     def _bind_keys(self):
         # Arrows step even while typing in the hex field (it's a paste-and-go field).
@@ -1404,8 +1419,10 @@ class App:
         w = c.winfo_width()
         if w < 4 or not self.yarns:
             return
-        slots = 2 * NEIGHBORS + 1
-        sw = w / slots
+        slots, gap = 2 * NEIGHBORS + 1, 6
+        # tile + gap; the outer tiles meet the swatch's edges (1 px in: the bold frame of the
+        # current tile would be cut off at the canvas edge)
+        sw = (w - 3 + gap) / slots
         used = self.used_yarns()
         marks = set(self.candidate_indexes())
         for s in range(slots):
@@ -1413,7 +1430,7 @@ class App:
             if not 0 <= i < len(self.yarns):
                 continue
             y = self.yarns[i]
-            x0, x1 = s * sw + 3, (s + 1) * sw - 3
+            x0, x1 = 1 + s * sw, 1 + (s + 1) * sw - gap
             current = i == self.index
             tag = "slot%d" % i
             c.create_rectangle(x0, 2, x1, 52, fill=display_color(y.rgb, self.gray),
