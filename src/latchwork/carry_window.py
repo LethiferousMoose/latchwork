@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from .palette import label as yarn_label
 from .project import EXTENSION, Project
+from .widgets import value_tip
 
 BG = "#ECECEC"
 UI_FONT = ("Segoe UI", 10)
@@ -197,6 +198,7 @@ class CarryDialog(tk.Toplevel):
             box = ttk.Combobox(self.conflict_rows, textvariable=var, values=labels,
                                state="readonly", width=46)
             box.grid(row=row, column=2, sticky="w")
+            value_tip(box)
             box.bind("<<ComboboxSelected>>", lambda e: self.update_view())
             self.choice[hex_] = var
         if conflicts:

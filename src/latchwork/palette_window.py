@@ -9,6 +9,7 @@ from . import palette as pal
 from . import photos
 from .colormath import SWATCH_L_OFFSET, SWATCH_L_SCALE, lightness, parse_hex, to_hex
 from .widgets import (ColorPanel, FieldNote, Tooltip, TreeSort, free_name, required_label,
+                      value_tip,
                       required_legend)
 
 BG = "#ECECEC"
@@ -481,6 +482,7 @@ class BrandChoiceDialog(tk.Toplevel):
         box = ttk.Combobox(self, textvariable=self.brand_var, width=28,
                            values=[b.name for b in brands])
         box.grid(row=1, column=1, sticky="w", padx=8)
+        value_tip(box)
         self.brand_note = FieldNote(self, BG)
         self.brand_note.grid(row=2, column=1, sticky="ew", padx=8)
         tk.Label(self, text="Pack size", font=UI_FONT, bg=BG).grid(row=3, column=0, sticky="w",
@@ -774,8 +776,8 @@ class YarnDialog(tk.Toplevel):
         brand_box = ttk.Combobox(form, textvariable=self.brand_var, state="readonly",
                                  values=[b.name for b in brands] + [NO_BRAND])
         brand_box.grid(row=2, column=1, columnspan=3, sticky="ew", padx=(8, 0))
-        tip(brand_box, "The yarn's brand, from the palette's brand list.\n"
-                       "Add a new brand under Brands... first.")
+        value_tip(brand_box, "The yarn's brand, from the palette's brand list.\n"
+                             "Add a new brand under Brands... first.")
 
         # What the photo suggests, as copyable hex codes (like HTML notation below).
         self.photo_rows = []
@@ -1073,6 +1075,7 @@ class ImportDialog(tk.Toplevel):
         self.action_box = ttk.Combobox(ctl, textvariable=self.action_var, state="readonly",
                                        width=30)
         self.action_box.pack(side="left", padx=6)
+        value_tip(self.action_box)
         self.action_box.bind("<<ComboboxSelected>>", lambda e: self.set_action())
         ttk.Button(ctl, text="Select all like this", command=self.select_kind).pack(
             side="left", padx=(6, 0), ipadx=8)

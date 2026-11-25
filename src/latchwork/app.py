@@ -20,7 +20,8 @@ from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
 from .project_panel import ProjectPanel
-from .widgets import ColorPanel, StatCard, Tooltip, describe_delta_L, free_name
+from .widgets import (ColorPanel, FitText, StatCard, Tooltip, describe_delta_L,
+                      free_name)
 
 # src/latchwork/app.py -> the repository folder
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -119,18 +120,6 @@ def on_screen(geometry, root):
 
 RECENT_MAX = 8   # File > Open recent
 PALETTE_BUTTON_CHROME = 34   # px of the palette dropdown taken by its padding and arrow
-
-
-def fit_text(text, font, room):
-    """The longest start of text that fits in room px with "..." added."""
-    lo, hi = 0, len(text)
-    while lo < hi:
-        mid = (lo + hi + 1) // 2
-        if font.measure(text[:mid].rstrip() + "\u2026") <= room:
-            lo = mid
-        else:
-            hi = mid - 1
-    return text[:lo].rstrip() + "\u2026"
 
 
 def recent_projects():
@@ -393,10 +382,7 @@ class App:
         self.palette_dropdown = tk.Menu(self.palette_button, tearoff=False)
         self.palette_button["menu"] = self.palette_dropdown
         # a long name is cut with "..." to fit, and shown in full on hover (like the yarn title)
-        self._palette_text, self._palette_cut = "", False
-        self.palette_button.bind("<Configure>", lambda e: self._fit_palette_name(), add="+")
-        Tooltip(self.palette_button,
-                lambda e: (self._palette_text, []) if self._palette_cut else None)
+        self.palette_name_text = FitText(self.palette_button, chrome=PALETTE_BUTTON_CHROME)
         # Just the dropdown: its menu has Manage yarns, and the title bar shows the counts.
 
         r = tk.Frame(self.main, bg=BG)
@@ -410,11 +396,8 @@ class App:
         # and the full name shows on hover
         self.yarn_title = tk.Label(r, text="", font=TITLE_FONT, bg=BG, anchor="w", width=1)
         self.yarn_title.grid(row=0, column=1, sticky="ew", padx=(8, 16), pady=(6, 0))
-        self._title_font = tkfont.Font(font=TITLE_FONT)
         self._badge_font = tkfont.Font(family="Segoe UI", size=9, weight="bold")
-        self._title_text, self._title_cut = "", False
-        self.yarn_title.bind("<Configure>", lambda e: self._fit_yarn_title())
-        Tooltip(self.yarn_title, lambda e: (self._title_text, []) if self._title_cut else None)
+        self.yarn_title_text = FitText(self.yarn_title, chrome=6)
 
         self.swatch = tk.Canvas(r, height=220, bg=BG, highlightthickness=0)
         self.swatch.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=16, pady=6)
@@ -703,8 +686,7 @@ class App:
             menu.add_command(label="Manage yarns...", accelerator="Ctrl+P",
                              command=self.open_palette_window)
         name = labels[self._palette_choice.get()] if self._palette_choice.get() >= 0 else ""
-        self._palette_text = name
-        self._fit_palette_name()
+        self.palette_name_text.set(name)
 
     def _use_bank(self, bank, keep_key, brands=None):
         if brands is not None:
@@ -1514,28 +1496,7 @@ class App:
             self.delta_card.set(*describe_delta_L(yarn.L - t_L))
 
     def set_yarn_title(self, text):
-        self._title_text = text
-        self._fit_yarn_title()
-
-    def _fit_palette_name(self):
-        text = self._palette_text
-        font = tkfont.nametofont("TkDefaultFont")
-        room = self.palette_button.winfo_width() - PALETTE_BUTTON_CHROME
-        self._palette_cut = room > 20 and font.measure(text) > room
-        if self._palette_cut:
-            text = fit_text(text, font, room)
-        if self.palette_button.cget("text") != text:
-            self.palette_button.config(text=text)
-
-    def _fit_yarn_title(self):
-        """Show the yarn title, cut with '...' when it's wider than its half of the view."""
-        text, f = self._title_text, self._title_font
-        room = self.yarn_title.winfo_width() - 6
-        self._title_cut = room > 20 and f.measure(text) > room
-        if self._title_cut:
-            text = fit_text(text, f, room)
-        if self.yarn_title.cget("text") != text:
-            self.yarn_title.config(text=text)
+        self.yarn_title_text.set(text)
 
     def draw_strip(self):
         c = self.strip

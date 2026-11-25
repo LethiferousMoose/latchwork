@@ -153,6 +153,74 @@ class Tooltip:
         self.key = None
 
 
+def fit_text(text, font, room):
+    """The longest start of text that fits in room px with "..." added."""
+    lo, hi = 0, len(text)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if font.measure(text[:mid].rstrip() + "\u2026") <= room:
+            lo = mid
+        else:
+            hi = mid - 1
+    return text[:lo].rstrip() + "\u2026"
+
+
+def widget_font(widget):
+    """The font a widget draws its text in (ttk widgets get theirs from the style)."""
+    try:
+        f = widget.cget("font")
+    except tk.TclError:
+        f = ""
+    if not f:
+        f = ttk.Style(widget).lookup(widget.winfo_class(), "font") or "TkDefaultFont"
+    return tkfont.Font(widget, font=f)
+
+
+class FitText:
+    """Text for a Label or Menubutton that may be wider than the widget: it's cut with "..."
+    to fit, and the whole text shows on hover while it's cut. chrome = px of the widget that
+    aren't room for text (padding, a dropdown arrow). Use set() instead of config(text=)."""
+
+    def __init__(self, widget, chrome=0, font=None):
+        self.widget, self.chrome = widget, chrome
+        self.font = tkfont.Font(widget, font=font) if font else widget_font(widget)
+        self.text, self.cut = "", False
+        widget.bind("<Configure>", lambda e: self.fit(), add="+")
+        Tooltip(widget, lambda e: (self.text, []) if self.cut else None)
+
+    def set(self, text):
+        self.text = text
+        self.fit()
+
+    def fit(self):
+        text = self.text
+        room = self.widget.winfo_width() - self.chrome
+        self.cut = room > 20 and self.font.measure(text) > room
+        if self.cut:
+            text = fit_text(text, self.font, room)
+        if self.widget.cget("text") != text:
+            self.widget.config(text=text)
+
+
+COMBO_CHROME = 26   # px of a Combobox taken by its padding and arrow
+
+
+def value_tip(box, help_text=None):
+    """Hover for a Combobox whose value may be wider than the box. Its text is its value, so
+    it can't be shortened with "..." like FitText; the whole value shows on hover instead,
+    above help_text when there is some (help_text alone when the value fits)."""
+    font = widget_font(box)
+
+    def content(_event):
+        value = box.get()
+        cut = font.measure(value) > box.winfo_width() - COMBO_CHROME
+        rows = [([], help_text)] if help_text else []
+        if cut:
+            return value, rows
+        return (None, rows) if rows else None
+    return Tooltip(box, content)
+
+
 class StatCard(tk.Frame):
     """A small boxed readout: caption, big value, short explanatory note."""
 
