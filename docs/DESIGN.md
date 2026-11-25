@@ -205,10 +205,15 @@ A `.latchwork` file is readable JSON:
   hand). Sprites from one game reuse exact hexes, so there is no near-matching: a different
   hex is a new color and is matched as usual. Rules:
   - Each project stays one rug; earlier projects are only read, so a hooked rug never changes.
-  - When sources gave the same hex different yarns, the newest project (last saved) is picked
-    and the summary lets you choose another per color.
+  - The dialog lists every color that would be carried over in one table (image color and
+    yarn swatch, yarn, source project, note); conflicts and yarns not in the active palette
+    are highlighted. It scales to any number of colors: the window is resizable and only the
+    table grows.
+  - When sources gave the same hex different yarns, the newest project (last saved) is picked;
+    "Yarn for selected" picks another: one selected color lists its yarns, several selected
+    list the projects ("From lake rug" takes each one's yarn from that rug where it has one).
   - Carried-over yarns missing from the active palette can be kept (snapshot fallback, as
-    above) or left to be matched from the active palette.
+    above) or left to be matched from the active palette (one checkbox for all of them).
   - Matching itself is unchanged: yarns used in earlier rugs get no preference.
 - **Assign from yarn image** (File): brings in a rug patterned by hand before Latchwork. The
   yarn image is the rug's image recolored so every pixel is a yarn's exact color, at the same
