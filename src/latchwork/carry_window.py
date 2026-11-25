@@ -20,24 +20,29 @@ def _names(items, most=4):
     return " and ".join(filter(None, [", ".join(items[:-1]), items[-1] if items else ""]))
 
 
-def _thumbnail(img, box_w=48, box_h=32):
-    """A rug's image as a PhotoImage at a whole-number scale that fits the box, so pixel art
-    stays crisp; transparent pixels show the window background."""
+def _thumbnail(img, box_w=64, box_h=40):
+    """A rug's image at a whole-number scale (so pixel art stays crisp), centered in a fixed
+    box_w x box_h image so every row's name starts at the same place. Transparent pixels and
+    the rest of the box stay transparent."""
     w, h = img.width, img.height
     photo = tk.PhotoImage(width=w, height=h)
     rows = []
     for y in range(h):
-        row = []
-        for r, g, b, a in img.pixels[y * w:(y + 1) * w]:
-            row.append("#%02x%02x%02x" % ((r, g, b) if a >= 128 else (236, 236, 236)))
-        rows.append("{" + " ".join(row) + "}")
+        rows.append("{" + " ".join("#%02x%02x%02x" % (r, g, b)
+                                   for r, g, b, _ in img.pixels[y * w:(y + 1) * w]) + "}")
     photo.put(" ".join(rows))
+    for i, (_, _, _, a) in enumerate(img.pixels):
+        if a < 128:
+            photo.transparency_set(i % w, i // w, True)
     zoom = min(box_w // w, box_h // h)
     if zoom > 1:
-        return photo.zoom(zoom)
-    if zoom == 1:
-        return photo
-    return photo.subsample(max(-(-w // box_w), -(-h // box_h)))
+        photo = photo.zoom(zoom)
+    elif zoom < 1:
+        photo = photo.subsample(max(-(-w // box_w), -(-h // box_h)))
+    box = tk.PhotoImage(width=box_w, height=box_h)
+    box.tk.call(box, "copy", photo, "-to", (box_w - photo.width()) // 2,
+                (box_h - photo.height()) // 2)
+    return box
 
 
 def _option_label(option):
@@ -67,7 +72,7 @@ class CarryDialog(tk.Toplevel):
         self.title("Carry over assignments")
         self.configure(bg=BG, padx=16, pady=14)
         self.minsize(600, 440)
-        self.geometry("720x580")
+        self.geometry("720x600")
         self.transient(parent)
 
         tk.Label(self, bg=BG, font=UI_FONT, justify="left", anchor="w",
@@ -77,7 +82,7 @@ class CarryDialog(tk.Toplevel):
         src = tk.Frame(self, bg=BG)
         src.pack(fill="x", pady=(10, 0))
         # earlier projects, newest first (the newest one's yarn is picked in a conflict)
-        ttk.Style(self).configure("Projects.Treeview", rowheight=36)
+        ttk.Style(self).configure("Projects.Treeview", rowheight=44)
         self.project_tree = ttk.Treeview(src, columns=("assigned", "carried", "date"), height=3,
                                          style="Projects.Treeview", selectmode="browse")
         for col, text, width, anchor in (("#0", "Project", 250, "w"),
