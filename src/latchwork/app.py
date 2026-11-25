@@ -379,14 +379,7 @@ class App:
         self.palette_button.pack()
         self.palette_dropdown = tk.Menu(self.palette_button, tearoff=False)
         self.palette_button["menu"] = self.palette_dropdown
-        # a fixed width, so "Manage yarns…" stays put as the count changes
-        self.palette_info = tk.Label(bar, font=("Segoe UI", 9), bg=BG, fg="#777", width=17,
-                                     anchor="w")
-        self.palette_info.pack(side="left")
-        manage = tk.Label(bar, text="Manage yarns…", font=("Segoe UI", 9, "underline"),
-                          bg=BG, fg="#1565C0", cursor="hand2")
-        manage.pack(side="left", padx=(10, 0))
-        manage.bind("<Button-1>", lambda e: self.open_palette_window())
+        # Just the dropdown: its menu has Manage yarns, and the title bar shows the counts.
 
         r = tk.Frame(self.main, bg=BG)
         r.pack(side="top", fill="both", expand=True)
@@ -693,9 +686,6 @@ class App:
                              command=self.open_palette_window)
         name = labels[self._palette_choice.get()] if self._palette_choice.get() >= 0 else ""
         self.palette_button.config(text=name)
-        n_ret = len(self.bank) - len(self.yarns)
-        self.palette_info.config(text="%d yarns%s" % (
-            len(self.yarns), ", %d retired" % n_ret if n_ret else ""))
 
     def _use_bank(self, bank, keep_key, brands=None):
         if brands is not None:
