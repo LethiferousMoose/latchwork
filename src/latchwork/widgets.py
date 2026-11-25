@@ -11,10 +11,11 @@ BAR_W, BAR_H = 240, 14  # channel gradient bars
 MARK_H = 7              # marker zone under each bar
 C_MAX = 200.0           # GIMP's LCh chroma slider range
 
+BG = "#ECECEC"          # window background
 PANEL_BG = "#F7F7F7"
 UI_FONT = ("Segoe UI", 10)
+SMALL_FONT = ("Segoe UI", 9)   # hints, notes, secondary text
 VALUE_FONT = ("Consolas", 11)
-NOTE_FONT = ("Segoe UI", 9)
 NOTE_GREY, NOTE_RED = "#777", "#C62828"
 
 
@@ -27,7 +28,7 @@ def required_label(parent, text, bg, font=UI_FONT):
 
 
 def required_legend(parent, bg):
-    return tk.Label(parent, text="* Required", font=NOTE_FONT, bg=bg, fg=NOTE_GREY)
+    return tk.Label(parent, text="* Required", font=SMALL_FONT, bg=bg, fg=NOTE_GREY)
 
 
 class FieldNote(tk.Frame):
@@ -36,10 +37,10 @@ class FieldNote(tk.Frame):
     resizes the dialog."""
 
     def __init__(self, parent, bg, helper=""):
-        h = tkfont.Font(font=NOTE_FONT).metrics("linespace") + 2
+        h = tkfont.Font(font=SMALL_FONT).metrics("linespace") + 2
         super().__init__(parent, bg=bg, height=h, width=1)
         self.helper = helper
-        self.label = tk.Label(self, font=NOTE_FONT, bg=bg, bd=0, padx=0, pady=0, anchor="w")
+        self.label = tk.Label(self, font=SMALL_FONT, bg=bg, bd=0, padx=0, pady=0, anchor="w")
         self.label.place(x=0, y=0)
         self.set()
 
@@ -151,6 +152,36 @@ class Tooltip:
             self.tip.destroy()
             self.tip = None
         self.key = None
+
+
+def swatch_image(colors, w=30, h=16, slots=None):
+    """PhotoImage of colors side by side with a thin border. With slots > len(colors), the
+    unused slots stay transparent so rows with one or two swatches line up."""
+    slots = slots or len(colors)
+    img = tk.PhotoImage(width=w, height=h)
+    seg = w / slots
+    for i, c in enumerate(colors):
+        x0, x1 = int(i * seg), int((i + 1) * seg)
+        img.put("#888888", to=(x0, 0, x1, h))
+        img.put(c, to=(x0 + 1, 1, x1 - 1, h - 1))
+    return img
+
+
+def vscroll(parent, widget):
+    """Pack a list or text widget with a vertical scrollbar on its right."""
+    sb = ttk.Scrollbar(parent, orient="vertical", command=widget.yview)
+    widget.configure(yscrollcommand=sb.set)
+    widget.pack(side="left", fill="both", expand=True)
+    sb.pack(side="left", fill="y")
+    return sb
+
+
+def tip(widget, text, title=None):
+    """Hover help for a widget; text may be a function returning the text (or None)."""
+    def content(_event):
+        t = text() if callable(text) else text
+        return (title, [([], t)]) if t else None
+    return Tooltip(widget, content)
 
 
 def fit_text(text, font, room):

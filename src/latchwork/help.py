@@ -4,9 +4,8 @@ Text markup: "# " starts a heading, "- " a bullet, "  " (two spaces) an indented
 blank lines separate paragraphs.
 """
 import tkinter as tk
-from tkinter import ttk
 
-BG = "#ECECEC"
+from .widgets import BG, vscroll
 
 TOPICS = [
     ("Getting started", """
@@ -193,10 +192,7 @@ class HelpWindow(tk.Toplevel):
         right.pack(side="left", fill="both", expand=True, padx=(6, 12), pady=12)
         self.text = tk.Text(right, wrap="word", font=("Segoe UI", 10), relief="solid", bd=1,
                             padx=16, pady=12, spacing1=2, spacing3=2, cursor="arrow")
-        sb = ttk.Scrollbar(right, orient="vertical", command=self.text.yview)
-        self.text.configure(yscrollcommand=sb.set)
-        self.text.pack(side="left", fill="both", expand=True)
-        sb.pack(side="left", fill="y")
+        vscroll(right, self.text)
         self.text.tag_configure("h", font=("Segoe UI", 13, "bold"), spacing1=12, spacing3=4)
         self.text.tag_configure("first", spacing1=0)
         self.text.tag_configure("bullet", lmargin1=8, lmargin2=24)

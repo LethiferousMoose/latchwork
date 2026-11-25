@@ -8,26 +8,11 @@ from tkinter import filedialog, messagebox, ttk
 from . import palette as pal
 from . import photos
 from .colormath import SWATCH_L_OFFSET, SWATCH_L_SCALE, lightness, parse_hex, to_hex
-from .widgets import (ColorPanel, FieldNote, Tooltip, TreeSort, free_name, required_label,
-                      value_tip,
+from .settings import read_settings, write_settings
+from .widgets import (BG, SMALL_FONT, UI_FONT, ColorPanel, FieldNote, Tooltip, TreeSort,
+                      free_name, required_label, swatch_image, tip, value_tip, vscroll,
                       required_legend)
 
-BG = "#ECECEC"
-UI_FONT = ("Segoe UI", 10)
-HINT_FONT = ("Segoe UI", 9)
-
-
-def swatch_image(colors, w=30, h=16, slots=None):
-    """PhotoImage of colors side by side with a thin border. With slots > len(colors), the
-    unused slots stay transparent so rows with one or two swatches line up."""
-    slots = slots or len(colors)
-    img = tk.PhotoImage(width=w, height=h)
-    seg = w / slots
-    for i, c in enumerate(colors):
-        x0, x1 = int(i * seg), int((i + 1) * seg)
-        img.put("#888888", to=(x0, 0, x1, h))
-        img.put(c, to=(x0 + 1, 1, x1 - 1, h - 1))
-    return img
 
 
 def _round_rect(c, x0, y0, x1, y1, r, **kw):
@@ -52,7 +37,6 @@ def saved_sort(app, key, sort):
     """A table's sort from last time ([column, descending]), or None for its default order."""
     if not app.remember:
         return None
-    from .app import read_settings
     state = read_settings().get(key)
     ok = isinstance(state, list) and len(state) == 2 and state[0] in sort.keys
     return [state[0], bool(state[1])] if ok else None
@@ -61,7 +45,6 @@ def saved_sort(app, key, sort):
 def keep_sort(app, key, state):
     """A heading was clicked: remember the order for next time (like the window size)."""
     if app.remember:
-        from .app import read_settings, write_settings
         settings = read_settings()
         settings[key] = state
         write_settings(settings)
@@ -102,7 +85,7 @@ class PaletteWindow(tk.Toplevel):
         self.find_var = tk.StringVar()
         self.find_var.trace_add("write", lambda *_: self.refresh())
         ttk.Entry(top, textvariable=self.find_var, width=24).pack(side="left", padx=6)
-        tk.Label(top, text="name, brand or hex", font=HINT_FONT, bg=BG, fg="#888").pack(side="left")
+        tk.Label(top, text="name, brand or hex", font=SMALL_FONT, bg=BG, fg="#888").pack(side="left")
         self.show_retired = tk.BooleanVar(value=True)
         ttk.Checkbutton(top, text="Show retired", variable=self.show_retired,
                         command=self.refresh).pack(side="left", padx=12)
@@ -138,10 +121,7 @@ class PaletteWindow(tk.Toplevel):
             "status": (lambda i: y(i).retired, True),
         }, default=lambda i: self._order[i], on_change=lambda st: keep_sort(app, "palette_sort", st))
         self.sort.state = saved_sort(app, "palette_sort", self.sort)
-        sb = ttk.Scrollbar(body, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=sb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        sb.pack(side="left", fill="y")
+        vscroll(body, self.tree)
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
         self.tree.bind("<Double-1>", lambda e: self.edit())
         self.tree.bind("<Delete>", lambda e: self.delete())
@@ -169,7 +149,7 @@ class PaletteWindow(tk.Toplevel):
             elif text in ("Set brand...", "Retire", "Delete..."):
                 self.needs_selection.append(b)
 
-        tk.Label(self, font=HINT_FONT, bg=BG, fg="#666", anchor="w", justify="left",
+        tk.Label(self, font=SMALL_FONT, bg=BG, fg="#666", anchor="w", justify="left",
                  text="Changes save immediately. Retired yarns are kept but not used for matching. "
                       "Pack sizes come from the brand.\n"
                       "Select several yarns (Ctrl+A for all shown) to set their brand at once. "
@@ -558,7 +538,7 @@ class BrandsDialog(tk.Toplevel):
         self.transient(win)
         tk.Label(self, text="Pack size is the number of pre-cut pieces per pack; \"cut\" means "
                             "you cut it from skeins. Every yarn uses its brand's pack size.",
-                 font=HINT_FONT, bg=BG, fg="#555",
+                 font=SMALL_FONT, bg=BG, fg="#555",
                  wraplength=440, justify="left").pack(fill="x", pady=(0, 8))
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True)
@@ -725,14 +705,6 @@ class BrandEditDialog(tk.Toplevel):
 PACK_HELP = "Blank = cut from skeins"
 
 
-def tip(widget, text, title=None):
-    """Hover help for a widget; text may be a function returning the text (or None)."""
-    def content(_event):
-        t = text() if callable(text) else text
-        return (title, [([], t)]) if t else None
-    return Tooltip(widget, content)
-
-
 class YarnDialog(tk.Toplevel):
     """Add or edit one yarn, including its photo. Nothing is saved or copied until Add/Save.
     result = {"name", "rgb", "brand", "photo_src", "photo_removed"} or None, where
@@ -858,7 +830,7 @@ class YarnDialog(tk.Toplevel):
                           highlightbackground="#BBB")
         holder.pack(padx=1)
         holder.pack_propagate(False)
-        self.picture = tk.Label(holder, bg="#DDD", font=HINT_FONT, fg="#777", justify="center",
+        self.picture = tk.Label(holder, bg="#DDD", font=SMALL_FONT, fg="#777", justify="center",
                                 wraplength=side - 16, cursor="hand2")
         self.picture.pack(fill="both", expand=True)
         self.picture.bind("<Button-1>", lambda e: self.choose_photo())
@@ -1049,7 +1021,7 @@ class ImportDialog(tk.Toplevel):
                  font=("Segoe UI", 11), bg=BG, fg="#555").pack(side="left", pady=(5, 0))
         self.badges = tk.Canvas(self, height=30, bg=BG, highlightthickness=0)
         self.badges.pack(fill="x", pady=(8, 4))
-        tk.Label(self, font=HINT_FONT, bg=BG, fg="#555", anchor="w",
+        tk.Label(self, font=SMALL_FONT, bg=BG, fg="#555", anchor="w",
                  text="Swatches: the file's color on the left, your yarn's on the right. Select rows "
                       "and pick an action below. Nothing changes until you press Import.").pack(
             fill="x", pady=(0, 6))
@@ -1064,10 +1036,7 @@ class ImportDialog(tk.Toplevel):
             self.tree.heading(col, text=text)
             self.tree.column(col, width=width, stretch=(col in ("#0", "action")))
         self.tree.tag_configure("attention", background="#FFF4CC")
-        sb = ttk.Scrollbar(body, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=sb.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        sb.pack(side="left", fill="y")
+        vscroll(body, self.tree)
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
 
         ctl = tk.Frame(self, bg=BG)

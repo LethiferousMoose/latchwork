@@ -12,10 +12,8 @@ from . import photos
 from . import plan as pl
 from .palette import label as yarn_label
 from .colormath import gray_for_lightness, lightness, parse_hex, to_hex
-from .widgets import Tooltip, TreeSort
+from .widgets import BG, UI_FONT, Tooltip, TreeSort, swatch_image, tip
 
-BG = "#ECECEC"
-UI_FONT = ("Segoe UI", 10)
 IMG_W, IMG_H = 400, 250
 TRANSPARENT_SHOW = "#F7F7F7"
 TABLE_ROWS = 6     # requested table height; tables shrink on short windows
@@ -49,23 +47,9 @@ def _gray(hex_):
     return to_hex(v, v, v)
 
 
-def _pair_image(left, right, w=40, h=16):
-    """Two-color swatch for a list row (right may be None)."""
-    img = tk.PhotoImage(width=w, height=h)
-    half = w // 2
-    img.put("#888888", to=(0, 0, half, h))
-    img.put(left, to=(1, 1, half - 1, h - 1))
-    if right:
-        img.put("#888888", to=(half, 0, w, h))
-        img.put(right, to=(half + 1, 1, w - 1, h - 1))
-    return img
-
-
-def _swatch(hex_, w=18, h=14):
-    img = tk.PhotoImage(width=w, height=h)
-    img.put("#888888", to=(0, 0, w, h))
-    img.put(hex_, to=(1, 1, w - 1, h - 1))
-    return img
+def _pair_image(left, right):
+    """Two-color swatch for a list row: image color, then its yarn's (right may be None)."""
+    return swatch_image([left] + ([right] if right else []), w=40, slots=2)
 
 
 class ProjectPanel(tk.Frame):
@@ -126,11 +110,11 @@ class ProjectPanel(tk.Frame):
         self.texture_cb = ttk.Checkbutton(views, text="Texture", variable=self.texture,
                                           command=self.render_image)
         self.texture_cb.pack(side="left", padx=(12, 0))
-        Tooltip(self.texture_cb, lambda e: (None, [([], (
+        tip(self.texture_cb,
             "Yarn preview with each yarn's photo instead of its flat color (T),\n"
             "like a photo layer behind the picture. Yarns without a photo stay\n"
             "flat; so does everything in grayscale, and the colors that\n"
-            "Highlight fades or Mark unassigned stripes."))]))
+            "Highlight fades or Mark unassigned stripes.")
         larger = tk.Label(views, text="View larger", font=("Segoe UI", 9, "underline"), bg=BG,
                           fg="#1565C0", cursor="hand2")
         larger.pack(side="right", padx=(0, 4))
@@ -449,7 +433,7 @@ class ProjectPanel(tk.Frame):
         for i, l in enumerate(plan.lines):
             img = self.plan_images.get(l.hex)
             if img is None:
-                img = self.plan_images[l.hex] = _swatch(l.hex)
+                img = self.plan_images[l.hex] = swatch_image([l.hex], w=18, h=14)
             self.plan_tree.insert("", "end", iid=str(i), text="  %s" % l.label, image=img,
                                   values=(format(l.count, ","), l.need(plan.spare)[2],
                                           len(l.colors)),

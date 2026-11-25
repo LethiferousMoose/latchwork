@@ -6,19 +6,9 @@ from tkinter import filedialog, messagebox, ttk
 
 from .palette import label as yarn_label
 from .project import EXTENSION, Project
-from .widgets import value_tip
+from .widgets import BG, SMALL_FONT, UI_FONT, swatch_image, value_tip
 
-BG = "#ECECEC"
-UI_FONT = ("Segoe UI", 10)
-SMALL = ("Segoe UI", 9)
 CONFLICT_ROWS = 6   # conflict rows shown before the list scrolls
-
-
-def _swatch(hex_, w=18, h=14):
-    img = tk.PhotoImage(width=w, height=h)
-    img.put("#888888", to=(0, 0, w, h))
-    img.put(hex_, to=(1, 1, w - 1, h - 1))
-    return img
 
 
 def _names(items, most=4):
@@ -63,7 +53,7 @@ class CarryDialog(tk.Toplevel):
         # Everything below has a fixed size, so the dialog and its buttons stay put as
         # projects are added: two lines each for the summary and details, and room for the
         # conflict and missing-yarn sections even while they're empty.
-        bold, small = tkfont.Font(font=("Segoe UI", 10, "bold")), tkfont.Font(font=SMALL)
+        bold, small = tkfont.Font(font=("Segoe UI", 10, "bold")), tkfont.Font(font=SMALL_FONT)
         text = tk.Frame(self, bg=BG, height=2 * bold.metrics("linespace")
                         + 2 * small.metrics("linespace") + 4)
         text.pack(fill="x", pady=(10, 0))
@@ -71,7 +61,7 @@ class CarryDialog(tk.Toplevel):
         self.summary = tk.Label(text, bg=BG, font=("Segoe UI", 10, "bold"), justify="left",
                                 anchor="w", wraplength=520)
         self.summary.pack(fill="x")
-        self.details = tk.Label(text, bg=BG, font=SMALL, fg="#555", justify="left", anchor="w",
+        self.details = tk.Label(text, bg=BG, font=SMALL_FONT, fg="#555", justify="left", anchor="w",
                                 wraplength=520)
         self.details.pack(fill="x")
         self.area = tk.Frame(self, bg=BG, width=520)
@@ -185,7 +175,7 @@ class CarryDialog(tk.Toplevel):
         conflicts = [h for h, opts in self.options.items() if len(opts) > 1]
         for row, hex_ in enumerate(conflicts):
             opts = self.options[hex_]
-            img = _swatch(hex_)
+            img = swatch_image([hex_], w=18, h=14)
             self.images.append(img)
             tk.Label(self.conflict_rows, image=img, bg=BG).grid(row=row, column=0, padx=(0, 6),
                                                                 pady=2)

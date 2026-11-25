@@ -1,7 +1,6 @@
 """Latchwork main window: the comparison view (target next to a yarn), menus and keys, and what
 ties the project sidebar, palettes and exports together. Run:  python latchwork.py
 """
-import json
 import os
 import re
 import sys
@@ -20,59 +19,12 @@ from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
 from .project_panel import ProjectPanel
-from .widgets import (ColorPanel, FitText, StatCard, Tooltip, describe_delta_L,
-                      free_name)
+from .settings import DATA_DIR, DEFAULT_PALETTE, ROOT, read_settings, write_settings
+from .widgets import (BG, UI_FONT, ColorPanel, FitText, StatCard, Tooltip,
+                      describe_delta_L, free_name)
 
-# src/latchwork/app.py -> the repository folder
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DATA_DIR = os.path.join(ROOT, "data")
-DEFAULT_PALETTE = os.path.join(DATA_DIR, "palette.csv")
 COMPARE_BAR_W = 140   # channel bars in the comparison at least; they grow with the window
-SETTINGS = os.path.join(ROOT, "settings", "latchwork_settings.json")  # per-user, not in git
-OLD_SETTINGS = os.path.join(ROOT, "latchwork_settings.json")          # before the data/ move
 
-
-def _migrate_settings():
-    """Move settings from the old repo-root location (before data/ and settings/ existed) and
-    point the old root palette.csv at data/palette.csv."""
-    if os.path.exists(SETTINGS) or not os.path.exists(OLD_SETTINGS):
-        return
-    try:
-        with open(OLD_SETTINGS, encoding="utf-8") as fh:
-            data = json.load(fh)
-    except (OSError, ValueError):
-        return
-    old = os.path.normcase(os.path.join(ROOT, "palette.csv"))
-
-    def fix(q):
-        return DEFAULT_PALETTE if isinstance(q, str) and os.path.normcase(q) == old else q
-    if isinstance(data, dict):
-        if "palette" in data:
-            data["palette"] = fix(data["palette"])
-        if isinstance(data.get("palettes"), list):
-            data["palettes"] = [fix(q) for q in data["palettes"]]
-        write_settings(data)
-        if os.path.exists(SETTINGS):
-            os.remove(OLD_SETTINGS)
-
-
-def read_settings():
-    _migrate_settings()
-    try:
-        with open(SETTINGS, encoding="utf-8") as fh:
-            data = json.load(fh)
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
-        return {}
-
-
-def write_settings(data):
-    try:
-        os.makedirs(os.path.dirname(SETTINGS), exist_ok=True)
-        with open(SETTINGS, "w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2)
-    except OSError:
-        pass  # remembering is a convenience; never fail over it
 
 
 def remembered_project():
@@ -154,8 +106,6 @@ def remembered_palette():
 
 NEIGHBORS = 4          # yarns shown on each side of the current one in the strip
 
-BG = "#ECECEC"
-UI_FONT = ("Segoe UI", 10)
 TITLE_FONT = ("Segoe UI", 18, "bold")
 
 
