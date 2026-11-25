@@ -870,12 +870,13 @@ class CanvasDialog(tk.Toplevel):
         self.configure(bg=BG, padx=16, pady=14)
         self.resizable(False, False)
         self.transient(parent)
-        self.vars, self.hints = {}, {}
+        self.vars, self.hints, entries = {}, {}, []
         for row, (key, text, hint) in enumerate(self.FIELDS):
             tk.Label(self, text=text, font=UI_FONT, bg=BG).grid(row=row, column=0, sticky="w",
                                                                 pady=3)
             v = tk.StringVar(value="%g" % values[key])
-            ttk.Entry(self, textvariable=v, width=7).grid(row=row, column=1, sticky="w", padx=8)
+            entries.append(ttk.Entry(self, textvariable=v, width=7))
+            entries[-1].grid(row=row, column=1, sticky="w", padx=8)
             # the hint doubles as the error line: it turns red with what's wrong
             self.hints[key] = tk.Label(self, text=hint, font=("Segoe UI", 9), bg=BG, fg="#777")
             self.hints[key].grid(row=row, column=2, sticky="w")
@@ -896,6 +897,8 @@ class CanvasDialog(tk.Toplevel):
         x = parent.winfo_rootx() + 40
         y = parent.winfo_rooty() + 200
         self.geometry("+%d+%d" % (x, y))
+        entries[0].focus_set()          # ready to type, like the other dialogs
+        entries[0].select_range(0, "end")
         self.grab_set()
         self.wait_window()
 

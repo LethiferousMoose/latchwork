@@ -175,6 +175,7 @@ class PaletteWindow(tk.Toplevel):
                       "Select several yarns (Ctrl+A for all shown) to set their brand at once. "
                       "Double-click to edit.").pack(fill="x", padx=12, pady=(6, 10))
         self.protocol("WM_DELETE_WINDOW", self.close)
+        self.bind("<Escape>", lambda e: self.close())
         self.refresh()
 
     # ---------- list ----------
@@ -589,6 +590,7 @@ class BrandsDialog(tk.Toplevel):
         self.bind("<Escape>", lambda e: self.destroy())
         self.refresh()
         center_on(self, win)
+        self.tree.focus_set()   # the arrow keys work in the list right away
         self.grab_set()
 
     def refresh(self, select=None):
@@ -1094,6 +1096,7 @@ class ImportDialog(tk.Toplevel):
         ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="right")
         self.ok = ttk.Button(btns, text="Import", command=self.accept)
         self.ok.pack(side="right", padx=6)
+        self.ok.lower()   # Tab reaches Import before Cancel, as they read
         self.bind("<Escape>", lambda e: self.destroy())
 
         self._updating = False
@@ -1112,6 +1115,7 @@ class ImportDialog(tk.Toplevel):
         self.update_rows()
         self.on_select()
         center_on(self, parent)
+        self.tree.focus_set()
         self.grab_set()
         self.wait_window()
 

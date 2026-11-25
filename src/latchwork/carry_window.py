@@ -109,6 +109,7 @@ class CarryDialog(tk.Toplevel):
         ttk.Button(self.btns, text=skip_text, command=self.destroy).pack(side="right")
         self.ok = ttk.Button(self.btns, text="Carry over", command=self.accept)
         self.ok.pack(side="right", padx=4)
+        self.ok.lower()   # Tab reaches Carry over before Skip/Cancel, as they read
         self.bind("<Return>", lambda e: self.accept())
         self.bind("<Escape>", lambda e: self.destroy())
 
