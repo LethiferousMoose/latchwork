@@ -57,7 +57,7 @@ Medium Brown (L 45.8, a +21.1, b +27.7): 5 darker, nearly the same color.
 Medium Brown wins. With weight 0 only ΔL² counts, and Delft Blue would win (0.2 against 25).
 
 # The ranking
-Every active yarn is scored and sorted: that list is the match ranking. The Match rank card shows where the yarn on screen sits in it; Next match (N) and Better match (B) walk down and up it, Home jumps back to #1.
+Every active yarn is scored and sorted: that list is the match ranking. The Match rank card shows where the yarn on screen sits in it and how many yarns match better; Next match (N) and Better match (B) walk down and up it, Home jumps back to #1.
 
 # Already used in this rug
 When the yarn on screen is already assigned (or carried over) to another color of this rug, a dark "Already used for" badge on the yarn lists those colors, and its tile in the strip below gets a dot. Two colors on one yarn become one color on the rug: fine for colors you want merged, worth a second look in a gradient. Suggestions don't count, and matching is unchanged.

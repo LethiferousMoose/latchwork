@@ -1490,8 +1490,9 @@ class App:
         self.yarn_panel.show(yarn.rgb, other=self.target)
         order = self.match_ranking()
         if order:
-            self.match_card.set("#%d" % (order.index(self.index) + 1),
-                                "best match" if order[0] == self.index else "B = better")
+            rank = order.index(self.index) + 1
+            above = "1 better match" if rank == 2 else "%d better matches" % (rank - 1)
+            self.match_card.set("#%d" % rank, "best match" if rank == 1 else above)
         else:
             self.match_card.set("\u2013", "", "#888")
         self.pos_card.set("%d of %d" % (self.index + 1, len(self.yarns)),
