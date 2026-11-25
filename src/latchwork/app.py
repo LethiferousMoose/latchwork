@@ -379,7 +379,9 @@ class App:
         self.palette_button.pack()
         self.palette_dropdown = tk.Menu(self.palette_button, tearoff=False)
         self.palette_button["menu"] = self.palette_dropdown
-        self.palette_info = tk.Label(bar, font=("Segoe UI", 9), bg=BG, fg="#777")
+        # a fixed width, so "Manage yarns…" stays put as the count changes
+        self.palette_info = tk.Label(bar, font=("Segoe UI", 9), bg=BG, fg="#777", width=17,
+                                     anchor="w")
         self.palette_info.pack(side="left")
         manage = tk.Label(bar, text="Manage yarns…", font=("Segoe UI", 9, "underline"),
                           bg=BG, fg="#1565C0", cursor="hand2")
@@ -1163,7 +1165,7 @@ class App:
             return
         i = next((k for k, y in enumerate(self.yarns) if y.rgb == rgb), None)
         if i is None:
-            self.yarn_panel.status.config(text="no yarn with this hex")
+            self.yarn_panel.status.config(text="no such yarn")
             return
         self.yarn_panel.status.config(text="")
         self.jump_to(i)

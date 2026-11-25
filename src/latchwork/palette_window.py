@@ -1082,8 +1082,9 @@ class ImportDialog(tk.Toplevel):
         self.name_entry.pack(side="left")
         self.name_var.trace_add("write", lambda *_: self.set_name())
 
-        self.problems = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020", anchor="w",
-                                 justify="left", wraplength=820)
+        # three lines, always: the table and the controls above stay put as problems come and go
+        self.problems = tk.Label(self, font=UI_FONT, bg=BG, fg="#B00020", anchor="nw",
+                                 justify="left", height=3)
         self.problems.pack(fill="x", pady=(8, 0))
         btns = tk.Frame(self, bg=BG)
         btns.pack(fill="x", pady=(8, 0))
@@ -1123,8 +1124,9 @@ class ImportDialog(tk.Toplevel):
             self.tree.set(str(i), "action", label)
         problems = pal.import_problems(self.bank, self.items)
         self.draw_badges(problems)
-        self.problems.config(text="\n".join(problems[:4]) + (
-            "\n... and %d more" % (len(problems) - 4) if len(problems) > 4 else ""))
+        shown = problems if len(problems) <= 3 else problems[:2] + [
+            "... and %d more" % (len(problems) - 2)]
+        self.problems.config(text="\n".join(shown))
         self.ok.state(["disabled"] if problems else ["!disabled"])
 
     # (outcome key, label, text/outline color, fill)

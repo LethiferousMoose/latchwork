@@ -168,14 +168,16 @@ class ProjectPanel(tk.Frame):
         self.progress.pack(side="right")
         info = tk.Frame(tab, bg=BG)
         info.pack(side="bottom", fill="x", pady=(8, 0))
-        self.info_swatch = tk.Label(info, bg=BG)
+        self._no_pair = tk.PhotoImage(width=40, height=16)   # keeps the text in place
+        self.info_swatch = tk.Label(info, bg=BG, image=self._no_pair)
         self.info_swatch.pack(side="left", padx=(2, 10))
         text = tk.Frame(info, bg=BG)
         text.pack(side="left", fill="x", expand=True)
         self.info_title = tk.Label(text, font=("Segoe UI", 10, "bold"), bg=BG, anchor="w")
         self.info_title.pack(fill="x")
-        self.info_sub = tk.Label(text, font=("Segoe UI", 9), bg=BG, fg="#666", anchor="w",
-                                 justify="left", wraplength=IMG_W - 70)
+        # always two lines high, so the list above doesn't jump as the text changes
+        self.info_sub = tk.Label(text, font=("Segoe UI", 9), bg=BG, fg="#666", anchor="nw",
+                                 justify="left", wraplength=IMG_W - 70, height=2)
         self.info_sub.pack(fill="x")
 
         body = tk.Frame(tab, bg=BG)
@@ -383,7 +385,7 @@ class ProjectPanel(tk.Frame):
         self.progress.config(text="%d / %d assigned" % (p.assigned_count, len(p.colors)))
         c = p.entry(self.selected_hex()) if self.selected_hex() else None
         if c is None:
-            self.info_swatch.config(image="")
+            self.info_swatch.config(image=self._no_pair)
             self.info_title.config(text="No color selected")
             self.info_sub.config(text="Pick a color in the list or click the image, then step "
                                       "through yarns and press Assign (A).")

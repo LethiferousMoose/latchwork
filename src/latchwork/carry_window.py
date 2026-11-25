@@ -1,6 +1,7 @@
 """Carry over assignments: give a project the yarns earlier projects used for the same hex."""
 import os
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import filedialog, messagebox, ttk
 
 from .palette import label as yarn_label
@@ -58,15 +59,26 @@ class CarryDialog(tk.Toplevel):
         ttk.Button(side, text="Add project...", width=14, command=self.add).pack(pady=(0, 4))
         ttk.Button(side, text="Remove", width=14, command=self.remove).pack()
 
-        self.summary = tk.Label(self, bg=BG, font=("Segoe UI", 10, "bold"), justify="left",
+        # Everything below has a fixed size, so the dialog and its buttons stay put as
+        # projects are added: two lines each for the summary and details, and room for the
+        # conflict and missing-yarn sections even while they're empty.
+        bold, small = tkfont.Font(font=("Segoe UI", 10, "bold")), tkfont.Font(font=SMALL)
+        text = tk.Frame(self, bg=BG, height=2 * bold.metrics("linespace")
+                        + 2 * small.metrics("linespace") + 4)
+        text.pack(fill="x", pady=(10, 0))
+        text.pack_propagate(False)
+        self.summary = tk.Label(text, bg=BG, font=("Segoe UI", 10, "bold"), justify="left",
                                 anchor="w", wraplength=520)
-        self.summary.pack(fill="x", pady=(10, 0))
-        self.details = tk.Label(self, bg=BG, font=SMALL, fg="#555", justify="left", anchor="w",
+        self.summary.pack(fill="x")
+        self.details = tk.Label(text, bg=BG, font=SMALL, fg="#555", justify="left", anchor="w",
                                 wraplength=520)
         self.details.pack(fill="x")
+        self.area = tk.Frame(self, bg=BG, width=520)
+        self.area.pack(fill="x")
+        self.area.pack_propagate(False)
 
         # conflicts: the same hex got different yarns in different projects
-        self.conflict_box = tk.Frame(self, bg=BG)
+        self.conflict_box = tk.Frame(self.area, bg=BG)
         tk.Label(self.conflict_box, bg=BG, font=UI_FONT, anchor="w", justify="left",
                  wraplength=520, text="Different yarns for the same color. The newest project is "
                                       "picked; choose another if you like:").pack(fill="x")
@@ -81,9 +93,9 @@ class CarryDialog(tk.Toplevel):
         self.conflict_canvas.create_window(0, 0, window=self.conflict_rows, anchor="nw")
 
         # yarns that aren't in the active palette
-        self.missing_box = tk.Frame(self, bg=BG)
-        self.missing_text = tk.Label(self.missing_box, bg=BG, font=UI_FONT, anchor="w",
-                                     justify="left", wraplength=520)
+        self.missing_box = tk.Frame(self.area, bg=BG)
+        self.missing_text = tk.Label(self.missing_box, bg=BG, font=UI_FONT, anchor="nw",
+                                     justify="left", wraplength=520, height=2)
         self.missing_text.pack(fill="x")
         self.keep_missing = tk.BooleanVar(value=True)
         for value, text in ((True, "Keep them (assigned, as in the earlier project)"),
@@ -99,6 +111,7 @@ class CarryDialog(tk.Toplevel):
         self.bind("<Return>", lambda e: self.accept())
         self.bind("<Escape>", lambda e: self.destroy())
 
+        self.area.configure(height=self._area_height())
         for path in initial:
             self._add_path(path, quiet=True)
         self.rebuild()
@@ -107,6 +120,17 @@ class CarryDialog(tk.Toplevel):
         self.grab_set()
         self.focus_set()
         self.wait_window()
+
+    def _area_height(self):
+        """Room for the most conflict rows shown at once plus the missing-yarn section."""
+        probe = ttk.Combobox(self.conflict_rows, state="readonly", width=46)
+        probe.grid(row=0, column=2, pady=2)
+        self.update_idletasks()
+        row_h = probe.winfo_reqheight() + 4
+        probe.destroy()
+        heading = self.conflict_box.winfo_children()[0].winfo_reqheight()
+        return (10 + heading + 4 + CONFLICT_ROWS * row_h
+                + 10 + self.missing_box.winfo_reqheight())
 
     # ---------- sources ----------
     def _add_path(self, path, quiet=False):
@@ -186,7 +210,10 @@ class CarryDialog(tk.Toplevel):
                 self.conflict_scroll.pack(side="left", fill="y")
             else:
                 self.conflict_scroll.pack_forget()
-            self.conflict_box.pack(fill="x", pady=(10, 0), before=self.btns)
+            if self.missing_box.winfo_manager():
+                self.conflict_box.pack(fill="x", pady=(10, 0), before=self.missing_box)
+            else:
+                self.conflict_box.pack(fill="x", pady=(10, 0))
         else:
             self.conflict_box.pack_forget()
         self.update_view()
@@ -216,7 +243,7 @@ class CarryDialog(tk.Toplevel):
             self.missing_text.config(text="%d carried-over yarn%s %s in the active palette: %s."
                                      % (len(names), "" if len(names) == 1 else "s",
                                         "isn't" if len(names) == 1 else "aren't", _names(names)))
-            self.missing_box.pack(fill="x", pady=(10, 0), before=self.btns)
+            self.missing_box.pack(fill="x", pady=(10, 0))
         else:
             self.missing_box.pack_forget()
         if not self.sources:

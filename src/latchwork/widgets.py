@@ -268,8 +268,10 @@ class ColorPanel(tk.Frame):
         self.entry.grid(row=0, column=1, padx=8)
         if on_copy:
             ttk.Button(html, text="Copy", width=6, command=on_copy).grid(row=0, column=2)
-        self.status = tk.Label(html, text="", font=("Segoe UI", 9), bg=PANEL_BG, fg="#B00020")
-        self.status.grid(row=0, column=3, sticky="w", padx=4)
+        # width=1: the message uses the room that's there and never widens the panel
+        self.status = tk.Label(html, text="", font=("Segoe UI", 9), bg=PANEL_BG, fg="#B00020",
+                               width=1, anchor="w")
+        self.status.grid(row=0, column=3, sticky="ew", padx=4)
         self.note = None
         if note is not None:
             self.note = FieldNote(html, PANEL_BG, note)
