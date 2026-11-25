@@ -85,8 +85,9 @@ class CarryDialog(tk.Toplevel):
 
         # yarns that aren't in the active palette
         self.missing_box = tk.Frame(self.area, bg=BG)
+        # three lines: up to four yarn names with brands, then "and N more"
         self.missing_text = tk.Label(self.missing_box, bg=BG, font=UI_FONT, anchor="nw",
-                                     justify="left", wraplength=520, height=2)
+                                     justify="left", wraplength=520, height=3)
         self.missing_text.pack(fill="x")
         self.keep_missing = tk.BooleanVar(value=True)
         for value, text in ((True, "Keep them (assigned, as in the earlier project)"),
