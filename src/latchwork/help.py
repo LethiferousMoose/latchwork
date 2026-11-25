@@ -122,7 +122,7 @@ Palette → Manage yarns (Ctrl+P) edits the active palette. Changes save immedia
 - Retire hides a yarn from matching but keeps it (e.g. discontinued). Delete is for mistakes.
 - Import (CSV or GIMP .gpl) always merges: nothing is removed, and a summary is shown before anything changes.
 - Selecting a yarn in the manager shows it in the main view.
-- Click a column heading to sort by it, again to reverse, a third time for the palette order (lightest first). The manager remembers its sort.
+- Click a column heading to sort by it, again to reverse, a third time for the palette order (lightest first). The manager and the Brands list remember their sort.
 - A yarn can have a photo (PNG or GIF): click the photo spot in the Add or Edit window (or Choose…). Next to it are the photo's average and the color it suggests; copy a hex code into HTML notation to use it. Nothing is saved until you press Save.
 - Choosing a photo while adding a yarn fills in its name (from the file name) and the suggested color, if those are still empty.
 

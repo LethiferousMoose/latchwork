@@ -47,6 +47,25 @@ def iid(yarn):
     return "\x1f".join(yarn.key)
 
 
+def saved_sort(app, key, sort):
+    """A table's sort from last time ([column, descending]), or None for its default order."""
+    if not app.remember:
+        return None
+    from .app import read_settings
+    state = read_settings().get(key)
+    ok = isinstance(state, list) and len(state) == 2 and state[0] in sort.keys
+    return [state[0], bool(state[1])] if ok else None
+
+
+def keep_sort(app, key, state):
+    """A heading was clicked: remember the order for next time (like the window size)."""
+    if app.remember:
+        from .app import read_settings, write_settings
+        settings = read_settings()
+        settings[key] = state
+        write_settings(settings)
+
+
 NO_BRAND = "(no brand)"   # the yarn dialog's choice for a yarn without one
 
 
@@ -116,9 +135,8 @@ class PaletteWindow(tk.Toplevel):
             "pack": (lambda i: pal.effective_pack(y(i), self.app.brands) or 0, True),
             "photo": (lambda i: photo_rank[self.tree.set(i, "photo")], False),
             "status": (lambda i: y(i).retired, True),
-        }, default=lambda i: self._order[i], on_change=self._sort_changed)
-        if app.remember:
-            self.sort.state = self._saved_sort()
+        }, default=lambda i: self._order[i], on_change=lambda st: keep_sort(app, "palette_sort", st))
+        self.sort.state = saved_sort(app, "palette_sort", self.sort)
         sb = ttk.Scrollbar(body, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -159,20 +177,6 @@ class PaletteWindow(tk.Toplevel):
         self.refresh()
 
     # ---------- list ----------
-    def _saved_sort(self):
-        from .app import read_settings
-        state = read_settings().get("palette_sort")
-        ok = isinstance(state, list) and len(state) == 2 and state[0] in self.sort.keys
-        return [state[0], bool(state[1])] if ok else None
-
-    def _sort_changed(self, state):
-        """A heading was clicked: remember the order for next time (like the window size)."""
-        if self.app.remember:
-            from .app import read_settings, write_settings
-            settings = read_settings()
-            settings["palette_sort"] = state
-            write_settings(settings)
-
     def selected(self):
         by_id = {iid(y): y for y in self.app.bank}
         return [by_id[i] for i in self.tree.selection() if i in by_id]
@@ -560,6 +564,15 @@ class BrandsDialog(tk.Toplevel):
                                          ("yarns", "Yarns", 60, "e")):
             self.tree.heading(col, text=text, anchor="w" if col != "yarns" else "e")
             self.tree.column(col, width=width, anchor=anchor, stretch=(col == "#0"))
+        # Sortable like the yarn table; the default is the palette's brand order.
+        brand = lambda i: pal.brand_by_key(self.app.brands, i)
+        self.sort = TreeSort(self.tree, {
+            "#0": (lambda i: brand(i).name.lower(), False),
+            "pack": (lambda i: brand(i).pack or 0, True),
+            "yarns": (lambda i: int(self.tree.set(i, "yarns")), True),
+        }, default=lambda i: self._order[i], on_change=lambda st: keep_sort(self.app, "brands_sort", st))
+        self.sort.state = saved_sort(self.app, "brands_sort", self.sort)
+        self._order = {}
         self.tree.pack(side="left", fill="both", expand=True)
         self.tree.bind("<Double-1>", lambda e: self.edit())
         self.tree.bind("<<TreeviewSelect>>", lambda e: self.on_select())
@@ -578,10 +591,13 @@ class BrandsDialog(tk.Toplevel):
 
     def refresh(self, select=None):
         self.tree.delete(*self.tree.get_children())
-        for b in self.app.brands:
+        self._order = {}
+        for i, b in enumerate(self.app.brands):
             n = sum(1 for y in self.app.bank if y.key[1] == b.key)
             self.tree.insert("", "end", iid=b.key, text="  " + b.name,
                              values=(str(b.pack) if b.pack else "cut", n))
+            self._order[b.key] = i
+        self.sort.apply()
         if select and self.tree.exists(select):
             self.tree.selection_set(select)
         self.on_select()

@@ -320,8 +320,10 @@ canvas defaults for new projects, and window sizes and places (`windows`: the ma
 maximized or not, the palette manager and the larger view), and the palette manager's
 table sort (`palette_sort`: `[column, descending]`, or absent/null for the palette's own
 order, lightest first; headings work like the project tables', L's first click darkest
-first, Pack largest first, Status retired first). A saved place whose title bar is
-no longer on any screen (a monitor unplugged) is ignored, and the default size is used.
+first, Pack largest first, Status retired first), and the same for the Brands list
+(`brands_sort`; default the palette's brand order, Pack and Yarns largest first). A saved
+place whose title bar is no longer on any screen (a monitor unplugged) is ignored, and the
+default size is used.
 
 ## Future possibilities
 
