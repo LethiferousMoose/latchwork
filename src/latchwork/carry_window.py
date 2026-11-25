@@ -1,4 +1,5 @@
 """Carry over assignments: give a project the yarns earlier projects used for the same hex."""
+import datetime
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -17,6 +18,26 @@ def _names(items, most=4):
     if len(items) > most:
         return "%s and %d more" % (", ".join(items[:most]), len(items) - most)
     return " and ".join(filter(None, [", ".join(items[:-1]), items[-1] if items else ""]))
+
+
+def _thumbnail(img, box_w=48, box_h=32):
+    """A rug's image as a PhotoImage at a whole-number scale that fits the box, so pixel art
+    stays crisp; transparent pixels show the window background."""
+    w, h = img.width, img.height
+    photo = tk.PhotoImage(width=w, height=h)
+    rows = []
+    for y in range(h):
+        row = []
+        for r, g, b, a in img.pixels[y * w:(y + 1) * w]:
+            row.append("#%02x%02x%02x" % ((r, g, b) if a >= 128 else (236, 236, 236)))
+        rows.append("{" + " ".join(row) + "}")
+    photo.put(" ".join(rows))
+    zoom = min(box_w // w, box_h // h)
+    if zoom > 1:
+        return photo.zoom(zoom)
+    if zoom == 1:
+        return photo
+    return photo.subsample(max(-(-w // box_w), -(-h // box_h)))
 
 
 def _option_label(option):
@@ -46,7 +67,7 @@ class CarryDialog(tk.Toplevel):
         self.title("Carry over assignments")
         self.configure(bg=BG, padx=16, pady=14)
         self.minsize(600, 440)
-        self.geometry("720x540")
+        self.geometry("720x580")
         self.transient(parent)
 
         tk.Label(self, bg=BG, font=UI_FONT, justify="left", anchor="w",
@@ -55,9 +76,19 @@ class CarryDialog(tk.Toplevel):
                  wraplength=680).pack(fill="x")
         src = tk.Frame(self, bg=BG)
         src.pack(fill="x", pady=(10, 0))
-        self.listbox = tk.Listbox(src, height=3, font=UI_FONT, activestyle="none",
-                                  exportselection=False)
-        self.listbox.pack(side="left", fill="x", expand=True)
+        # earlier projects, newest first (the newest one's yarn is picked in a conflict)
+        ttk.Style(self).configure("Projects.Treeview", rowheight=36)
+        self.project_tree = ttk.Treeview(src, columns=("assigned", "carried", "date"), height=3,
+                                         style="Projects.Treeview", selectmode="browse")
+        for col, text, width, anchor in (("#0", "Project", 250, "w"),
+                                         ("assigned", "Assigned", 80, "center"),
+                                         ("carried", "Carried over", 100, "center"),
+                                         ("date", "Date", 110, "w")):
+            self.project_tree.heading(col, text=text, anchor=anchor)
+            self.project_tree.column(col, width=width, minwidth=50, anchor=anchor,
+                                     stretch=(col == "#0"))
+        vscroll(src, self.project_tree)
+        self.thumbs = {}
         side = tk.Frame(src, bg=BG)
         side.pack(side="left", anchor="n", padx=(8, 0))
         ttk.Button(side, text="Add project...", width=14, command=self.add).pack(pady=(0, 4))
@@ -157,9 +188,9 @@ class CarryDialog(tk.Toplevel):
         self.rebuild()
 
     def remove(self):
-        sel = self.listbox.curselection()
+        sel = self.project_tree.selection()
         if sel:
-            del self.sources[sel[0]]
+            self.sources = [s for s in self.sources if s[0] != sel[0]]
             self.rebuild()
 
     # ---------- table ----------
@@ -167,10 +198,16 @@ class CarryDialog(tk.Toplevel):
         """Sources changed: recompute the options and refill the table (choices made for a
         color are kept while that yarn is still offered)."""
         self.sources.sort(key=lambda s: -s[3])    # newest (last saved) first
-        self.listbox.delete(0, "end")
-        for _, name, src, _ in self.sources:
-            n = sum(1 for c in src.colors if c.confirmed)
-            self.listbox.insert("end", "%s   (%d assigned)" % (name, n))
+        self.project_tree.delete(*self.project_tree.get_children())
+        for path, name, src, mtime in self.sources:
+            if path not in self.thumbs:
+                self.thumbs[path] = _thumbnail(src.image)
+            date = datetime.datetime.fromtimestamp(mtime)
+            self.project_tree.insert("", "end", iid=path, text="  " + name,
+                                     image=self.thumbs[path],
+                                     values=(sum(1 for c in src.colors if c.confirmed), 0,
+                                             "%s %d, %d" % (date.strftime("%b"), date.day,
+                                                            date.year)))
         old = {h: _option_label(self.options[h][i]) for h, i in self.pick.items()
                if h in self.options}
         self.options = self.project.carry_options([(n, s) for _, n, s, _ in self.sources])
@@ -277,6 +314,8 @@ class CarryDialog(tk.Toplevel):
         if missing and not self.keep_missing.get():
             picks = [t for t in picks if t[0] not in set(missing)]
         self.final = picks
+        for path, name, _, _ in self.sources:   # how many colors each project gives
+            self.project_tree.set(path, "carried", sum(1 for t in picks if t[2] == name))
         total = len(p.colors)
         already = sum(1 for c in p.colors if c.confirmed)
         new = total - already - len(self.options)
