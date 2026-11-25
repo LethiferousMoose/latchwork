@@ -371,8 +371,12 @@ class App:
         bar = tk.Frame(self.main, bg=BG)
         bar.pack(side="top", fill="x", padx=16, pady=(10, 0))
         tk.Label(bar, text="Palette", font=UI_FONT, bg=BG, fg="#555").pack(side="left")
-        self.palette_button = ttk.Menubutton(bar, text="", width=26)
-        self.palette_button.pack(side="left", padx=(6, 8))
+        # The vista theme draws a Menubutton grey on grey with no border; a 1 px frame makes
+        # it read as a control rather than a disabled label.
+        edge = tk.Frame(bar, bg="#7A7A7A", padx=1, pady=1)
+        edge.pack(side="left", padx=(6, 8))
+        self.palette_button = ttk.Menubutton(edge, text="", width=26)
+        self.palette_button.pack()
         self.palette_dropdown = tk.Menu(self.palette_button, tearoff=False)
         self.palette_button["menu"] = self.palette_dropdown
         self.palette_info = tk.Label(bar, font=("Segoe UI", 9), bg=BG, fg="#777")

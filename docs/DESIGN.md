@@ -317,7 +317,10 @@ list, the last project (reopened at start), the recent projects (File > Open rec
 8 opened or created, most recent first; a missing one offers to come off the list instead of
 being dropped silently, since it may be on a drive that isn't connected), the color weight,
 canvas defaults for new projects, and window sizes and places (`windows`: the main window,
-maximized or not, the palette manager and the larger view). A saved place whose title bar is
+maximized or not, the palette manager and the larger view), and the palette manager's
+table sort (`palette_sort`: `[column, descending]`, or absent/null for the palette's own
+order, lightest first; headings work like the project tables', L's first click darkest
+first, Pack largest first, Status retired first). A saved place whose title bar is
 no longer on any screen (a monitor unplugged) is ignored, and the default size is used.
 
 ## Future possibilities

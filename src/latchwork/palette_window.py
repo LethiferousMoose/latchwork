@@ -8,7 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 from . import palette as pal
 from . import photos
 from .colormath import SWATCH_L_OFFSET, SWATCH_L_SCALE, lightness, parse_hex, to_hex
-from .widgets import (ColorPanel, FieldNote, Tooltip, free_name, required_label,
+from .widgets import (ColorPanel, FieldNote, Tooltip, TreeSort, free_name, required_label,
                       required_legend)
 
 BG = "#ECECEC"
@@ -102,6 +102,23 @@ class PaletteWindow(tk.Toplevel):
             self.tree.column(col, width=width, minwidth=40, anchor=anchor,
                              stretch=(col == "status"))
         self.tree.tag_configure("retired", foreground="#999999")
+        # Clickable headings, as in the project tables. The default order is the palette's,
+        # lightest first, so L's first click shows darkest first.
+        self._rows = {}     # tree row id -> yarn, refilled by refresh()
+        self._order = {}    # tree row id -> place in the default order
+        y = lambda i: self._rows[i]
+        photo_rank = {"yes": 0, "missing": 1, "": 2}
+        self.sort = TreeSort(self.tree, {
+            "#0": (lambda i: y(i).key, False),
+            "hex": (lambda i: y(i).hex.lower(), False),
+            "L": (lambda i: y(i).L, False),
+            "brand": (lambda i: (not y(i).brand, y(i).brand.lower()), False),
+            "pack": (lambda i: pal.effective_pack(y(i), self.app.brands) or 0, True),
+            "photo": (lambda i: photo_rank[self.tree.set(i, "photo")], False),
+            "status": (lambda i: y(i).retired, True),
+        }, default=lambda i: self._order[i], on_change=self._sort_changed)
+        if app.remember:
+            self.sort.state = self._saved_sort()
         sb = ttk.Scrollbar(body, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -142,6 +159,20 @@ class PaletteWindow(tk.Toplevel):
         self.refresh()
 
     # ---------- list ----------
+    def _saved_sort(self):
+        from .app import read_settings
+        state = read_settings().get("palette_sort")
+        ok = isinstance(state, list) and len(state) == 2 and state[0] in self.sort.keys
+        return [state[0], bool(state[1])] if ok else None
+
+    def _sort_changed(self, state):
+        """A heading was clicked: remember the order for next time (like the window size)."""
+        if self.app.remember:
+            from .app import read_settings, write_settings
+            settings = read_settings()
+            settings["palette_sort"] = state
+            write_settings(settings)
+
     def selected(self):
         by_id = {iid(y): y for y in self.app.bank}
         return [by_id[i] for i in self.tree.selection() if i in by_id]
@@ -160,6 +191,7 @@ class PaletteWindow(tk.Toplevel):
         self.tree.delete(*self.tree.get_children())
         needle = pal.name_key(self.find_var.get())
         shown = 0
+        self._rows, self._order = {}, {}
         for y in pal.sort_yarns(self.app.bank):
             if y.retired and not self.show_retired.get():
                 continue
@@ -172,7 +204,10 @@ class PaletteWindow(tk.Toplevel):
                              values=(y.hex, "%.1f" % y.L, y.brand or "–", self.pack_cell(y),
                                      self.photo_cell(y), "retired" if y.retired else ""),
                              tags=("retired",) if y.retired else ())
+            self._rows[iid(y)] = y
+            self._order[iid(y)] = shown
             shown += 1
+        self.sort.apply()
         sel = [s for s in keep if self.tree.exists(s)]
         if sel:
             self.tree.selection_set(sel)
