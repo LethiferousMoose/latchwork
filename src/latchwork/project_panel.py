@@ -359,8 +359,11 @@ class ProjectPanel(tk.Frame):
     def size_columns(self):
         """Color, Count and status fit their contents; Yarn takes the rest (scrolls if long)."""
         t = self.tree
+        # Status always has room for its longest text, so marking a candidate (the star)
+        # or carrying a color over never resizes the table.
         _fit_columns(t, {"#0": (64, None), "count": (14, None),
-                         "yarn": (16, self._italic), "state": (14, self._italic)})
+                         "yarn": (16, self._italic),
+                         "state": (14, self._italic, ["carried over \u26059"])})
         # Yarn takes exactly the leftover width (no stretch), so the total never overshoots
         # the visible area by a few pixels and the horizontal scrollbar only moves when a
         # name really doesn't fit.
@@ -945,14 +948,16 @@ TREE_BORDER = 4   # px the Treeview's frame takes from its width
 
 
 def _fit_columns(tree, spec):
-    """Size columns to their widest cell or heading. spec: {col: (padding px, font or None)};
-    the tree column (#0) padding should include the indent and row image."""
+    """Size columns to their widest cell or heading. spec: {col: (padding px, font or None[,
+    texts to always leave room for])}; the tree column (#0) padding should include the indent
+    and row image."""
     base = tkfont.nametofont("TkDefaultFont")
     head = tkfont.nametofont("TkHeadingFont")
     items = tree.get_children()
-    for col, (pad, font) in spec.items():
+    for col, (pad, font, *room) in spec.items():
         f = font or base
         texts = [tree.item(i, "text") if col == "#0" else str(tree.set(i, col)) for i in items]
+        texts += room[0] if room else []
         widest = max([f.measure(t) + pad for t in texts] +
                      [head.measure(tree.heading(col, "text").rstrip(" \u25b2\u25bc") + " \u25bc") + 14])
         tree.column(col, width=widest, minwidth=widest)
