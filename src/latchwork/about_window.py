@@ -1,18 +1,17 @@
-"""Help > About Latchwork: version, build, Python and Tk, where files are, the repository."""
+"""Help > About Latchwork: version, build, Python and Tk, the repository."""
 import platform
 import tkinter as tk
 import webbrowser
 from tkinter import ttk
 
-from . import settings as st
 from .version import REPO_URL, VERSION, build
-from .widgets import BG, SMALL_FONT, UI_FONT, FitText
+from .widgets import BG, SMALL_FONT, UI_FONT
 
 LICENSE = "MIT License, © 2026 Tim Biggin"
 
 
 class AboutDialog(tk.Toplevel):
-    def __init__(self, parent, palette_path=None):
+    def __init__(self, parent):
         super().__init__(parent)
         self.title("About Latchwork")
         self.configure(bg=BG, padx=20, pady=16)
@@ -28,20 +27,15 @@ class AboutDialog(tk.Toplevel):
         tk.Label(self, text="Latch-hook rug planning from pixel art.", font=UI_FONT, bg=BG,
                  anchor="w").pack(fill="x", pady=(10, 0))
 
-        grid = tk.Frame(self, bg=BG, width=440)
+        grid = tk.Frame(self, bg=BG)
         grid.pack(fill="x", pady=(10, 0))
-        grid.columnconfigure(1, weight=1, minsize=360)
         rows = [("Python", "%s (%s)" % (platform.python_version(), platform.system())),
-                ("Tk", str(self.tk.call("info", "patchlevel"))),
-                ("Palette", palette_path or "none open"),
-                ("Settings", st.SETTINGS)]
+                ("Tk", str(self.tk.call("info", "patchlevel")))]
         for r, (name, value) in enumerate(rows):
             tk.Label(grid, text=name, font=UI_FONT, fg="#555", bg=BG,
                      anchor="w").grid(row=r, column=0, sticky="w", padx=(0, 12))
-            # width=1: a long path is cut with "..." (whole on hover) instead of widening this
-            value_label = tk.Label(grid, font=UI_FONT, bg=BG, anchor="w", width=1)
-            value_label.grid(row=r, column=1, sticky="ew")
-            FitText(value_label).set(value)
+            tk.Label(grid, text=value, font=UI_FONT, bg=BG, anchor="w").grid(row=r, column=1,
+                                                                            sticky="w")
 
         link = tk.Label(self, text=REPO_URL.split("://", 1)[1], font=UI_FONT + ("underline",),
                         fg="#0B5FB0", bg=BG, cursor="hand2", anchor="w")

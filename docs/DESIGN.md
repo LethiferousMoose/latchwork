@@ -353,8 +353,7 @@ default size is used.
 - Help > About shows the version and the build: a packaged build reads `_build.py` (commit and
   date, written by the build, git-ignored); from source it asks git for the commit and whether
   there are local changes, else just "From source". Also Python and Tk versions (for bug
-  reports), the palette and settings paths (cut with "…", whole on hover), the repository
-  link and the license.
+  reports), the repository link and the license.
 - A packaged build is a portable folder laid out like the repository: `data/` and
   `settings/` sit next to the program (`settings.app_folder()`; on macOS next to
   Latchwork.app), so nothing about where files live differs from running from source.

@@ -315,7 +315,7 @@ class App:
                                   command=lambda t=topic: open_help(self.root, t))
         help_menu.add_separator()
         help_menu.add_command(label="About Latchwork",
-                              command=lambda: AboutDialog(self.root, self.palette_path))
+                              command=lambda: AboutDialog(self.root))
         bar.add_cascade(label="Help", menu=help_menu)
         self.root.config(menu=bar)
         self.root.bind("<F1>", lambda e: open_help(self.root))
