@@ -2,9 +2,24 @@
 and its data folder are."""
 import json
 import os
+import sys
 
-# src/latchwork/settings.py -> the repository folder
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def app_folder():
+    """The folder that holds data/ and settings/: the repository when running from source; next
+    to the program in a packaged (PyInstaller) build, which is a portable folder laid out like
+    the repository. On macOS that's the folder holding Latchwork.app."""
+    if getattr(sys, "frozen", False):
+        here = os.path.dirname(os.path.abspath(sys.executable))
+        marker = os.sep + os.path.join("Contents", "MacOS")
+        if here.endswith(marker) and here[:-len(marker)].endswith(".app"):
+            here = os.path.dirname(here[:-len(marker)])
+        return here
+    # src/latchwork/settings.py -> the repository folder
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+ROOT = app_folder()
 DATA_DIR = os.path.join(ROOT, "data")
 DEFAULT_PALETTE = os.path.join(DATA_DIR, "palette.csv")
 SETTINGS = os.path.join(ROOT, "settings", "latchwork_settings.json")  # per-user, not in git

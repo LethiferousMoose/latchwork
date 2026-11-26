@@ -22,6 +22,8 @@ Latchwork takes a pixel-art image to a finished latch-hook pattern:
 - File → Export pattern (Ctrl+E): a single HTML file for your phone or printer.
 
 Projects save automatically on every change. Edit → Undo (Ctrl+Z) takes back assignments.
+
+Help → About Latchwork shows the version and build, and where the palette and settings are stored.
 """),
     ("How matching works", """
 # How matching works

@@ -345,6 +345,20 @@ first, Pack largest first, Status retired first), and the same for the Brands li
 place whose title bar is no longer on any screen (a monitor unplugged) is ignored, and the
 default size is used.
 
+## Versions and builds (`version.py`, `about_window.py`)
+
+- `VERSION` in `version.py` is the one place the version lives (SemVer: features bump the
+  middle number, fixes the last, and the first only if older versions can't open new project
+  files). A release is tagged `v` + VERSION.
+- Help > About shows the version and the build: a packaged build reads `_build.py` (commit and
+  date, written by the build, git-ignored); from source it asks git for the commit and whether
+  there are local changes, else just "From source". Also Python and Tk versions (for bug
+  reports), the palette and settings paths (cut with "…", whole on hover), the repository
+  link and the license.
+- A packaged build is a portable folder laid out like the repository: `data/` and
+  `settings/` sit next to the program (`settings.app_folder()`; on macOS next to
+  Latchwork.app), so nothing about where files live differs from running from source.
+
 ## Future possibilities
 
 Not planned, but noted so the reasoning isn't lost:

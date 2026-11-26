@@ -14,13 +14,14 @@ from . import pixelart
 from . import plan as pl
 from .colormath import (DEFAULT_COLOR_WEIGHT, gray_for_lightness, match_order, parse_hex,
                        rgb_to_lab, rgb_to_lch, to_hex)
+from .about_window import AboutDialog
 from .carry_window import CarryDialog
 from .shared_window import SharedListDialog
 from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
 from .project_panel import ProjectPanel
-from .settings import DATA_DIR, DEFAULT_PALETTE, ROOT, read_settings, write_settings
+from .settings import DATA_DIR, DEFAULT_PALETTE, read_settings, write_settings
 from .widgets import (BG, UI_FONT, ColorPanel, FitText, StatCard, Tooltip,
                       describe_delta_L, free_name)
 
@@ -312,6 +313,9 @@ class App:
         for i, (topic, _) in enumerate(help_topics):
             help_menu.add_command(label=topic, accelerator="F1" if i == 0 else "",
                                   command=lambda t=topic: open_help(self.root, t))
+        help_menu.add_separator()
+        help_menu.add_command(label="About Latchwork",
+                              command=lambda: AboutDialog(self.root, self.palette_path))
         bar.add_cascade(label="Help", menu=help_menu)
         self.root.config(menu=bar)
         self.root.bind("<F1>", lambda e: open_help(self.root))
