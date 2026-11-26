@@ -1,13 +1,11 @@
 """Carry over assignments: give a project the yarns earlier projects used for the same hex."""
-import datetime
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import ttk
 
 from .palette import label as yarn_label
-from .project import EXTENSION, Project
-from .widgets import (BG, SMALL_FONT, UI_FONT, TreeSort, swatch_image, value_tip,
-                      vscroll)
+from .widgets import (BG, SMALL_FONT, UI_FONT, ProjectList, TreeSort, names, swatch_image,
+                      value_tip, vscroll)
 
 FROM = "From "   # "Yarn for selected" choice that takes every selected color's yarn from a project
 
@@ -65,7 +63,6 @@ class CarryDialog(tk.Toplevel):
         self.app, self.project = app, project
         self.result = None
         self.final = []
-        self.sources = []          # [(path, name, Project, mtime)], newest first
         self.options = {}          # hex -> [(source name, yarn snapshot)], newest first
         self.pick = {}             # hex -> index into its options
         self.images = {}
@@ -79,25 +76,16 @@ class CarryDialog(tk.Toplevel):
                  text="Colors with exactly the same hex as an assigned color in these projects get "
                       "the same yarn. Other colors are matched as usual.",
                  wraplength=680).pack(fill="x")
-        src = tk.Frame(self, bg=BG)
-        src.pack(fill="x", pady=(10, 0))
         # earlier projects, newest first (the newest one's yarn is picked in a conflict)
-        ttk.Style(self).configure("Projects.Treeview", rowheight=44)
-        self.project_tree = ttk.Treeview(src, columns=("assigned", "carried", "date"), height=3,
-                                         style="Projects.Treeview", selectmode="browse")
-        for col, text, width, anchor in (("#0", "Project", 250, "w"),
-                                         ("assigned", "Assigned", 80, "center"),
-                                         ("carried", "Carried over", 100, "center"),
-                                         ("date", "Date", 110, "w")):
-            self.project_tree.heading(col, text=text, anchor=anchor)
-            self.project_tree.column(col, width=width, minwidth=50, anchor=anchor,
-                                     stretch=(col == "#0"))
-        vscroll(src, self.project_tree)
-        self.thumbs = {}
-        side = tk.Frame(src, bg=BG)
-        side.pack(side="left", anchor="n", padx=(8, 0))
-        ttk.Button(side, text="Add project...", width=14, command=self.add).pack(pady=(0, 4))
-        ttk.Button(side, text="Remove", width=14, command=self.remove).pack()
+        src = self.projects = ProjectList(
+            self, [("assigned", "Assigned", 80), ("carried", "Carried over", 100)],
+            lambda p: (sum(1 for c in p.colors if c.confirmed), 0), self.rebuild,
+            "Carry over", "Carry over from which projects?",
+            initialdir=os.path.dirname(project.path or "") or None, exclude=project.path,
+            exclude_note="That's the project itself.")
+        src.pack(fill="x", pady=(10, 0))
+        self.sources = src.sources
+        self.project_tree = src.tree
 
         # bottom up, so the table takes whatever height is left
         self.btns = tk.Frame(self, bg=BG)
@@ -156,7 +144,8 @@ class CarryDialog(tk.Toplevel):
         self.bind("<Return>", lambda e: self.accept())
         self.bind("<Escape>", lambda e: self.destroy())
         for path in initial:
-            self._add_path(path, quiet=True)
+            src.add_path(path, quiet=True)
+        src.refresh()
         self.rebuild()
         self.update_idletasks()
         self.geometry("+%d+%d" % (parent.winfo_rootx() + 60, parent.winfo_rooty() + 60))
@@ -164,55 +153,11 @@ class CarryDialog(tk.Toplevel):
         self.tree.focus_set()
         self.wait_window()
 
-    # ---------- sources ----------
-    def _add_path(self, path, quiet=False):
-        norm = os.path.normcase(os.path.abspath(path))
-        if self.project.path and norm == os.path.normcase(os.path.abspath(self.project.path)):
-            if not quiet:
-                messagebox.showinfo("Carry over", "That's the project itself.", parent=self)
-            return
-        if any(os.path.normcase(os.path.abspath(p)) == norm for p, _, _, _ in self.sources):
-            return
-        try:
-            src = Project.load(path)
-            mtime = os.path.getmtime(path)
-        except (OSError, ValueError, KeyError, TypeError) as e:
-            if not quiet:
-                messagebox.showerror("Carry over", "Could not open %s\n\n%s" % (path, e),
-                                     parent=self)
-            return
-        self.sources.append((path, src.name, src, mtime))
-
-    def add(self):
-        paths = filedialog.askopenfilenames(
-            parent=self, title="Carry over from which projects?",
-            initialdir=os.path.dirname(self.project.path or "") or None,
-            filetypes=[("Latchwork project", "*" + EXTENSION), ("All files", "*.*")])
-        for path in paths:
-            self._add_path(path)
-        self.rebuild()
-
-    def remove(self):
-        sel = self.project_tree.selection()
-        if sel:
-            self.sources = [s for s in self.sources if s[0] != sel[0]]
-            self.rebuild()
-
     # ---------- table ----------
     def rebuild(self):
         """Sources changed: recompute the options and refill the table (choices made for a
         color are kept while that yarn is still offered)."""
-        self.sources.sort(key=lambda s: -s[3])    # newest (last saved) first
-        self.project_tree.delete(*self.project_tree.get_children())
-        for path, name, src, mtime in self.sources:
-            if path not in self.thumbs:
-                self.thumbs[path] = _thumbnail(src.image)
-            date = datetime.datetime.fromtimestamp(mtime)
-            self.project_tree.insert("", "end", iid=path, text="  " + name,
-                                     image=self.thumbs[path],
-                                     values=(sum(1 for c in src.colors if c.confirmed), 0,
-                                             "%s %d, %d" % (date.strftime("%b"), date.day,
-                                                            date.year)))
+        self.sources = self.projects.sources
         old = {h: _option_label(self.options[h][i]) for h, i in self.pick.items()
                if h in self.options}
         self.options = self.project.carry_options([(n, s) for _, n, s, _ in self.sources])
@@ -267,9 +212,9 @@ class CarryDialog(tk.Toplevel):
             self.choice_var.set(_option_label(opts[self.pick[sel[0]]]))
             many = len(opts) > 1
         elif sel:
-            names = [n for _, n, _, _ in self.sources
-                     if any(n == o[0] for h in sel for o in self.options[h])]
-            self.choice_box.config(values=[FROM + n for n in names])
+            offered = [n for _, n, _, _ in self.sources
+                       if any(n == o[0] for h in sel for o in self.options[h])]
+            self.choice_box.config(values=[FROM + n for n in offered])
             picked = {self.options[h][self.pick[h]][0] for h in sel}
             self.choice_var.set(FROM + picked.pop() if len(picked) == 1 else "")
             many = any(len(self.options[h]) > 1 for h in sel)
@@ -325,7 +270,7 @@ class CarryDialog(tk.Toplevel):
         already = sum(1 for c in p.colors if c.confirmed)
         new = total - already - len(self.options)
         self.summary.config(text="%d of %d colors carried over from %s, %d new." % (
-            len(picks), total, _names(n for _, n, _, _ in self.sources), new))
+            len(picks), total, names(n for _, n, _, _ in self.sources), new))
         parts = []
         if already:
             parts.append("%d already assigned here, left as they are" % already)

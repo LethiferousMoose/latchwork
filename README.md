@@ -74,6 +74,8 @@ first and tells you what's missing.
    </p>
 4. **Plan tab:** packs or pieces per yarn, finished size and canvas to cut. Canvas settings
    (holes per inch, borders) are per project under *Change…*.
+   Buying for several rugs at once? **File → Shared yarn list for several projects** adds up
+   what they need together (and exports it as CSV), so one pack can serve more than one rug.
 5. **File → Export pattern** (Ctrl+E) writes the HTML pattern. Copy it to your phone and open
    it in the browser. Turn on the row and column trackers to read one cell at a time, and press
    **Done** as you go: hooked cells fade, and the pattern keeps count of what's left.

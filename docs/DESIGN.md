@@ -252,6 +252,16 @@ A `.latchwork` file is readable JSON:
   and the note list the image colors.
 - Pre-cut yarn: `packs = ceil(knots × (1 + spare%) / pack size)`. Cut from skeins: the number of
   pieces. No skein estimates.
+- **Shared yarn list** (File, `SharedPlan`, `shared_window.py`): the yarns several projects
+  need together, for buying at once. The app stays one project at a time; this dialog only
+  reads the projects (the open one as it is in memory). Each project's count gets its own
+  spare % (so it agrees with that project's Plan tab), then the pieces are pooled per yarn and
+  rounded up to packs once: `packs = ceil(Σ ceil(knots × (1 + spare%)) / pack size)`, since one
+  pack's leftovers go into the next rug. The same yarn means the same name, brand and hex, as
+  within a Plan; the pack size is the open palette's (else the first project's snapshot).
+  Unassigned colors aren't counted and are named below the table. The CSV has the yarn list's
+  columns (without spare %, which differs per project) plus one column per project with its
+  pieces, a TOTAL row, and the projects (spare %, unassigned colors, size) at the bottom.
 - Canvas, per project (defaults: 3.75 holes per inch, borders 3 per side, 8 top, 4 bottom):
   - Finished size = image size ÷ holes per inch.
   - Canvas to cut = (width + 2 × side) × (height + top + bottom) holes. The defaults come from

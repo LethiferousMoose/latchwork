@@ -163,6 +163,100 @@ def write_yarn_list(plan, path):
         raise
 
 
+
+class SharedLine:
+    """One yarn across several projects: each project's pieces include its own spare %, then
+    they're pooled, so leftovers from one rug's pack go into the next."""
+
+    def __init__(self, line):
+        self.name, self.hex, self.palette = line.name, line.hex, line.palette
+        self.brand, self.pack = line.brand, line.pack
+        self.count = 0      # holes, without spare
+        self.per = {}       # project index -> pieces incl. that project's spare
+
+    @property
+    def label(self):
+        return label(self.name, self.brand)
+
+    @property
+    def pieces(self):
+        return sum(self.per.values())
+
+    def need(self):
+        """(total pieces incl. spare, packs or None, readable text), like YarnLine.need."""
+        n = self.pieces
+        if self.pack:
+            packs = math.ceil(n / self.pack)
+            return n, packs, "%d pack%s" % (packs, "" if packs == 1 else "s")
+        return n, None, "%s pieces" % format(n, ",")
+
+
+class SharedPlan:
+    """The yarns several projects need together. plans: [(project name, Plan)]. A yarn is the
+    same yarn when its name, brand and hex match (as within one Plan); its pack size is the
+    first project's (the open palette's when a resolve was given to the Plans)."""
+
+    def __init__(self, plans):
+        self.names = [n for n, _ in plans]
+        self.plans = [p for _, p in plans]
+        lines = {}
+        for i, plan in enumerate(self.plans):
+            for l in plan.lines:
+                key = (name_key(l.name), name_key(l.brand), l.hex)
+                shared = lines.get(key)
+                if shared is None:
+                    shared = lines[key] = SharedLine(l)
+                shared.count += l.count
+                shared.per[i] = shared.per.get(i, 0) + l.need(plan.spare)[0]
+        self.lines = sorted(lines.values(), key=lambda l: (-l.pieces, l.label.lower()))
+
+    @property
+    def total_packs(self):
+        return sum(l.need()[1] or 0 for l in self.lines)
+
+    @property
+    def total_pieces_to_cut(self):
+        return sum(l.pieces for l in self.lines if not l.pack)
+
+    @property
+    def unassigned(self):
+        """[(project name, colors not assigned)] for projects that have any."""
+        return [(n, len(p.unassigned)) for n, p in zip(self.names, self.plans) if p.unassigned]
+
+
+def write_shared_list(shared, path):
+    """The yarn-list CSV for several projects: the combined need, then one column per project
+    (its pieces including its spare %), and the projects at the bottom."""
+    folder = os.path.dirname(os.path.abspath(path))
+    fd, tmp = tempfile.mkstemp(prefix=".latchwork-", suffix=".tmp", dir=folder)
+    try:
+        with os.fdopen(fd, "w", newline="", encoding="utf-8-sig") as fh:
+            w = csv.writer(fh)
+            w.writerow(["yarn", "brand", "hex", "count", "count_with_spare", "pack_size", "packs",
+                        "pieces_to_cut", "palette"] + shared.names)
+            k = len(shared.names)
+            for l in shared.lines:
+                n, packs, _ = l.need()
+                w.writerow([l.name, l.brand, l.hex, l.count, n, l.pack or "",
+                            packs if packs is not None else "",
+                            "" if packs is not None else n, l.palette]
+                           + [l.per.get(i, "") for i in range(k)])
+            w.writerow([])
+            w.writerow(["TOTAL", "", "", sum(l.count for l in shared.lines),
+                        sum(l.pieces for l in shared.lines), "", shared.total_packs,
+                        shared.total_pieces_to_cut, ""]
+                       + [sum(l.per.get(i, 0) for l in shared.lines) for i in range(k)])
+            w.writerow([])
+            w.writerow(["project", "spare_percent", "unassigned_colors", "size"])
+            for name, plan in zip(shared.names, shared.plans):
+                w.writerow([name, "%g" % plan.spare, len(plan.unassigned),
+                            "%d x %d holes" % (plan.width, plan.height)])
+        os.replace(tmp, path)
+    except BaseException:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+        raise
+
 def preview_pixels(project):
     """Image pixels with each color replaced by its yarn: the assigned one, or the suggested one
     for unassigned colors. Colors with no yarn at all stay original."""

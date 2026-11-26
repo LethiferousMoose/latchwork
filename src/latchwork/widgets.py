@@ -1,11 +1,13 @@
 """Shared Tk widgets for Latchwork."""
+import datetime
 import math
 import os
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .colormath import lch_to_rgb, rgb_to_lch, to_hex
+from .project import EXTENSION, Project
 
 BAR_W, BAR_H = 240, 14  # channel gradient bars
 MARK_H = 7              # marker zone under each bar
@@ -447,6 +449,143 @@ class ColorPanel(tk.Frame):
         top = BAR_H + 1
         bar.create_polygon(x, top, x - 5, top + MARK_H - 1, x + 5, top + MARK_H - 1,
                            fill=fill, outline=outline, tags="marker")
+
+
+def names(items, most=4):
+    """'a', 'a and b', 'a, b and c', 'a, b, c, d and 2 more'."""
+    items = list(items)
+    if len(items) > most:
+        return "%s and %d more" % (", ".join(items[:most]), len(items) - most)
+    return " and ".join(filter(None, [", ".join(items[:-1]), items[-1] if items else ""]))
+
+
+def thumbnail(img, box_w=64, box_h=40):
+    """A rug's image at a whole-number scale (so pixel art stays crisp), centered in a fixed
+    box_w x box_h image so every row's name starts at the same place. Transparent pixels and
+    the rest of the box stay transparent."""
+    w, h = img.width, img.height
+    photo = tk.PhotoImage(width=w, height=h)
+    rows = []
+    for y in range(h):
+        rows.append("{" + " ".join("#%02x%02x%02x" % (r, g, b)
+                                   for r, g, b, _ in img.pixels[y * w:(y + 1) * w]) + "}")
+    photo.put(" ".join(rows))
+    for i, (_, _, _, a) in enumerate(img.pixels):
+        if a < 128:
+            photo.transparency_set(i % w, i // w, True)
+    zoom = min(box_w // w, box_h // h)
+    if zoom > 1:
+        photo = photo.zoom(zoom)
+    elif zoom < 1:
+        photo = photo.subsample(max(-(-w // box_w), -(-h // box_h)))
+    box = tk.PhotoImage(width=box_w, height=box_h)
+    box.tk.call(box, "copy", photo, "-to", (box_w - photo.width()) // 2,
+                (box_h - photo.height()) // 2)
+    return box
+
+
+def short_date(timestamp):
+    """'Nov 5, 2026'."""
+    d = datetime.datetime.fromtimestamp(timestamp)
+    return "%s %d, %d" % (d.strftime("%b"), d.day, d.year)
+
+
+class ProjectList(tk.Frame):
+    """A table of projects (thumbnail and name, the caller's columns, last saved date) with
+    Add project... and Remove beside it, newest first. Used by Carry over and the shared yarn
+    list.
+
+    columns: [(column, heading, width)] between Project and Date, filled by values(project);
+    on_change(): called after projects are added or removed; heading: the error dialogs' title;
+    exclude: a project path that can't be added (said with exclude_note)."""
+
+    def __init__(self, parent, columns, values, on_change, heading, ask_title,
+                 initialdir=None, exclude=None, exclude_note=""):
+        super().__init__(parent, bg=BG)
+        self.values, self.on_change, self.heading = values, on_change, heading
+        self.ask_title, self.initialdir = ask_title, initialdir
+        self.exclude, self.exclude_note = exclude and self._norm(exclude), exclude_note
+        self.sources = []          # [(path, name, Project, mtime)], newest first
+        self.thumbs = {}
+        ttk.Style(self).configure("Projects.Treeview", rowheight=44)
+        self.tree = ttk.Treeview(self, columns=[col for col, _, _ in columns] + ["date"],
+                                 height=3, style="Projects.Treeview", selectmode="browse")
+        for col, text, width, anchor in ([("#0", "Project", 250, "w")]
+                                         + [(c, t, wd, "center") for c, t, wd in columns]
+                                         + [("date", "Date", 110, "w")]):
+            self.tree.heading(col, text=text, anchor=anchor)
+            self.tree.column(col, width=width, minwidth=50, anchor=anchor,
+                             stretch=(col == "#0"))
+        vscroll(self, self.tree)
+        side = tk.Frame(self, bg=BG)
+        side.pack(side="left", anchor="n", padx=(8, 0))
+        ttk.Button(side, text="Add project...", width=14, command=self.add).pack(pady=(0, 4))
+        self.remove_button = ttk.Button(side, text="Remove", width=14, command=self.remove)
+        self.remove_button.pack()
+        self.tree.bind("<<TreeviewSelect>>", lambda e: self._remove_state())
+        self.tree.bind("<Delete>", lambda e: self.remove())
+
+    @staticmethod
+    def _norm(path):
+        return os.path.normcase(os.path.abspath(path))
+
+    def add_path(self, path, quiet=False, project=None):
+        """Add the project at path (project: the already open one, so unsaved changes count).
+        Returns True when it was added."""
+        norm = self._norm(path)
+        if norm == self.exclude:
+            if not quiet:
+                messagebox.showinfo(self.heading, self.exclude_note, parent=self)
+            return False
+        if any(self._norm(p) == norm for p, _, _, _ in self.sources):
+            return False
+        try:
+            src = project or Project.load(path)
+            mtime = os.path.getmtime(path) if os.path.exists(path) else 0
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            if not quiet:
+                messagebox.showerror(self.heading, "Could not open %s\n\n%s" % (path, e),
+                                     parent=self)
+            return False
+        self.sources.append((path, src.name, src, mtime))
+        return True
+
+    def add(self):
+        folder = self.initialdir
+        if self.sources:
+            folder = os.path.dirname(self.sources[0][0])
+        paths = filedialog.askopenfilenames(
+            parent=self, title=self.ask_title, initialdir=folder or None,
+            filetypes=[("Latchwork project", "*" + EXTENSION), ("All files", "*.*")])
+        if any([self.add_path(p) for p in paths]):
+            self.refresh()
+            self.on_change()
+
+    def remove(self):
+        sel = self.tree.selection()
+        if sel:
+            i = self.tree.index(sel[0])
+            self.sources = [s for s in self.sources if s[0] != sel[0]]
+            self.refresh()
+            rows = self.tree.get_children()
+            if rows:       # keep a row selected, so Remove can be pressed again
+                self.tree.selection_set(rows[min(i, len(rows) - 1)])
+                self.tree.focus(rows[min(i, len(rows) - 1)])
+            self.on_change()
+
+    def _remove_state(self):
+        self.remove_button.state(["!disabled"] if self.tree.selection() else ["disabled"])
+
+    def refresh(self):
+        """Refill the table (the caller's columns from values(project))."""
+        self.sources.sort(key=lambda s: -s[3])    # newest (last saved) first
+        self.tree.delete(*self.tree.get_children())
+        for path, name, src, mtime in self.sources:
+            if path not in self.thumbs:
+                self.thumbs[path] = thumbnail(src.image)
+            self.tree.insert("", "end", iid=path, text="  " + name, image=self.thumbs[path],
+                             values=tuple(self.values(src)) + (short_date(mtime),))
+        self._remove_state()
 
 
 class TreeSort:

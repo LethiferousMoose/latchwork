@@ -109,6 +109,43 @@ class TestPlan(unittest.TestCase):
         self.assertTrue(any(r and r[0] == "UNASSIGNED" for r in rows))
         self.assertTrue(any(r and r[0] == "canvas to cut" and r[1] == "9 x 14 holes" for r in rows))
 
+    def _second(self):
+        """The same image with its own spare %: Rust on 2 holes, Navy on 1, 2 colors unassigned."""
+        p2 = Project.from_image_bytes(make_png(3, 2, RGB_ROWS, 2), "t2.png",
+                                      os.path.join(self.dir, "t2.latchwork"))
+        p2.settings["spare_percent"] = 10
+        p2.assign("#C86432", Yarn("Rust", (180, 80, 40), brand="Herrschners"), "sky.csv",
+                  self.brands)
+        p2.assign("#FFFFFF", self.navy, "palette.csv", self.brands)
+        return p2
+
+    def test_shared_plan_pools_pieces(self):
+        shared = pl.SharedPlan([("A", pl.Plan(self.p)), ("B", pl.Plan(self._second()))])
+        lines = [(l.label, l.count, l.per, l.pieces, l.need()) for l in shared.lines]
+        self.assertEqual(lines, [
+            # each project's own spare first (B: 1 * 1.1 -> 2), then added up
+            ("Navy (Red Heart)", 4, {0: 3, 1: 2}, 5, (5, None, "5 pieces")),
+            # 2 + 3 pieces share one pack of 320 (per rug it would be 2 packs)
+            ("Rust (Herrschners)", 4, {0: 2, 1: 3}, 5, (5, 1, "1 pack"))])
+        self.assertEqual((shared.total_packs, shared.total_pieces_to_cut), (1, 5))
+        self.assertEqual(shared.unassigned, [("A", 1), ("B", 2)])
+        self.assertEqual(pl.SharedPlan([]).lines, [])
+
+    def test_shared_list_csv(self):
+        shared = pl.SharedPlan([("A", pl.Plan(self.p)), ("B", pl.Plan(self._second()))])
+        path = os.path.join(self.dir, "shared.csv")
+        pl.write_shared_list(shared, path)
+        with open(path, encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        self.assertEqual(rows[0], ["yarn", "brand", "hex", "count", "count_with_spare",
+                                   "pack_size", "packs", "pieces_to_cut", "palette", "A", "B"])
+        self.assertEqual(rows[1], ["Navy", "Red Heart", "#14193C", "4", "5", "", "", "5",
+                                   "palette.csv", "3", "2"])
+        self.assertEqual(rows[2], ["Rust", "Herrschners", "#B45028", "4", "5", "320", "1", "",
+                                   "sky.csv", "2", "3"])
+        self.assertIn(["TOTAL", "", "", "8", "10", "", "1", "5", "", "5", "5"], rows)
+        self.assertIn(["B", "10", "2", "3 x 2 holes"], rows)
+
     def test_preview_pixels_and_png(self):
         px = pl.preview_pixels(self.p)
         self.assertEqual(px[3], (255, 255, 255, 255))      # no yarn at all: stays original

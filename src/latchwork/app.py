@@ -15,6 +15,7 @@ from . import plan as pl
 from .colormath import (DEFAULT_COLOR_WEIGHT, gray_for_lightness, match_order, parse_hex,
                        rgb_to_lab, rgb_to_lch, to_hex)
 from .carry_window import CarryDialog
+from .shared_window import SharedListDialog
 from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
@@ -289,6 +290,8 @@ class App:
         file_menu.add_command(label="Export pattern (phone / print)...", accelerator="Ctrl+E",
                               command=self.export_pattern)
         file_menu.add_command(label="Export yarn list...", command=self.export_yarn_list)
+        file_menu.add_command(label="Shared yarn list for several projects...",
+                              command=self.shared_list)
         file_menu.add_command(label="Save preview image...", command=self.save_preview)
         file_menu.add_command(label="Export before/after...", command=self.save_before_after)
         file_menu.add_separator()
@@ -1268,6 +1271,10 @@ class App:
         if path:
             messagebox.showinfo("Export yarn list", "Saved %d yarn%s to\n%s" % (
                 len(plan.lines), "" if len(plan.lines) == 1 else "s", path))
+
+    def shared_list(self):
+        """File menu: the yarns several projects need together (works without a project)."""
+        SharedListDialog(self.root, self)
 
     def export_pattern(self):
         if not self._need_project():

@@ -148,6 +148,8 @@ Settings are per project (Plan tab → Change…), with "Also use these for new 
 
 File menu: export the yarn list (CSV) and the yarn-color preview (PNG, one pixel per knot).
 
+Shared yarn list for several projects (File menu): add the rugs you're buying for and see what they need together. Each project's own spare % is added, then the pieces are pooled before rounding up to packs, so one pack can go to more than one rug. Unassigned colors aren't counted. Export CSV... saves the list with one column per project. The projects aren't changed.
+
 Export before/after: the original next to the yarn preview, as one PNG to share. Each picture is zoomed by a whole number to about 500 pixels (so pixel art stays crisp), in a light gray frame; art wider than tall is stacked, original on top. Unassigned colors show their suggested yarn, as in the preview.
 """),
     ("Pattern on the phone", """
