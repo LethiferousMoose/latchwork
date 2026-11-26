@@ -20,6 +20,15 @@ def app_folder():
 
 
 ROOT = app_folder()
+
+
+def translocated(executable=None):
+    """True when macOS runs a downloaded, unsigned build from a hidden read-only copy (App
+    Translocation): data/ and settings/ aren't next to it there, so the app can't work."""
+    return bool(getattr(sys, "frozen", False) and sys.platform == "darwin"
+                and "/AppTranslocation/" in (executable or sys.executable))
+
+
 DATA_DIR = os.path.join(ROOT, "data")
 DEFAULT_PALETTE = os.path.join(DATA_DIR, "palette.csv")
 SETTINGS = os.path.join(ROOT, "settings", "latchwork_settings.json")  # per-user, not in git

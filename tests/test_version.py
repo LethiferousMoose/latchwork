@@ -47,6 +47,18 @@ class TestVersion(unittest.TestCase):
                 self.assertEqual(settings.app_folder(), os.path.join(os.path.abspath(os.sep), "apps", "Latchwork"))
         self.assertTrue(os.path.isfile(os.path.join(settings.app_folder(), "latchwork.py")))
 
+    def test_translocated(self):
+        exe = "Latchwork.app/Contents/MacOS/Latchwork"
+        hidden = "/private/var/folders/xy/T/AppTranslocation/1A2B/d/" + exe
+        moved = "/Users/me/Latchwork/" + exe
+        self.assertFalse(settings.translocated(hidden))     # from source: never
+        with mock.patch.object(sys, "frozen", True, create=True):
+            with mock.patch.object(sys, "platform", "darwin"):
+                self.assertTrue(settings.translocated(hidden))
+                self.assertFalse(settings.translocated(moved))
+            with mock.patch.object(sys, "platform", "win32"):
+                self.assertFalse(settings.translocated(hidden))
+
 
 if __name__ == "__main__":
     unittest.main()

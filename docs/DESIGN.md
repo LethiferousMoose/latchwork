@@ -372,6 +372,9 @@ default size is used.
   Unsigned: SmartScreen warns once; on macOS a downloaded unsigned app is blocked and run
   from a read-only randomized copy (App Translocation), so the README has the folder's
   quarantine flag removed once (`xattr -dr com.apple.quarantine`), which fixes both.
+  If someone skips that, the app sees it's running from the hidden copy (`/AppTranslocation/`
+  in its path, `settings.translocated()`) and says how to fix it, instead of starting with
+  no palette.
 - The build writes `_build.py` (version, commit, UTC date; git-ignored, removed after the
   build) so the packaged app knows all that without git.
 - Help > About shows the version (without the `+g<commit>` part) and the build line ("Built

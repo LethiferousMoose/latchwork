@@ -21,7 +21,7 @@ from .help import TOPICS as help_topics, open_help
 from .palette_window import PaletteWindow
 from .project import EXTENSION, MANY_COLORS, Project
 from .project_panel import ProjectPanel
-from .settings import DATA_DIR, DEFAULT_PALETTE, read_settings, write_settings
+from .settings import DATA_DIR, DEFAULT_PALETTE, read_settings, translocated, write_settings
 from .widgets import (BG, UI_FONT, ColorPanel, FitText, StatCard, Tooltip,
                       describe_delta_L, free_name)
 
@@ -1495,8 +1495,22 @@ class App:
             c.tag_bind(tag, self._right_click, lambda e, i=i: self.mark_candidate(i))
 
 
+TRANSLOCATED = (
+    "Latchwork is running from a temporary read-only copy, so it can't find its palette or "
+    "save settings. macOS does this with downloaded apps that aren't signed.\n\n"
+    "To fix it once, open Terminal and type this, with a space at the end:\n\n"
+    "xattr -dr com.apple.quarantine\n\n"
+    "Then drag the Latchwork folder onto the Terminal window, press Return and open Latchwork "
+    "again.")
+
+
 def main():
     root = tk.Tk()
+    if translocated():   # macOS ran a downloaded build from a hidden copy: say how to fix it
+        root.withdraw()
+        messagebox.showerror("Latchwork", TRANSLOCATED)
+        root.destroy()
+        return
     path = remembered_palette()
     app = App(root, path, remember=True)
     if app.palette_path is None and path != DEFAULT_PALETTE:
