@@ -28,6 +28,9 @@ tidied so others can use it too. Keep it simple.
 - `settings/`: per-user settings (git-ignored).
 - `tests/`: `python -m unittest discover -s tests` (adds `src/` to the path).
 - `tools/export_palette.py`: the GIMP 2.10 script that exported the original palette.
+- `tools/build.py` + `.github/workflows/`: PyInstaller builds (a build tool, not an app
+  dependency), CI, and the Release workflow. The git tag is the version (`version.py`); I start
+  releases from GitHub, so never create or push tags.
 - `docs/images/`: README screenshots, made from a neutral demo image (not my rug samples).
   When a change visibly alters a screen shown there (main window, Plan tab, palette manager,
   help, carry-over dialog, larger view, phone and desktop pattern), retake that screenshot the

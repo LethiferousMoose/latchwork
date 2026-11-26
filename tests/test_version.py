@@ -11,14 +11,30 @@ from latchwork import settings, version  # noqa: E402
 
 
 class TestVersion(unittest.TestCase):
-    def test_semver(self):
-        self.assertRegex(version.VERSION, r"^\d+\.\d+\.\d+$")
+    def test_from_describe(self):
+        f = version.from_describe
+        self.assertEqual(f("v1.2.0-0-gabc1234"), "1.2.0")
+        self.assertEqual(f("v1.2.0-3-gabc1234"), "1.2.1.dev3+gabc1234")
+        self.assertEqual(f("v1.2.0-3-gabc1234-dirty"), "1.2.1.dev3+gabc1234.dirty")
+        self.assertEqual(f("v1.2.0-0-gabc1234-dirty"), "1.2.0+gabc1234.dirty")
+        self.assertEqual(f("v10.20.30-12-gdeadbeef"), "10.20.31.dev12+gdeadbeef")
+        self.assertEqual(f(None, 42, "abc1234"), "0.0.1.dev42+gabc1234")   # no release yet
+        self.assertEqual(f(None, 42, "abc1234.dirty"), "0.0.1.dev42+gabc1234.dirty")
+        self.assertEqual(f("release-1", 5, "abc1234"), "0.0.1.dev5+gabc1234")  # not a v tag
 
-    def test_build_from_source(self):
-        text = version.build()
-        self.assertTrue(re.match(r"^(From source|Built )", text), text)
+    def test_bump(self):
+        self.assertEqual(version.bump(None, "major"), "1.0.0")    # the first release
+        self.assertEqual(version.bump("1.2.3", "major"), "2.0.0")
+        self.assertEqual(version.bump("1.2.3", "minor"), "1.3.0")
+        self.assertEqual(version.bump("1.2.3", "patch"), "1.2.4")
+        with self.assertRaises(ValueError):
+            version.bump("1.2.3", "huge")
+
+    def test_from_source(self):
+        self.assertTrue(re.match(r"^(\d+\.\d+\.\d+|unknown)", version.version()))
+        self.assertTrue(re.match(r"^(From source|Built )", version.build()))
         with mock.patch.object(version, "git", return_value=None):
-            self.assertEqual(version.build(), "From source")
+            self.assertEqual((version.version(), version.build()), ("unknown", "From source"))
 
     def test_frozen_app_folder(self):
         with mock.patch.object(sys, "frozen", True, create=True):

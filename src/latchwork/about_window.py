@@ -4,7 +4,7 @@ import tkinter as tk
 import webbrowser
 from tkinter import ttk
 
-from .version import REPO_URL, VERSION, build
+from .version import REPO_URL, build, version
 from .widgets import BG, SMALL_FONT, UI_FONT, tip
 
 LICENSE = "MIT License, © 2026 Tim Biggin"
@@ -20,7 +20,8 @@ class AboutDialog(tk.Toplevel):
 
         tk.Label(self, text="Latchwork", font=("Segoe UI", 16, "bold"), bg=BG,
                  anchor="w").pack(fill="x")
-        tk.Label(self, text="Version " + VERSION, font=("Segoe UI", 11), bg=BG,
+        # "+g<commit>" is left off the version: the build line below names the commit
+        tk.Label(self, text="Version " + version().split("+")[0], font=("Segoe UI", 11), bg=BG,
                  anchor="w").pack(fill="x")
         tk.Label(self, text=build(), font=SMALL_FONT, fg="#555", bg=BG,
                  anchor="w").pack(fill="x")
