@@ -18,10 +18,10 @@ jobs:
         os: [windows-latest, macos-latest, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0          # tags, for the version
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - name: Tk libraries (Linux)
@@ -31,7 +31,7 @@ jobs:
       - id: build
         shell: bash
         run: python tools/build.py ${{ inputs.version && format('--version {0}', inputs.version) || '' }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: latchwork-${{ runner.os }}
           path: ${{ steps.build.outputs.archive }}
