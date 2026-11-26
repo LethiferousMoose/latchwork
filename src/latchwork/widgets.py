@@ -235,6 +235,58 @@ class FitText:
             self.widget.config(text=text)
 
 
+class FitColumn:
+    """FitText for a Treeview column: a cell wider than its column is cut with "...", and the
+    whole text shows on hover while it's cut. It re-fits when the table or column is resized.
+    tip(iid) -> (title, rows) for the hover instead of the plain text (e.g. one row per item).
+    Use set(iid, text) instead of tree.set()."""
+
+    CHROME = 12   # px of a cell that aren't room for text (padding)
+
+    def __init__(self, tree, column, tip=None):
+        self.tree, self.column, self.tip = tree, column, tip
+        self.font = tkfont.Font(tree, font=ttk.Style(tree).lookup(
+            tree.cget("style") or "Treeview", "font") or "TkDefaultFont")
+        self.texts, self.cut, self.job = {}, set(), None
+        for event in ("<Configure>", "<ButtonRelease-1>"):   # window or column resized
+            tree.bind(event, lambda e: self._later(), add="+")
+        Tooltip(tree, self._content)
+
+    def set(self, iid, text):
+        self.texts[iid] = text
+        self._fit(iid, self._room())
+
+    def _room(self):
+        return self.tree.column(self.column, "width") - self.CHROME
+
+    def _fit(self, iid, room):
+        text = self.texts[iid]
+        cut = room > 20 and self.font.measure(text) > room
+        (self.cut.add if cut else self.cut.discard)(iid)
+        self.tree.set(iid, self.column, fit_text(text, self.font, room) if cut else text)
+
+    def _later(self):
+        if not self.job:
+            self.job = self.tree.after_idle(self.fit)
+
+    def fit(self):
+        self.job = None
+        room = self._room()
+        for iid in [i for i in self.texts if not self.tree.exists(i)]:
+            del self.texts[iid]
+            self.cut.discard(iid)
+        for iid in self.texts:
+            self._fit(iid, room)
+
+    def _content(self, event):
+        iid = self.tree.identify_row(event.y)
+        col = self.tree.identify_column(event.x)
+        here = "#%d" % (list(self.tree["columns"]).index(self.column) + 1)
+        if iid not in self.cut or col != here:
+            return None
+        return self.tip(iid) if self.tip else (self.texts[iid], [])
+
+
 COMBO_CHROME = 26   # px of a Combobox taken by its padding and arrow
 
 

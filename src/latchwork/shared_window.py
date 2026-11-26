@@ -4,8 +4,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from . import plan as pl
-from .widgets import (BG, SMALL_FONT, UI_FONT, ProjectList, TreeSort, free_name, names,
-                      swatch_image, vscroll)
+from .widgets import (BG, SMALL_FONT, UI_FONT, FitColumn, ProjectList, TreeSort, free_name,
+                      names, swatch_image, vscroll)
 
 HEADING = "Shared yarn list"
 
@@ -64,6 +64,9 @@ class SharedListDialog(tk.Toplevel):
             self.tree.column(col, width=width, minwidth=60, stretch=stretch, anchor=anchor)
         vscroll(body, self.tree)
         line = lambda i: self.shared.lines[int(i)]
+        # many projects: "Used in" is cut with "...", and the hover lists them all
+        self.used = FitColumn(self.tree, "used", tip=lambda i: (
+            "Used in", [([], self.shared.names[k]) for k in sorted(line(i).per)]))
         self.sort = TreeSort(self.tree, {
             "#0": (lambda i: line(i).label.lower(), False),
             "used": (lambda i: len(line(i).per), True),
@@ -103,7 +106,8 @@ class SharedListDialog(tk.Toplevel):
                 self.images[l.hex] = swatch_image([l.hex], w=24)
             used = [self.shared.names[k] for k in sorted(l.per)]
             self.tree.insert("", "end", iid=str(i), text="  " + l.label, image=self.images[l.hex],
-                             values=(", ".join(used), format(l.pieces, ","), l.need()[2]))
+                             values=("", format(l.pieces, ","), l.need()[2]))
+            self.used.set(str(i), ", ".join(used))
         self.sort.apply()
         self.update_view()
 
