@@ -144,7 +144,11 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(rows[2], ["Rust", "Herrschners", "#B45028", "4", "5", "320", "1", "",
                                    "sky.csv", "2", "3"])
         self.assertIn(["TOTAL", "", "", "8", "10", "", "1", "5", "", "5", "5"], rows)
-        self.assertIn(["B", "10", "2", "3 x 2 holes"], rows)
+        self.assertIn(["project", "spare_percent", "unassigned_colors", "finished_size",
+                       "finished_in", "canvas_to_cut", "canvas_in", "holes_per_inch"], rows)
+        # 3 x 2 holes; default borders 3 + 3 sides, 8 top + 4 bottom; 3.75 holes per inch
+        self.assertIn(["B", "10", "2", "3 x 2 holes", "0.8 x 0.5 in", "9 x 14 holes",
+                       "2.4 x 3.7 in", "3.75"], rows)
 
     def test_preview_pixels_and_png(self):
         px = pl.preview_pixels(self.p)

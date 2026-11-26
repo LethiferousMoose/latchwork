@@ -259,6 +259,8 @@ A `.latchwork` file is readable JSON:
   rounded up to packs once: `packs = ceil(Σ ceil(knots × (1 + spare%)) / pack size)`, since one
   pack's leftovers go into the next rug. The same yarn means the same name, brand and hex, as
   within a Plan; the pack size is the open palette's (else the first project's snapshot).
+  Spare % and canvas belong to each project, so they're per project (the project list, and
+  the CSV's project section: finished size, canvas to cut, holes per inch), never pooled.
   With many projects, *Used in* is cut with "…" and the hover lists them all
   (`FitColumn`, FitText for a table column). Unassigned colors aren't counted and are named
   below the table. The CSV has the yarn list's

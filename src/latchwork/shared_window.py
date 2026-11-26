@@ -4,8 +4,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 from . import plan as pl
-from .widgets import (BG, SMALL_FONT, UI_FONT, FitColumn, ProjectList, TreeSort, free_name,
-                      names, swatch_image, vscroll)
+from .widgets import (BG, SMALL_FONT, UI_FONT, FitColumn, ProjectList, Tooltip, TreeSort,
+                      free_name, names, swatch_image, vscroll)
 
 HEADING = "Shared yarn list"
 
@@ -35,11 +35,14 @@ class SharedListDialog(tk.Toplevel):
                  wraplength=680).pack(fill="x")
         open_path = app.project.path if app.project else None
         self.projects = ProjectList(
-            self, [("assigned", "Assigned", 90), ("spare", "Spare", 70)], self._project_values,
+            self, [("assigned", "Assigned", 80), ("spare", "Spare", 60),
+                   ("canvas", "Canvas", 100)], self._project_values,
             self.rebuild, HEADING, "Add which projects?",
             initialdir=os.path.dirname(open_path) if open_path else None)
+        self.projects.tree.column("#0", width=170)   # it stretches; room for Add project...
         self.projects.pack(fill="x", pady=(10, 0))
         self.projects.tree.tag_configure("attention", background="#FFF4CC")
+        Tooltip(self.projects.tree, self._canvas_tip)
 
         # bottom up, so the table takes whatever height is left
         self.btns = tk.Frame(self, bg=BG)
@@ -91,8 +94,28 @@ class SharedListDialog(tk.Toplevel):
     @staticmethod
     def _project_values(project):
         n = len(project.colors)
-        spare = float(project.settings.get("spare_percent", 0) or 0)
-        return ("%d of %d" % (sum(1 for c in project.colors if c.confirmed), n), "%g%%" % spare)
+        plan = pl.Plan(project)      # sizes only: no pack sizes needed
+        return ("%d of %d" % (sum(1 for c in project.colors if c.confirmed), n),
+                "%g%%" % plan.spare, "%.1f × %.1f in" % plan.canvas_in)
+
+    def _canvas_tip(self, event):
+        """The Canvas cell's hover: canvas to cut and finished size, in inches and holes."""
+        t = self.projects.tree
+        row = t.identify_row(event.y)
+        if not row or t.identify_column(event.x) != "#3":    # assigned, spare, canvas
+            return None
+        plan = next((p for (path, _, _, _), p in zip(self.projects.sources, self.shared.plans)
+                     if path == row), None)
+        if plan is None:
+            return None
+        cw, ch = plan.canvas_cells
+        cv = plan.canvas
+        return ("Canvas", [
+            ([], "To cut: %.1f × %.1f in (%d × %d holes)" % (plan.canvas_in + (cw, ch))),
+            ([], "Finished: %.1f × %.1f in (%d × %d holes)" % (plan.finished_in
+                                                              + (plan.width, plan.height))),
+            ([], "%g holes/inch · borders: %d each side, %d top, %d bottom" % (
+                cv["holes_per_inch"], cv["border_side"], cv["border_top"], cv["border_bottom"]))])
 
     def rebuild(self):
         sources = self.projects.sources

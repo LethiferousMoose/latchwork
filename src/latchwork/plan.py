@@ -226,7 +226,8 @@ class SharedPlan:
 
 def write_shared_list(shared, path):
     """The yarn-list CSV for several projects: the combined need, then one column per project
-    (its pieces including its spare %), and the projects at the bottom."""
+    (its pieces including its spare %), and the projects at the bottom with their sizes and
+    canvas (each project's own canvas settings)."""
     folder = os.path.dirname(os.path.abspath(path))
     fd, tmp = tempfile.mkstemp(prefix=".latchwork-", suffix=".tmp", dir=folder)
     try:
@@ -247,10 +248,16 @@ def write_shared_list(shared, path):
                         shared.total_pieces_to_cut, ""]
                        + [sum(l.per.get(i, 0) for l in shared.lines) for i in range(k)])
             w.writerow([])
-            w.writerow(["project", "spare_percent", "unassigned_colors", "size"])
+            w.writerow(["project", "spare_percent", "unassigned_colors", "finished_size",
+                        "finished_in", "canvas_to_cut", "canvas_in", "holes_per_inch"])
             for name, plan in zip(shared.names, shared.plans):
+                fw, fh_ = plan.finished_in
+                cw, ch = plan.canvas_cells
+                ciw, cih = plan.canvas_in
                 w.writerow([name, "%g" % plan.spare, len(plan.unassigned),
-                            "%d x %d holes" % (plan.width, plan.height)])
+                            "%d x %d holes" % (plan.width, plan.height),
+                            "%.1f x %.1f in" % (fw, fh_), "%d x %d holes" % (cw, ch),
+                            "%.1f x %.1f in" % (ciw, cih), "%g" % plan.canvas["holes_per_inch"]])
         os.replace(tmp, path)
     except BaseException:
         if os.path.exists(tmp):
