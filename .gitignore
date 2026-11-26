@@ -1,6 +1,11 @@
 __pycache__/
 *.pyc
 
+# build stamp and output (tools/build.py)
+src/latchwork/_build.py
+build/
+dist/
+
 # GIMP working files (keep out of git; palette.csv is the source of truth)
 *.xcf
 

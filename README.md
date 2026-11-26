@@ -30,6 +30,24 @@ and export a pattern you can read on your phone while hooking.
 
 ## Getting started
 
+### Download (nothing to install)
+
+Get the zip for your system from the
+[latest release](https://github.com/LethiferousMoose/latchwork/releases/latest), unzip it
+anywhere and run **Latchwork** inside. The folder is portable: your palette (`data/`) and
+settings (`settings/`) live next to the program, so to update, unzip the new version and copy
+those two folders over.
+
+- **Windows:** the builds aren't signed, so SmartScreen may say "Windows protected your PC".
+  Click **More info → Run anyway** (once).
+- **macOS** (Apple Silicon): the builds aren't signed, so macOS blocks them and would run the
+  app from a hidden read-only copy where it can't find its palette. Once, after unzipping,
+  open Terminal, type `xattr -dr com.apple.quarantine ` (with the space), drag the unzipped
+  folder onto the window and press Return. Then open **Latchwork.app** as usual.
+- **Linux:** unpack the `.tar.gz` and run `Latchwork` in the folder.
+
+### Or run from source
+
 You need **Python 3.8 or newer with Tkinter**. There is nothing else to install.
 
 - **Windows:** install Python from [python.org](https://www.python.org/downloads/) (Tkinter is
@@ -127,8 +145,22 @@ data/               yarn palettes (CSV)
 settings/           your settings, created on first run (not in git)
 docs/               design notes and screenshots
 tests/              unit tests: python -m unittest discover -s tests
-tools/              the GIMP script that exported the original palette
+tools/              build.py (portable builds), the GIMP palette export script
+.github/workflows/  CI (tests and builds) and Release
 ```
+
+## Versions and releases
+
+The git tag is the version: releases are tagged `v1.2.0`, and anything in between shows as a
+dev version of the next patch, like `1.2.1.dev3` (Help → About shows which one you have).
+To release, run **Actions → Release → Run workflow** on GitHub and pick patch, minor or major
+(or `gh workflow run release.yml -f bump=minor`). It runs the tests, builds Windows, macOS and
+Linux, and only then tags the commit and publishes the release with the builds attached.
+Every push to main and every pull request also runs the tests and the builds (downloadable
+from the run's Artifacts).
+
+To build locally: `pip install -r tools/build-requirements.txt` (PyInstaller, best in a
+virtual environment), then `python tools/build.py`; the zip lands in `dist/`.
 
 ## More
 

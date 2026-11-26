@@ -1,0 +1,38 @@
+# The portable builds for Windows, macOS and Linux (tools/build.py), uploaded as workflow
+# artifacts. Called by CI (dev versions from git) and Release (the release's version).
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build as (empty = from git, e.g. 1.0.1.dev3+gabc1234)
+        type: string
+        default: ""
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # ubuntu-22.04: the oldest supported runner, so the Linux build runs on older systems too
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0          # tags, for the version
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Tk libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libtk8.6
+      - run: python -m pip install -r tools/build-requirements.txt
+      - id: build
+        shell: bash
+        run: python tools/build.py ${{ inputs.version && format('--version {0}', inputs.version) || '' }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: latchwork-${{ runner.os }}
+          path: ${{ steps.build.outputs.archive }}
+          if-no-files-found: error

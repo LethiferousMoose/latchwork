@@ -345,6 +345,42 @@ first, Pack largest first, Status retired first), and the same for the Brands li
 place whose title bar is no longer on any screen (a monitor unplugged) is ignored, and the
 default size is used.
 
+## Versions and builds (`version.py`, `tools/build.py`, `.github/workflows/`)
+
+- **The git tag is the version**, like Gradle's axion-release: nothing in the code holds it.
+  SemVer: features bump the middle number, fixes the last, and the first only if older
+  versions can't open new project files. `git describe --tags --long --dirty --match v*`
+  gives it: on `v1.2.0` it's `1.2.0`; 3 commits later `1.2.1.dev3+gabc1234` (PEP 440, a dev
+  version of the next patch); uncommitted changes add `.dirty`; before the first tag
+  `0.0.1.devN` (N = all commits). Source without git (GitHub's source zip) is "unknown".
+- **Release** (`release.yml`, started by hand with patch/minor/major): checks it's on main,
+  runs the tests, works out the version (`build.py next <part>`: the last `v*` tag raised;
+  refuses a commit that's already released), builds all three systems as that version, and
+  only when they all succeed creates the tag and the GitHub Release with the builds attached
+  (`gh release create --target <sha>`), so a failed run leaves nothing to clean up. No one
+  pushes tags by hand. **CI** (`ci.yml`, pushes to main and pull requests) runs the tests on
+  Python 3.8 and 3.13 on all three systems, then the same builds as dev versions (run
+  artifacts). Both call `build.yml`.
+- **Builds** (`tools/build.py`, PyInstaller as a build tool only, pinned in
+  `tools/build-requirements.txt`): one-folder, windowed, from a generated entry script
+  (`latchwork.py` shares the package's name, so PyInstaller would bundle the script instead of
+  the package). The result is a portable folder laid out like the repository: the program,
+  `data/` (the palette files, not photos), an empty `settings/`, README and LICENSE, zipped
+  (macOS with `ditto` to keep the app's symlinks; Linux as `.tar.gz` to keep permissions).
+  `settings.app_folder()` finds `data/` and `settings/` next to the program (on macOS next to
+  Latchwork.app), so nothing about where files live differs from running from source.
+  Unsigned: SmartScreen warns once; on macOS a downloaded unsigned app is blocked and run
+  from a read-only randomized copy (App Translocation), so the README has the folder's
+  quarantine flag removed once (`xattr -dr com.apple.quarantine`), which fixes both.
+  If someone skips that, the app sees it's running from the hidden copy (`/AppTranslocation/`
+  in its path, `settings.translocated()`) and says how to fix it, instead of starting with
+  no palette.
+- The build writes `_build.py` (version, commit, UTC date; git-ignored, removed after the
+  build) so the packaged app knows all that without git.
+- Help > About shows the version (without the `+g<commit>` part) and the build line ("Built
+  Nov 25, 2026 from abc1234", or "From source, commit abc1234 with local changes"), Python and
+  Tk versions (for bug reports), the repository link and the license.
+
 ## Future possibilities
 
 Not planned, but noted so the reasoning isn't lost:

@@ -1,0 +1,65 @@
+# Make a release: Actions > Release > Run workflow (or: gh workflow run release.yml -f bump=minor).
+# The version is the last v* tag raised by the chosen part (the first release: major -> 1.0.0).
+# Tests, builds all three systems, and only then creates the tag and the GitHub Release with the
+# builds attached, so a failed run leaves no tag behind.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to raise (major.minor.patch)
+        type: choice
+        options: [patch, minor, major]
+        default: minor
+
+permissions:
+  contents: write
+
+concurrency: release
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - name: Releases come from main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Run the release from main, not ${{ github.ref_name }}."
+          exit 1
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: python -m unittest discover -s tests
+      - id: next
+        run: |
+          version=$(python tools/build.py next ${{ inputs.bump }})
+          echo "Releasing v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: version
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.version.outputs.version }}
+
+  release:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Tag and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" dist/* --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "Latchwork $VERSION" --generate-notes

@@ -20,14 +20,17 @@ tidied so others can use it too. Keep it simple.
 - `latchwork.py`: launcher (checks Python/Tkinter, adds `src/` to the path).
   `latchwork.bat` / `.command` / `.sh` wrap it per OS (`.gitattributes` keeps their line endings).
 - `src/latchwork/`: the package, relative imports. `app.py` is the main window; `colormath`,
-  `palette`, `project`, `plan`, `pattern`, `pixelart`, `settings` have no Tk (`photos` is the Tk image side);
-  `palette_window`, `project_panel`, `carry_window`, `shared_window`, `widgets`, `help` are Tk UI (shared widgets, colors and
+  `palette`, `project`, `plan`, `pattern`, `pixelart`, `settings`, `version` have no Tk (`photos` is the Tk image side);
+  `palette_window`, `project_panel`, `carry_window`, `shared_window`, `about_window`, `widgets`, `help` are Tk UI (shared widgets, colors and
   fonts live in `widgets`). `pattern_template.html` is the phone pattern.
 - `data/`: palettes (`palette.csv` + `palette.brands.csv`, my real yarns). Yarn photos go in
   `palette.swatches/` next to a palette (git-ignored: shop swatch photos aren't ours to share).
 - `settings/`: per-user settings (git-ignored).
 - `tests/`: `python -m unittest discover -s tests` (adds `src/` to the path).
 - `tools/export_palette.py`: the GIMP 2.10 script that exported the original palette.
+- `tools/build.py` + `.github/workflows/`: PyInstaller builds (a build tool, not an app
+  dependency), CI, and the Release workflow. The git tag is the version (`version.py`); I start
+  releases from GitHub, so never create or push tags.
 - `docs/images/`: README screenshots, made from a neutral demo image (not my rug samples).
   When a change visibly alters a screen shown there (main window, Plan tab, palette manager,
   help, carry-over dialog, larger view, phone and desktop pattern), retake that screenshot the
