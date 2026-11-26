@@ -5,7 +5,7 @@ import webbrowser
 from tkinter import ttk
 
 from .version import REPO_URL, VERSION, build
-from .widgets import BG, SMALL_FONT, UI_FONT
+from .widgets import BG, SMALL_FONT, UI_FONT, tip
 
 LICENSE = "MIT License, © 2026 Tim Biggin"
 
@@ -37,10 +37,14 @@ class AboutDialog(tk.Toplevel):
             tk.Label(grid, text=value, font=UI_FONT, bg=BG, anchor="w").grid(row=r, column=1,
                                                                             sticky="w")
 
-        link = tk.Label(self, text=REPO_URL.split("://", 1)[1], font=UI_FONT + ("underline",),
-                        fg="#0B5FB0", bg=BG, cursor="hand2", anchor="w")
-        link.pack(fill="x", pady=(10, 0))
+        # a named link, underlined while pointed at; the address shows on hover
+        link = tk.Label(self, text="Latchwork on GitHub ↗", font=UI_FONT, fg="#0B5FB0",
+                        bg=BG, cursor="hand2")
+        link.pack(anchor="w", pady=(10, 0))
         link.bind("<Button-1>", lambda e: webbrowser.open(REPO_URL))
+        link.bind("<Enter>", lambda e: link.config(font=UI_FONT + ("underline",)), add="+")
+        link.bind("<Leave>", lambda e: link.config(font=UI_FONT), add="+")
+        tip(link, REPO_URL)
         tk.Label(self, text=LICENSE, font=SMALL_FONT, fg="#555", bg=BG,
                  anchor="w").pack(fill="x")
 
